@@ -116,21 +116,24 @@ scenes.title = {
     if (hit('act')) this.start();
   },
   start() {
-    irisTo(60, 134, () => go(SAVE && SAVE.created ? 'prologue' : 'creator'));
+    // пролог показываем один раз; «Продолжить» ведёт сразу в подъезд
+    irisTo(60, 140, () => go(!(SAVE && SAVE.created) ? 'creator' : (SAVE.seenIntro || SAVE.tours.t1) ? 'tour' : 'prologue', { tour: 't1' }));
   },
   draw(dt) {
-    drawNight(dt, 0);
+    drawNight(dt);
     // название слева, на фоне неба
     const tw = textW(L(UI.title), 16);
-    text(L(UI.title), 18, 30, { size: 16, col: '#f4f3ee', shadow: '#0b0c10' });
-    rect(18, 50, tw, 2, '#ff7a4a');
-    text(L(UI.subtitle), 18, 58, { col: '#f2c94c', shadow: '#0b0c10', size: 6 });
-    text(L(UI.by), 18, 72, { col: '#9fd9c2', size: 6, shadow: '#0b0c10' });
-    if (SAVE && SAVE.name) text(L(UI.hello) + SAVE.name + '!', 18, 112, { col: '#cfd6e4', shadow: '#0b0c10', size: 6 });
+    text(L(UI.title), 18, 22, { size: 16, col: '#f4f3ee', shadow: '#0b0c10' });
+    rect(18, 42, tw, 2, '#ff6a45'); rect(18, 44, tw, 1, '#7a2a1e');
+    text(L(UI.subtitle), 18, 52, { col: '#f2c94c', shadow: '#0b0c10', size: 6 });
+    text(L(UI.by), 18, 64, { col: '#9fd9c2', size: 6, shadow: '#0b0c10' });
     if (this.settings) return this.drawSettings();
-    const bw = Math.max(textW(L(UI.cont)), textW(L(UI.settings))) + 16;
-    if (button(SAVE && SAVE.created ? L(UI.cont) : L(UI.play), 0, 126, 'primary', { left: 18, w: bw })) this.start();
-    if (button(L(UI.settings), 0, 148, 'alt', { left: 18, w: bw })) { this.settings = true; this.sure = false; }
+    // панель меню в рамке
+    const bw = Math.max(textW(L(UI.cont)), textW(L(UI.settings)), 96) + 16, py = SAVE && SAVE.name ? 112 : 124;
+    frameBox(12, py, bw + 12, 196 - py - 8);
+    if (SAVE && SAVE.name) text(L(UI.hello) + SAVE.name + '!', 18, py + 7, { col: '#cfd6e4', size: 6 });
+    if (button(SAVE && SAVE.created ? L(UI.cont) : L(UI.play), 0, 140, 'primary', { left: 18, w: bw })) this.start();
+    if (button(L(UI.settings), 0, 162, 'alt', { left: 18, w: bw })) { this.settings = true; this.sure = false; }
   },
   drawSettings() {
     rect(0, 0, W, H, 'rgba(11,12,16,.55)');
@@ -216,29 +219,32 @@ scenes.creator = {
    ============================================================ */
 scenes.prologue = {
   enter() {
-    this.t = 0; setTouch({ act: L(UI.next) });
-    if (SAVE.tours.t1 && SAVE.tours.t1.done) { this.skip = true; return; }
-    this.skip = false; this.run();
+    this.t = 0; this.hx = -20; this.goal = 150; this.dir = 1; setTouch({ act: L(UI.next) });
+    this.run();
   },
+  focus() { return { x: W / 2, y: 150 }; },
   async run() {
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => { this.arrived = r; });
     dlgOpen('E-KNOT', () => EKNOT_PORT, 900);
     await say(L(UI.pushOSI));
     dlgOpen(SAVE.name, e => portrait(SAVE.look, e), 420);
     await say(L(UI.heroIntro1), 'sad');
     await say(L(UI.heroIntro2), 'happy');
     dlgClose();
-    irisTo(W / 2, 150, () => go('tour', { tour: 't1' }));
+    SAVE.seenIntro = true; persist();
+    this.goal = STREET_DOOR_X; await new Promise(r => { this.arrived = r; });
+    irisTo(STREET_DOOR_X, 160, () => go('tour', { tour: 't1' }));
   },
   update(dt) {
-    this.t += dt;
-    if (this.skip) { this.skip = false; irisTo(W / 2, 150, () => go('tour', { tour: 't1' })); return; }
-    dlgUpdate(dt);
+    this.t += dt; dlgUpdate(dt);
+    const d = this.goal - this.hx;
+    if (Math.abs(d) > .5) { this.hx += Math.sign(d) * Math.min(Math.abs(d), dt * .07); this.moving = true; }
+    else if (this.moving) { this.moving = false; const a = this.arrived; this.arrived = null; a && a(); }
   },
   draw(dt) {
-    drawNight(dt, 0);
-    const fr = ['idle0', 'idle1'][Math.floor(this.t / 500) % 2];
-    sprite(personSprite(SAVE.look, fr), 100, 196 - PH);
+    drawStreet(dt, this.t);
+    const fr = this.moving ? 'walk' + (Math.floor(this.t / 130) % 4) : 'idle' + (Math.floor(this.t / 500) % 2);
+    sprite(personSprite(SAVE.look, fr), Math.round(this.hx) - 9, STREET_GROUND - PH);
     dlgDraw();
   },
 };
@@ -285,7 +291,7 @@ scenes.tour = {
     this.camY = clamp(this.hero.y - 165, 0, this.WH - H);
     this.talker = { floor: tour.talkerFloor, x: 112, done: false, look: { skin: '#d6a07a', hair: 'short', hairCol: '#3a2a20', top: 'hoodie', topCol: '#3b3f55', pants: '#2b2a33', hat: 'cap', capCol: '#3f6f8c', beard: true } };
     this.helper = { state: 'hidden', floor: 2, x: 104, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
-    this.rats = [{ x: 150, dir: 1, t: 0 }, { x: 300, dir: -1, t: 300 }];
+    this.rats = [{ x: 170, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 300, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
     this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
     API.tourStart(tour.id).then(r => this.run = r);
     setTimeout(() => { toast('E-KNOT', L(UI.tut1)); setTimeout(() => !this.over && toast('E-KNOT', L(UI.tut2)), 4500); }, 600);
@@ -312,12 +318,16 @@ scenes.tour = {
     if (this.helper.state === 'busy' && this.minute >= this.helper.doneAt) this.helperDone();
     if (this.helper.state === 'hidden' && this.signatures() >= T.helperAfter) this.helper.state = 'shown';
     // крысы
-    for (const r of this.rats) { r.t += dt; r.x += r.dir * dt * .09; if (r.x < 96 || r.x > 384) r.dir *= -1;
-      if (h.floor === 1 && Math.abs(h.x - r.x) < 26) r.dir = h.x < r.x ? 1 : -1; }
+    this.updateRats(dt);
     if (this.racAnim) { this.racAnim.t += dt; if (this.racAnim.t > 1800) this.racAnim = null; }
 
     if (this.ballot) { if (hit('ballot') || hit('back') || hit('act')) this.ballot = false; return; }
-    if (this.busy) { this.updateCam(dt); return; }
+    if (this.busy) {
+      if (h.goal != null) { const d = h.goal - h.x; h.dir = Math.sign(d) || h.dir; h.moving = true; h.walkT += dt; h.x += Math.sign(d) * Math.min(Math.abs(d), dt * .075);
+        if (Math.abs(h.goal - h.x) < .5) { h.x = h.goal; h.goal = null; h.moving = false; const a = h.arrive; h.arrive = null; a && a(); } }
+      else h.moving = false;
+      this.updateCam(dt); return;
+    }
 
     if (hit('ballot')) { this.ballot = true; return; }
     if (hit('raccoon')) this.useRaccoon();
@@ -360,9 +370,53 @@ scenes.tour = {
                     : { to: h.floor - 1, t: 0, pts: [[STAIR_X - 4, b], [12, b + 50], [STAIR_X - 8, b + 100]] };
   },
 
+  walkTo(x) { const h = this.hero; return new Promise(res => { h.goal = x; h.arrive = res; }); },
+  /* ---- крысы: бегают по первому этажу, при виде героя прячутся в норы ---- */
+  updateRats(dt) {
+    const h = this.hero, near = h.floor === 1 || (h.climb && h.climb.to === 1);
+    for (const r of this.rats) {
+      r.t += dt; r.k += dt;
+      const scared = near && (h.climb || Math.abs(h.x - r.x) < 96);
+      if (r.st === 'roam') {
+        if (scared) { r.st = 'alert'; r.k = 0; continue; }
+        if (r.pause > 0) { r.pause -= dt; continue; }
+        r.x += r.dir * dt * .045; if (r.x < 100 || r.x > 380) r.dir *= -1;
+        if (Math.random() < dt / 2500) r.pause = 300 + Math.random() * 900; if (Math.random() < dt / 4000) r.dir *= -1;
+      } else if (r.st === 'alert') {                         // замерла, «!» — и бежит
+        if (r.k > 260) { r.st = 'flee'; r.k = 0;
+          const away = RAT_HOLES.filter(x => Math.sign(x - r.x) !== Math.sign(h.x - r.x) || h.climb);
+          r.hole = (away.length ? away : RAT_HOLES).reduce((a, x) => Math.abs(x - r.x) < Math.abs(a - r.x) ? x : a); r.dir = Math.sign(r.hole - r.x) || 1; }
+      } else if (r.st === 'flee') {
+        const goal = r.hole - r.dir * 9, d = goal - r.x; r.x += Math.sign(d) * Math.min(Math.abs(d), dt * .2);
+        if (Math.abs(d) < 1) { r.st = 'in'; r.k = 0; }
+      } else if (r.st === 'in') { if (r.k > 320) { r.st = 'hidden'; r.k = 0; } }
+      else if (r.st === 'hidden') { if (near) r.k = 0; else if (r.k > 2200 + Math.random() * 800) { r.st = 'out'; r.k = 0; r.dir = Math.random() < .5 ? -1 : 1; } }
+      else if (r.st === 'out') { if (r.k > 320) { r.st = 'roam'; r.k = 0; r.x = r.hole + r.dir * 9; } }
+    }
+  },
+  drawRats(cy, t) {
+    const b = this.base(1) - cy;
+    for (const r of this.rats) {
+      const fr = RAT[r.st === 'flee' ? Math.floor(r.t / 60) % 2 : r.st === 'roam' && r.pause <= 0 ? Math.floor(r.t / 120) % 2 : 0];
+      if (r.st === 'hidden') { if (Math.floor(t / 1700 + r.x) % 3 === 0 && (t % 1700) < 1200) { rect(r.hole - 2, b - 5, 1, 1, '#e8d36a'); rect(r.hole + 1, b - 5, 1, 1, '#e8d36a'); } continue; }
+      if (r.st === 'in' || r.st === 'out') {
+        // ныряет в нору головой вперёд (или вылезает): часть за краем норы скрыта
+        const k = Math.min(1, r.k / 320), x = r.st === 'in' ? r.hole - r.dir * 9 + r.dir * 18 * k : r.hole - r.dir * 9 + r.dir * 18 * k;
+        const hideSide = r.st === 'in' ? r.dir : -r.dir;
+        ctx.save(); ctx.beginPath(); if (hideSide > 0) ctx.rect(0, 0, r.hole, H); else ctx.rect(r.hole + 1, 0, W, H); ctx.clip();
+        sprite(fr, Math.round(x - 8), b - 8, r.dir > 0); ctx.restore();
+        continue;
+      }
+      sprite(fr, Math.round(r.x - 8), b - 8, r.dir > 0);
+      if (r.st === 'alert') text('!', r.x, b - 18, { col: '#f2c94c', align: 'center', size: 6, shadow: '#0b0c10' });
+    }
+  },
+
   /* ---- стук в дверь и разговор ---- */
   async visit(r) {
-    this.busy = true; const h = this.hero; h.dir = DOOR_X[r.d] > h.x ? 1 : -1;
+    this.busy = true; const h = this.hero;
+    // встаём сбоку от двери, чтобы жилец вышел на порог, а не «в» героя
+    const side = h.x <= DOOR_X[r.d] ? -1 : 1; await this.walkTo(DOOR_X[r.d] + side * 23); h.dir = -side;
     h.knockT = 700; sfx.knock(); this.addTime(.5); pop(DOOR_X[r.d], this.base(r.floor) - 30, LANG === 'kz' ? 'тық-тық' : 'тук-тук', '#c9cdc8');
     await wait(750);
     const m = this.minute, A = r.A;
@@ -502,14 +556,14 @@ scenes.tour = {
       rect(236, b - 94, 1, 6, '#0e1011'); rect(231, b - 88, 11, 4, '#1c1f24'); rect(233, b - 85, 7, 3, lampOn ? '#fff1b8' : '#4b4f4c');
       if (lampOn) {
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
-        const gr = ctx.createRadialGradient(236, b - 84, 2, 236, b - 50, 110); gr.addColorStop(0, 'rgba(255,214,140,.30)'); gr.addColorStop(.5, 'rgba(255,190,110,.10)'); gr.addColorStop(1, 'rgba(255,190,110,0)');
-        ctx.fillStyle = gr; ctx.fillRect(126, b - 94, 220, 94);
+        if (!this.glow) this.glow = makeCanvas(220, 94, ({ g }) => { const gr = g.createRadialGradient(110, 10, 2, 110, 44, 110); gr.addColorStop(0, 'rgba(255,214,140,.30)'); gr.addColorStop(.5, 'rgba(255,190,110,.10)'); gr.addColorStop(1, 'rgba(255,190,110,0)'); g.fillStyle = gr; g.fillRect(0, 0, 220, 94); });
+        ctx.drawImage(this.glow, 126, b - 94);
         for (let i = 0; i < 6; i++) { const dx = Math.sin(t / 2200 + i * 2.1 + f) * 46, dy = ((t / 60 + i * 37 + f * 11) % 70); rect(236 + dx, b - 80 + dy, 1, 1, 'rgba(255,236,190,.5)'); }
         ctx.restore();
       }
       for (let d = 0; d < 4; d++) {
         const apt = (f - 1) * 4 + d + 1, x = DOOR_X[d], r = this.res[apt];
-        if (apt === T.heroApt) { sprite(ICONS.me, x - 4, b - 72); continue; }
+        if (apt === T.heroApt) { sprite(ICONS.me, x + 16, b - 40); continue; }
         if (!r) continue;
         const home = !(r.away && this.minute < r.returnAt);
         if (home && !r.sleeping && r.door === 0) { rect(x - 11, b - 2, 22, 1, '#f2d27a'); ctx.fillStyle = 'rgba(242,210,122,.25)'; ctx.fillRect(x - 13, b - 1, 26, 1); }
@@ -523,12 +577,12 @@ scenes.tour = {
           ctx.beginPath(); ctx.moveTo(x - 13, b); ctx.lineTo(x + 13, b); ctx.lineTo(x + 34, b + 1); ctx.lineTo(x - 34, b + 1); ctx.fill();
           ctx.fillRect(x - 40, b - 2, 80, 2); ctx.restore();
         }
-        const ic = ICONS[r.status]; if (ic) sprite(ic, x - 4, b - 72);
+        const ic = ICONS[r.status]; if (ic) { rect(x + 15, b - 41, 11, 11, 'rgba(10,12,16,.55)'); sprite(ic, x + 16, b - 40); }
       }
     }
     // кот на окне 4-го этажа, крысы на 1-м
     if (T.floors >= 4) sprite(CAT, 30, this.base(4) - FLOOR_H + 22 - cy);
-    for (const r of this.rats) sprite(RAT[Math.floor(r.t / 110) % 2], r.x - 8, this.base(1) - 8 - cy, r.dir > 0);
+    this.drawRats(cy, t);
     // болтун
     const tk = this.talker;
     if (!tk.done || (tk.leaving && tk.leaving < 1400)) {
@@ -571,7 +625,8 @@ scenes.tour = {
   },
   drawHUD() {
     const T = this.tour;
-    rect(0, 0, W, 18, 'rgba(20,21,28,.88)'); rect(0, 18, W, 1, '#0b0c10');
+    rect(0, 0, W, 19, 'rgba(14,17,28,.94)'); rect(0, 19, W, 1, '#55607c'); rect(0, 20, W, 1, 'rgba(5,6,10,.6)');
+    rect(126, 3, 1, 13, '#2c3346'); rect(238, 3, 1, 13, '#2c3346');
     const m = Math.floor(this.minute), hh = Math.floor(m / 60), mm = m % 60;
     const left = this.end - this.minute;
     // часы
@@ -621,7 +676,7 @@ scenes.result = {
   update(dt) { this.t += dt; if (hit('act')) irisTo(W / 2, 200, () => go('title')); },
   draw(dt) {
     const d = this.d;
-    drawNight(dt, d.success ? 0 : 0);
+    drawNight(dt);
     paper(60, 16, 280, 196, 11);
     text(L(UI.protocol), W / 2, 26, { align: 'center', col: INK_MUTED });
     text(d.success ? L(UI.win) : L(UI.lose), W / 2, 42, { align: 'center', col: d.success ? INK_TEAL : INK_RED });

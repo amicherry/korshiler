@@ -153,6 +153,14 @@ function plate(x, y, w, h) {
   rect(x + 3, y + h - 6, w - 6, 3, '#284579');
   for (const [rx, ry] of [[x + 6, y + 6], [x + w - 8, y + 6], [x + 6, y + h - 8], [x + w - 8, y + h - 8]]) rect(rx, ry, 2, 2, '#9fb0cc');
 }
+// тёмная пиксельная рамка: панели меню, HUD, диалог
+function frameBox(x, y, w, h, alpha = .9) {
+  rect(x + 2, y + 2, w, h, 'rgba(5,6,10,.5)');
+  rect(x, y, w, h, `rgba(14,17,28,${alpha})`);
+  rect(x + 1, y, w - 2, 1, '#55607c'); rect(x + 1, y + h - 1, w - 2, 1, '#55607c'); rect(x, y + 1, 1, h - 2, '#55607c'); rect(x + w - 1, y + 1, 1, h - 2, '#55607c');
+  rect(x + 2, y + 2, w - 4, 1, '#262c3d'); rect(x + 2, y + h - 3, w - 4, 1, '#0a0c12');
+  for (const [cx, cy] of [[x + 2, y + 2], [x + w - 4, y + 2], [x + 2, y + h - 4], [x + w - 4, y + h - 4]]) rect(cx, cy, 2, 2, '#8792ad');
+}
 const INK = '#2b2a33', INK_RED = '#b8443f', INK_TEAL = '#2f8577', INK_MUTED = '#857d6c', INK_GOLD = '#a87b12';
 
 /* ---------- уведомления E-KNOT (тосты) ---------- */
@@ -205,7 +213,7 @@ function irisTo(x, y, cb) { if (trans.phase) return; Object.assign(trans, { phas
 function irisFrom(x, y) { Object.assign(trans, { phase: 'in', t: 0, x, y, cb: null }); }
 function drawIris(dt) {
   if (!trans.phase) return;
-  trans.t += dt; const D = 420, R = Math.hypot(W, H) + 10;
+  trans.t += dt; const D = 320, R = Math.hypot(W, H) + 10;
   const k = Math.min(1, trans.t / D);
   ctx.fillStyle = '#0b0c10';
   if (trans.phase === 'out') {

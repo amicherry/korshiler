@@ -71,6 +71,7 @@ const PW = 18, PH = 42;
    грязь, облупленная краска, чёрные перила, стёганые двери
    ============================================================ */
 const FLOOR_H = 100, STAIR_X = 78;
+const RAT_HOLES = [112, 236, 368];
 const DOOR_X = [138, 204, 270, 336];
 const floorBase = (f, floors) => 40 + floors * FLOOR_H - (f - 1) * FLOOR_H;
 const DOOR_STYLES = [
@@ -102,9 +103,23 @@ function drawStairwell(floors, doorLook) {
       r(STAIR_X, b - 45, W - STAIR_X, 1, '#1d302c'); r(STAIR_X, b - 44, W - STAIR_X, 1, '#3e625b');
       // потёки и грязь
       for (let i = 0; i < 18; i++) { const x = STAIR_X + R() * (W - STAIR_X); r(x, top, 1, 6 + R() * 30, 'rgba(20,24,22,.22)'); }
-      for (let i = 0; i < 9; i++) { const x = STAIR_X + 4 + R() * (W - STAIR_X - 30), y = top + 8 + R() * 30, w = 6 + R() * 16, h = 4 + R() * 8;
-        r(x, y, w, h, '#7b877f'); r(x, y + h, w, 1, '#3c4744'); if (R() < .5) { for (let bx = 0; bx < w - 2; bx += 5) r(x + 1 + bx, y + 1, 4, 2, '#7a4b3d'); } }
-      for (let i = 0; i < 8; i++) { const x = STAIR_X + R() * (W - STAIR_X - 10), y = b - 40 + R() * 34; r(x, y, 3 + R() * 7, 2 + R() * 3, '#3f6259'); }
+      // обвалившаяся штукатурка: рваный край, под ним кирпич (только в простенках, не на дверях)
+      const gaps = [108, 171, 237, 303, 362].sort(() => R() - .5).slice(0, 1 + (R() < .55 ? 1 : 0));
+      for (const gx of gaps) {
+        const cx = Math.round(gx + (R() - .5) * 12), cy = Math.round(b - 72 + R() * 12), rw = 4 + R() * 5, rh = 2.5 + R() * 2.5;
+        const rad = Array.from({ length: 10 }, () => .55 + R() * .6);
+        const inside = (x, y) => { const a = (Math.atan2(y / rh, x / rw) + Math.PI) / (Math.PI * 2) * 10, i = Math.floor(a) % 10, f = a - Math.floor(a);
+          const k = rad[i] * (1 - f) + rad[(i + 1) % 10] * f; return (x * x) / (rw * rw) + (y * y) / (rh * rh) <= k * k; };
+        for (let y = -Math.ceil(rh * 1.3); y <= Math.ceil(rh * 1.3); y++) for (let x = -Math.ceil(rw * 1.3); x <= Math.ceil(rw * 1.3); x++) {
+          const X = cx + x, Y = cy + y;
+          if (inside(x, y)) { const row = Math.floor((Y + 300) / 3), mortar = (Y + 300) % 3 === 2 || (X + (row % 2) * 3) % 6 === 0;
+            p(X, Y, mortar ? '#4f4c45' : ((X * 3 + row) % 5 === 0 ? '#6a3a2d' : '#784434')); }
+          else if (inside(x, y + 1) || inside(x + 1, y)) p(X, Y, '#a3ada4');
+          else if (inside(x, y - 1) || inside(x - 1, y)) p(X, Y, '#2f3835');
+        }
+      }
+      // потёртости на нижней панели
+      for (let i = 0; i < 10; i++) { const x = STAIR_X + R() * (W - STAIR_X - 16), y = b - 38 + R() * 30; r(x, y, 4 + R() * 12, 1, R() < .5 ? '#284239' : '#3e5e56'); }
       // трубы и провода
       r(388, top, 4, FLOOR_H - 6, '#454c4a'); r(388, top, 1, FLOOR_H - 6, '#5e6663'); r(386, top + 20, 8, 3, '#2c3130'); r(386, top + 70, 8, 3, '#2c3130');
       for (let x = STAIR_X; x < W; x++) p(x, top + 3 + Math.round(Math.sin((x - STAIR_X) / 26) * 2 + 2), '#151718');
@@ -119,8 +134,10 @@ function drawStairwell(floors, doorLook) {
       // плиты перекрытия
       r(0, b, W, 7, '#3b3f3d'); r(0, b, W, 1, '#5b605c'); r(0, b + 6, W, 1, '#202322');
       // граффити и объявления
-      if (R() < .8) { const gx = STAIR_X + 20 + R() * 220, gy = b - 38 + R() * 16, col = pick(R, ['#c9cdc8', '#9a6fb0', '#c45a4a']);
-        for (let i = 0; i < 14; i++) p(gx + i, gy + Math.round(Math.sin(i * 1.3) * 2), col); }
+      // граффити — короткие надписи маркером в простенке, с подтёками
+      { const tag = ['ОСИ?', 'ЦОЙ', 'А+Д', '2007', 'ЖЕК', 'ҮЙ', 'ЕНОТ'][(f * 3 + 1) % 7], gx = [171, 303, 237][f % 3], col = pick(R, ['#c9cdc8', '#b88ad0', '#d9705e', '#e0c35a']);
+        g.font = '8px ' + FONT; g.textBaseline = 'top'; const tw = g.measureText(tag).width; g.globalAlpha = .55; g.fillStyle = col; g.fillText(tag, Math.round(gx - tw / 2), b - 34);
+        r(Math.round(gx - tw / 2 + 3 + R() * (tw - 6)), b - 26, 1, 2 + Math.floor(R() * 3), col); g.globalAlpha = 1; }
       r(372, top + 12, 12, 16, '#c9c2ae'); for (let i = 0; i < 4; i++) r(374, top + 15 + i * 3, 8, 1, '#7a7466'); r(375, top + 10, 5, 3, 'rgba(220,206,150,.8)');
       // двери
       for (let d = 0; d < 4; d++) {
@@ -134,6 +151,8 @@ function drawStairwell(floors, doorLook) {
       r(STAIR_X + 8, top + 14, 16, 24, '#3d4446'); r(STAIR_X + 9, top + 15, 14, 22, '#4f585a'); p(STAIR_X + 20, top + 32, '#d9b43a');
       line(STAIR_X + 16, top + 3, STAIR_X + 16, top + 14, '#151718');
       if (f === 1) { r(352, b - 44, 30, 24, '#3a4a52'); for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) { r(354 + i * 9, b - 42 + j * 11, 8, 9, '#4f6470'); r(355 + i * 9, b - 38 + j * 11, 6, 1, '#1c2428'); } }
+      if (f === 1) for (const hx of RAT_HOLES) { r(hx - 4, b - 4, 9, 4, '#07080a'); r(hx - 3, b - 6, 7, 2, '#07080a'); r(hx - 2, b - 7, 5, 1, '#07080a');
+        p(hx - 5, b - 4, '#5b605c'); p(hx - 4, b - 6, '#5b605c'); p(hx + 4, b - 6, '#2b302e'); p(hx + 5, b - 4, '#2b302e'); r(hx - 2, b - 8, 5, 1, '#5b605c'); }
       r(8, b - 18, 24, 12, '#4b524f'); for (let i = 0; i < 6; i++) r(10 + i * 4, b - 18, 2, 12, '#353a38');
       // лестница с чёрными перилами (пролёт на этаж выше)
       if (f < floors) {
@@ -151,64 +170,3 @@ function drawStairwell(floors, doorLook) {
   });
 }
 
-/* ============================================================
-   НОЧНАЯ ПАНЕЛЬКА (меню, пролог, итоги) — по референсу:
-   высокий дом, мелкие окна, вывеска на крыше. Анимируется:
-   свет в окнах гаснет и загорается, мерцают телевизоры, идёт снег
-   ============================================================ */
-const NIGHT = { built: null, lang: null, windows: [], stars: [], snow: [], t: 0, next: 0, sign: null };
-function buildNight() {
-  const R = rng(5);
-  const bx = 150, by = 58, bw = 226, cols = 18, rows = 17, cw = 12, rh = 10;
-  NIGHT.layout = { bx, by, bw, cols, rows, cw, rh };
-  NIGHT.static = makeCanvas(W, H, ({ r, p }) => {
-    for (let y = 0; y < H; y++) r(0, y, W, 1, `rgb(${16 + y * .06 | 0},${26 + y * .09 | 0},${46 + y * .12 | 0})`);
-    // дом
-    r(bx, by, bw, H - by, '#2c3240'); r(bx, by, bw, 2, '#4a5263'); r(bx + bw - 26, by, 26, H - by, '#232834');
-    for (let row = 0; row < rows; row++) { const y = by + 6 + row * rh; r(bx, y + 8, bw - 26, 1, '#3a4152'); }
-    for (let c = 0; c < cols; c += 6) r(bx + 4 + c * cw - 2, by + 2, 1, H - by, '#262b37');
-    r(bx - 4, by - 4, bw + 8, 4, '#1c212b');
-    // соседний дом и крыша на переднем плане
-    r(0, 196, 150, 29, '#0d1017'); r(30, 186, 2, 10, '#0d1017'); r(26, 186, 10, 1, '#0d1017'); r(40, 180, 1, 16, '#0d1017');
-    r(372, 120, 28, 105, '#0f131b'); r(376, 118, 24, 2, '#171c26');
-  });
-  NIGHT.windows = [];
-  for (let row = 0; row < rows; row++) for (let c = 0; c < cols; c++) {
-    const x = bx + 4 + c * cw, y = by + 6 + row * rh; if (x + 7 > bx + bw - 28) continue;
-    const roll = R();
-    NIGHT.windows.push({ x, y, on: roll < .22, tv: roll > .97, warm: R() < .7 ? '#f2c66a' : '#f7e3a1' });
-  }
-  NIGHT.stars = Array.from({ length: 70 }, () => ({ x: R() * W, y: R() * 120, ph: R() * 6, big: R() < .15 }));
-  NIGHT.snow = Array.from({ length: 60 }, () => ({ x: R() * W, y: R() * H, v: .006 + R() * .012, dx: (R() - .5) * .01 }));
-  NIGHT.lang = LANG;
-}
-function drawNight(dt, signLevel = 0) {
-  if (!NIGHT.static) buildNight();
-  NIGHT.t += dt; const t = NIGHT.t;
-  sprite(NIGHT.static, 0, 0);
-  for (const s of NIGHT.stars) { const a = .45 + .55 * Math.abs(Math.sin(t / 900 + s.ph)); ctx.globalAlpha = a; rect(s.x, s.y, s.big ? 2 : 1, s.big ? 2 : 1, '#dfe6f2'); }
-  ctx.globalAlpha = 1;
-  // самолёт мигает
-  const px = (t / 22) % (W + 200) - 100; if (px > 0 && px < W) { rect(px, 26 + px * .03, 2, 1, '#9fb0cc'); if (Math.floor(t / 500) % 2) rect(px + 2, 26 + px * .03, 1, 1, '#ff5a4a'); }
-  // окна: время от времени кто-то выключает или включает свет
-  if (t > NIGHT.next) { NIGHT.next = t + 250 + Math.random() * 900; const w = NIGHT.windows[Math.floor(Math.random() * NIGHT.windows.length)]; w.on = !w.on; }
-  for (const w of NIGHT.windows) {
-    if (w.tv) { const f = Math.sin(t / 90 + w.x) > 0; rect(w.x, w.y, 7, 6, f ? '#7fa3d9' : '#5878b8'); continue; }
-    rect(w.x, w.y, 7, 6, w.on ? w.warm : '#1b2030');
-    if (w.on) { rect(w.x, w.y + 5, 7, 1, shade(w.warm, -50)); ctx.fillStyle = 'rgba(242,198,106,.08)'; ctx.fillRect(w.x - 2, w.y - 2, 11, 10); }
-  }
-  // вывеска на крыше: пока дом не обновлён, горят только некоторые буквы
-  const { bx, by, bw } = NIGHT.layout, sign = LANG === 'kz' ? 'БӘРІ ЖАҚСЫ БОЛАДЫ!' : 'ВСЁ БУДЕТ ХОРОШО!';
-  font(8); const sw = Math.ceil(textW(sign, 8)) + 12, sx = Math.round(bx + (bw - 26) / 2 - sw / 2), sy = by - 22;
-  rect(sx + 6, sy + 14, 2, 8, '#14171e'); rect(sx + sw - 8, sy + 14, 2, 8, '#14171e'); rect(sx, sy, sw, 14, '#120c0e');
-  let x = sx + 6; const cw = textW('Ж', 8);
-  [...sign].forEach((ch, i) => {
-    let on;
-    if (signLevel >= 1) on = true;                       // после ремонта горит вся надпись
-    else on = i % 3 === 1 && !(i % 6 === 1 && Math.sin(t / 70 + i) > .55);   // сейчас — отдельные буквы, одна искрит
-    if (on) { ctx.fillStyle = 'rgba(255,80,50,.25)'; ctx.fillRect(x - 2, sy, cw + 4, 14); }
-    text(ch, x, sy + 3, { col: on ? '#ff7a4a' : '#3a1614' }); x += textW(ch, 8);
-  });
-  // снег
-  for (const s of NIGHT.snow) { s.y += s.v * dt; s.x += s.dx * dt; if (s.y > H) { s.y = -2; s.x = Math.random() * W; } rect(s.x, s.y, 1, 1, 'rgba(230,236,245,.75)'); }
-}
