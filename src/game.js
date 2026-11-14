@@ -262,8 +262,25 @@ scenes.prologue = {
    ============================================================ */
 function hashStr(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 function makeResidents(tour, seed) {
-  const R = rng(seed), mix = tour.mix.slice();
-  for (let i = mix.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [mix[i], mix[j]] = [mix[j], mix[i]]; }
+  const R = rng(seed), pool = tour.mix.slice();
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  // раскладываем по этажам так, чтобы на одном этаже не было двух одинаковых жильцов,
+  // а одинаковые типы не скапливались на соседних этажах
+  const apts = []; for (let apt = 1; apt <= tour.floors * tour.perFloor; apt++) if (apt !== tour.heroApt) apts.push(apt);
+  const fl = apt => Math.ceil(apt / tour.perFloor);
+  let mix = null, bestCost = 1e9;
+  for (let attempt = 0; attempt < 40 && bestCost > 0; attempt++) {
+    const left = pool.slice(), order = apts.slice().sort(() => R() - .5), put = {}, onFloor = {};
+    for (const apt of order) {
+      const f = fl(apt), here = onFloor[f] || (onFloor[f] = []), near = [...(onFloor[f - 1] || []), ...(onFloor[f + 1] || [])];
+      const score = a => (here.includes(a) ? 10 : 0) + (near.includes(a) ? 1 : 0) + R() * .5;
+      let best = 0; for (let i = 1; i < left.length; i++) if (score(left[i]) < score(left[best])) best = i;
+      put[apt] = left.splice(best, 1)[0]; here.push(put[apt]);
+    }
+    let cost = 0; for (const f in onFloor) cost += onFloor[f].length - new Set(onFloor[f]).size;
+    if (cost < bestCost) { bestCost = cost; mix = apts.map(a => put[a]); }
+  }
+  const seen = {}, vOff = Math.floor(R() * 4);
   const res = {}; let k = 0; const used = new Set();
   for (let apt = 1; apt <= tour.floors * tour.perFloor; apt++) {
     if (apt === tour.heroApt) continue;
@@ -277,7 +294,7 @@ function makeResidents(tour, seed) {
     const away = !A.renter && a !== 'apa' && !A.sleeper && R() < tour.awayShare;
     const trust = (SAVE.trust && SAVE.trust[apt]) || 0;
     res[apt] = { apt, arch: a, A, name, look, mood: A.mood + trust + Math.round((R() - .5) * 8), status: A.renter ? 'unknown' : 'unknown',
-      away, returnAt: tour.start + 8 + Math.floor(R() * 34) + (R() < .2 ? 999 : 0), knocks: 0, listened: false, sleeping: !!A.sleeper, door: 0, met: false,
+      away, returnAt: tour.start + 8 + Math.floor(R() * 34) + (R() < .2 ? 999 : 0), knocks: 0, listened: false, v: (seen[a] = (seen[a] || 0) + 1) + vOff, last: {}, sleeping: !!A.sleeper, door: 0, met: false,
       floor: Math.ceil(apt / tour.perFloor), d: (apt - 1) % tour.perFloor };
   }
   return res;
@@ -464,7 +481,10 @@ scenes.tour = {
     if (r.sleeping) { r.mood -= 8; r.sleeping = false; }
     r.away = false; this.addTime(.5);
     dlgOpen(r.name, e => portrait(r.look, e), A.voice, A.renter ? null : () => r.mood);
-    const Ln = k => L(A.lines[k] || GENERIC[k]);
+    // у каждого жильца свой вариант приветствия/истории/ответа; реакции чередуются без повторов подряд
+    const Ln = k => { const v = A.lines[k] || GENERIC[k]; if (!Array.isArray(v)) return L(v);
+      if (['good', 'meh', 'bad'].includes(k)) { let i; do i = Math.floor(Math.random() * v.length); while (v.length > 1 && i === r.last[k]); r.last[k] = i; return L(v[i]); }
+      return L(v[r.v % v.length]); };
     if (A.renter) { await say(Ln('greet')); r.status = 'renter'; return this.endVisit(r); }
     if (r.status === 'yes') { await say(L(GENERIC.already), 'happy'); return this.endVisit(r); }
     if (r.status === 'no') { await say(L(GENERIC.againNo), 'angry'); return this.endVisit(r); }
