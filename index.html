@@ -382,6 +382,7 @@ const UI = {
   pushOSI:    { kz: 'Сіздің үйде ОСИ құрылмаған. ОСИ болмаса, жөндеу мен жақсарту мүмкін емес.', ru: 'В вашем доме не создано ОСИ. Без ОСИ ремонт и улучшения невозможны.' },
   heroIntro1: { kz: 'Иә... Үй құлайын деп тұр. Лифт істемейді, шатырдағы жазу сөнген.', ru: 'Да уж... Дом разваливается. Лифт стоит, вывеска на крыше погасла.' },
   heroIntro2: { kz: 'Бастамашыл топ құру үшін 10 қолтаңба керек. Кеттік!', ru: 'Для инициативной группы нужно 10 подписей. Погнали!' },
+  tutTap:     { kz: 'Есікке немесе басқа қабатқа бас — кейіпкер өзі барады.', ru: 'Нажми на дверь или на другой этаж — герой дойдёт сам.' },
   tut1:       { kz: 'Есікке жақындап, ҚАҒУ бас. Есік астындағы жарық — үйде біреу бар.', ru: 'Подойди к двери и нажми СТУК. Свет под дверью — кто-то дома.' },
   tut2:       { kz: 'Сол жақта саты. ▲▼ арқылы қабат ауыстыр. Әр әрекет уақыт алады!', ru: 'Слева лестница: ▲▼ — сменить этаж. Каждое действие тратит время!' },
   nobody:     { kz: 'Ешкім жоқ сияқты. Кейін қайта келуге болады.', ru: 'Похоже, никого нет. Можно зайти позже.' },
@@ -648,7 +649,7 @@ function drawDoorPanel(P, x, b, L, w = 26, h = 48) {
   r(x + 7, b - 24, 3, 2, '#c9a95a'); p(x + 9, b - 23, '#7a6532'); p(x - 1, b - 33, OUT); p(x, b - 33, '#6b7a82');
 }
 function drawStairwell(floors, doorLook) {
-  const WH = 60 + floors * FLOOR_H;
+  const WH = 60 + floors * FLOOR_H + 96;   // снизу — подвал, чтобы первый этаж не прятался за окном диалога
   return makeCanvas(W, WH, (P) => {
     const { r, p, line, g } = P, R = rng(41);
     r(0, 0, W, WH, '#141617');
@@ -723,6 +724,14 @@ function drawStairwell(floors, doorLook) {
       }
     }
     r(0, 0, W, 34, '#101213'); r(0, 30, W, 4, '#2c302e');
+    // подвал: трубы, вентиль, капли — сюда потом придёт ремонт протечки
+    { const y0 = floorBase(1, floors) + 7;
+      r(0, y0, W, WH - y0, '#121516'); for (let i = 0; i < 40; i++) r(R() * W, y0 + 4 + R() * 80, 2 + R() * 8, 1, '#191d1e');
+      r(0, y0 + 18, W, 5, '#3a3f3c'); r(0, y0 + 18, W, 1, '#565c58'); r(0, y0 + 30, W, 3, '#5a3d2e'); r(0, y0 + 30, W, 1, '#7a5440');
+      for (let x = 20; x < W; x += 64) { r(x, y0 + 16, 3, 9, '#2a2e2c'); r(x + 30, y0 + 28, 3, 7, '#2a2e2c'); }
+      r(250, y0 + 8, 9, 9, '#8a2e26'); r(253, y0 + 11, 3, 3, '#121516'); r(254, y0 + 17, 1, 2, '#3a3f3c');
+      for (const x of [118, 252, 330]) { r(x, y0 + 24, 1, 3, '#5d8fb0'); p(x, y0 + 40, '#5d8fb0'); p(x - 1, y0 + 41, '#3d6a85'); p(x + 1, y0 + 41, '#3d6a85'); }
+      for (let x = 0; x < W; x += 40) r(x, y0 + 60, 26, 30, '#16191a'); }
   });
 }
 
@@ -1024,13 +1033,32 @@ function portrait(look, expr = 'neutral') {
     if (look.headphones) { r(9, 5, 22, 2, OUT); r(8, 15, 4, 7, '#b8443f'); r(28, 15, 4, 7, '#b8443f'); }
     // головной убор
     if (look.hat === 'scarf') {
-      const sc = look.scarfCol || '#c8414a';
-      ell(20, 15, 12, 13, sc); ell(20, 19, 7, 9, sk);
-      if (expr === 'happy') { for (const x of [15, 23]) { p(x, ey, E); p(x + 1, ey - 1, E); p(x + 2, ey, E); } } else { r(16, ey, 2, 2, E); r(22, ey, 2, 2, E); }
-      if (expr === 'happy') { p(17, 24, M); r(18, 25, 4, 1, M); p(22, 24, M); } else if (expr === 'angry' || expr === 'sad') { r(18, 25, 4, 1, M); p(17, 26, M); p(22, 26, M); } else r(18, 25, 4, 1, M);
-      p(20, 21, skD); p(20, 22, skD); p(15, 21, skD); p(25, 21, skD);
-      const R = rng(7); for (let i = 0; i < 26; i++) { const a = R() * Math.PI * 2, d = 9 + R() * 3; p(20 + Math.cos(a) * d, 15 + Math.sin(a) * d * 1.05, '#f4f3ee'); }
-      r(16, 29, 8, 3, sc); r(22, 31, 3, 4, shade(sc, -25));
+      // әже в орамале: платок обрамляет лицо, седая чёлка, узел под подбородком, мелкий узор только на ткани
+      const [s0, s1, s2] = tones(look.scarfCol || '#c8414a');
+      // платок: круглый сверху, по бокам ровно спадает к узлу под подбородком
+      const inScarf = (x, y) => y <= 16 ? ((x - 20) ** 2) / 132 + ((y - 15) ** 2) / 156 <= 1 : (y <= 31 && x >= 8.5 + (y - 16) * .5 && x <= 31.5 - (y - 16) * .5);
+      const inFace = (x, y) => ((x - 20) ** 2) / 44 + ((y - 20) ** 2) / 66 <= 1;
+      const body = (x, y) => inScarf(x, y) && !inFace(x, y);
+      for (let y = 2; y < 32; y++) for (let x = 7; x < 34; x++) if (body(x, y)) p(x, y, x > 26 ? s2 : x < 13 ? s0 : s1);
+      for (let y = 10; y < 30; y++) for (let x = 12; x < 29; x++) if (inFace(x, y)) p(x, y, sk);
+      // складки и редкий узор — только внутри ткани, не по краю
+      for (let y = 18; y < 30; y++) { const xl = Math.round(10 + (y - 16) * .5); if (body(xl + 1, y)) p(xl + 1, y, s2); }
+      for (let y = 5; y < 30; y += 5) for (let x = 10 + (y % 10 ? 2 : 0); x < 31; x += 5) {
+        let ok = true; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!body(x + dx, y + dy)) ok = false;
+        if (ok) { p(x, y, '#f1e4c4'); p(x + 1, y, shade(s1, 18)); }
+      }
+      r(15, 12, 11, 2, '#c9c6c0'); p(15, 14, '#c9c6c0'); p(25, 14, '#c9c6c0'); r(16, 12, 9, 1, '#e6e3dc');   // седая чёлка
+      for (let y = 17; y < 29; y++) for (let x = 12; x < 29; x++) if (inFace(x, y) && !inFace(x + 1, y)) p(x, y, skD);   // тень на щеке
+      const ey2 = 18;
+      if (expr === 'happy') { for (const x of [15, 22]) { p(x, ey2, E); p(x + 1, ey2 - 1, E); p(x + 2, ey2, E); } }
+      else { r(16, ey2 - 1, 2, 2, E); r(22, ey2 - 1, 2, 2, E); p(16, ey2 - 1, '#f4f3ee'); p(22, ey2 - 1, '#f4f3ee'); }
+      if (expr === 'angry') { line(14, 14, 18, 16, '#8f8a84'); line(21, 16, 25, 14, '#8f8a84'); } else { line(14, 15, 18, 15, '#a8a49c'); line(21, 15, 25, 15, '#a8a49c'); }
+      p(14, ey2 + 1, skD); p(26, ey2 + 1, skD); p(13, ey2, skD); p(27, ey2, skD);        // морщинки у глаз
+      p(19, 20, skD); p(19, 21, skD); r(19, 22, 2, 1, skD);                            // нос
+      p(16, 23, skD); p(24, 23, skD);                                                   // носогубные складки
+      if (expr === 'happy') { p(17, 24, M); r(18, 25, 5, 1, M); p(23, 24, M); } else if (expr === 'angry' || expr === 'sad') { r(18, 25, 5, 1, M); p(17, 26, M); p(23, 26, M); } else r(18, 25, 5, 1, M);
+      p(15, 21, '#e8a08a'); p(25, 21, '#e8a08a');                                       // румянец
+      r(17, 30, 7, 3, s1); r(18, 30, 5, 1, s0); r(15, 33, 4, 5, s2); r(22, 33, 4, 6, s2); p(16, 33, s1); p(23, 33, s1);  // узел и концы
     }
     if (look.hat === 'tyube') { r(11, 5, 18, 5, '#1b1a21'); r(12, 4, 16, 1, '#1b1a21'); for (const x of [13, 17, 21, 25]) { p(x, 6, '#f4f3ee'); p(x + 1, 7, '#f4f3ee'); p(x, 8, '#f4f3ee'); } }
     if (look.hat === 'cap') { const cc = look.capCol || '#b8443f'; ell(20, 8, 10, 4, cc); r(10, 8, 20, 3, cc); r(24, 10, 10, 2, shade(cc, -30)); }
@@ -1099,18 +1127,26 @@ function persist() { API.save(SAVE); }
 const DLG = { open: false, name: '', port: null, voice: 400, text: '', shown: 0, choices: null, cursor: 0, resolve: null, expr: 'neutral', mood: null, blipAt: 0 };
 function dlgOpen(name, port, voice = 400, mood = null) { Object.assign(DLG, { open: true, name, port, voice, mood, text: '', shown: 0, choices: null }); }
 function dlgClose() { DLG.open = false; DLG.choices = null; DLG.resolve = null; }
-function say(t, expr = 'neutral') { return new Promise(res => Object.assign(DLG, { text: t, shown: 0, choices: null, expr, resolve: res })); }
+// длинная реплика делится на страницы по 5 строк — ничего не обрезается
+const DLG_LINES = 5, DLG_TW = 320;
+function sayPage(t, expr) { return new Promise(res => Object.assign(DLG, { text: t, shown: 0, choices: null, expr, resolve: res })); }
+async function say(t, expr = 'neutral') {
+  const lines = wrapText(t, DLG_TW);
+  for (let i = 0; i < lines.length; i += DLG_LINES) await sayPage(lines.slice(i, i + DLG_LINES).join(' '), expr);
+}
 function ask(opts) { return new Promise(res => Object.assign(DLG, { shown: DLG.text.length, choices: opts, cursor: 0, resolve: res })); }
-const CH = { x0: 62, colW: 164, y0: 175, rowH: 14 };
+const CH = { x0: 64, colW: 162, y0: 146, rowH: 18, bw: 156, bh: 16 };
 function dlgUpdate(dt) {
   if (!DLG.open || !DLG.resolve) return;
   if (DLG.choices) {
     const n = DLG.choices.length;
-    if (hit('down') || hit('right')) { DLG.cursor = (DLG.cursor + 1) % n; sfx.select(); }
-    if (hit('up') || hit('left')) { DLG.cursor = (DLG.cursor + n - 1) % n; sfx.select(); }
+    if (hit('right')) { DLG.cursor = (DLG.cursor + 1) % n; sfx.select(); }
+    if (hit('left')) { DLG.cursor = (DLG.cursor + n - 1) % n; sfx.select(); }
+    if (hit('down')) { DLG.cursor = (DLG.cursor + 2) % n; sfx.select(); }
+    if (hit('up')) { DLG.cursor = (DLG.cursor + n - 2) % n; sfx.select(); }
     for (let i = 0; i < n; i++) {
       const x = CH.x0 + (i % 2) * CH.colW, y = CH.y0 + Math.floor(i / 2) * CH.rowH;
-      if (clickIn(x - 8, y - 3, CH.colW - 4, CH.rowH)) { DLG.cursor = i; return choose(); }
+      if (clickIn(x - 1, y - 1, CH.bw + 2, CH.bh + 2)) { DLG.cursor = i; return choose(); }
     }
     if (hit('act')) return choose();
     return;
@@ -1136,18 +1172,18 @@ function dlgDraw() {
   if (textW(DLG.name) <= 52) text(DLG.name, x + 29, y + 56, { align: 'center', col: '#f2c94c' });
   else { const parts = DLG.name.split(' '); parts.slice(0, 2).forEach((s, i) => text(s.slice(0, 9), x + 29, y + 55 + i * 9, { align: 'center', col: '#f2c94c', size: 6 })); }
   // текст
-  const lines = wrapText(DLG.text.slice(0, Math.floor(DLG.shown)), 320);
-  const full = wrapText(DLG.text, 320);
-  const maxLines = DLG.choices ? 2 : 5;
-  const off = Math.max(0, full.length - maxLines);
-  lines.slice(off, off + maxLines).forEach((l, i) => text(l, x + 58, y + 9 + i * 12));
+  if (!DLG.choices) wrapText(DLG.text.slice(0, Math.floor(DLG.shown)), DLG_TW).slice(0, DLG_LINES).forEach((l, i) => text(l, x + 58, y + 9 + i * 12));
   if (!DLG.choices && DLG.shown >= DLG.text.length && DLG.resolve) { if (Math.floor(performance.now() / 300) % 2) rect(x + w - 14, y + h - 12, 6, 4, '#f2c94c'); }
   if (DLG.choices) {
+    // варианты — крупные кнопки в две колонки, нажимаются пальцем
+    const rowsN = Math.ceil(DLG.choices.length / 2), y0 = y + Math.round((h - rowsN * CH.rowH) / 2) + 1;
+    CH.y0 = y0;
     DLG.choices.forEach((c, i) => {
-      const cx = CH.x0 + (i % 2) * CH.colW, cy = CH.y0 + Math.floor(i / 2) * CH.rowH;
-      const sel = i === DLG.cursor;
-      if (sel) { rect(cx - 9, cy + 1, 5, 5, '#f2c94c'); rect(cx - 8, cy, 3, 7, '#f2c94c'); }
-      text(c.label, cx, cy, { col: sel ? '#f2c94c' : (c.dim ? '#8f949c' : '#f4f3ee') });
+      const cx = CH.x0 + (i % 2) * CH.colW, cy = y0 + Math.floor(i / 2) * CH.rowH, sel = i === DLG.cursor;
+      rect(cx, cy, CH.bw, CH.bh, sel ? '#f2c94c' : '#1d2130'); rect(cx, cy + CH.bh - 2, CH.bw, 2, sel ? '#b8902a' : '#11141d');
+      rect(cx, cy, CH.bw, 1, sel ? '#ffe28a' : '#3a4157');
+      const sz = textW(c.label) > CH.bw - 8 ? 6 : 8;
+      text(c.label, cx + CH.bw / 2, cy + (sz === 8 ? 4 : 5), { align: 'center', size: sz, col: sel ? '#1b1a21' : (c.dim ? '#7d8394' : '#f4f3ee') });
     });
   }
   // настрой жильца
@@ -1364,7 +1400,8 @@ scenes.tour = {
     this.rats = [{ x: 170, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 300, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
     this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
     API.tourStart(tour.id).then(r => this.run = r);
-    setTimeout(() => { toast('E-KNOT', L(UI.tut1)); setTimeout(() => !this.over && toast('E-KNOT', L(UI.tut2)), 4500); }, 600);
+    this.plan = null;
+    setTimeout(() => { toast('E-KNOT', L(UI.tutTap)); setTimeout(() => !this.over && toast('E-KNOT', L(UI.tut1)), 4500); }, 600);
   },
   focus() { return { x: this.hero.x, y: this.hero.y - this.camY - 14 }; },
   signatures() { return Object.values(this.res).filter(r => r.status === 'yes').length; },
@@ -1413,6 +1450,21 @@ scenes.tour = {
       this.updateCam(dt); return;
     }
     let dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    if (dir || keys.up || keys.down) this.plan = null;          // клавиши отменяют маршрут
+    if (!dir && this.plan) {
+      const P = this.plan;
+      if (P.floor !== h.floor) {                                   // сначала к лестнице и по этажам
+        const sx = STAIR_X - 6;
+        if (Math.abs(h.x - sx) > 1.5) dir = Math.sign(sx - h.x);
+        else { this.startClimb(Math.sign(P.floor - h.floor)); this.updateCam(dt); return; }
+      } else if (Math.abs(h.x - P.x) > 1.5) dir = Math.sign(P.x - h.x);
+      else {
+        this.plan = null; h.moving = false;
+        if (P.door) { if (P.door === T.heroApt) toast('E-KNOT', L(UI.yourDoor), 2400); else this.visit(this.res[P.door]); this.updateCam(dt); return; }
+        if (P.npc) { this.runHelper(); this.updateCam(dt); return; }
+      }
+      if (dir && Math.abs((P.floor !== h.floor ? STAIR_X - 6 : P.x) - h.x) < dt * .075) { h.x = P.floor !== h.floor ? STAIR_X - 6 : P.x; dir = 0; }
+    }
     h.moving = dir !== 0;
     if (dir) { h.dir = dir; h.x = clamp(h.x + dir * dt * .075, STAIR_X - 6, 388); h.walkT += dt; this.stepAcc += dt; if (this.stepAcc > 230) { this.stepAcc = 0; sfx.step(); } }
     h.y = this.base(h.floor);
@@ -1440,6 +1492,16 @@ scenes.tour = {
                     : { to: h.floor - 1, t: 0, pts: [[STAIR_X - 4, b], [12, b + 50], [STAIR_X - 8, b + 100]] };
   },
 
+  onTap(x, wy) {
+    const T = this.tour; let f = 1;
+    for (let k = 1; k <= T.floors; k++) { const b = this.base(k); if (wy > b - FLOOR_H + 6 && wy <= b + 8) f = k; }
+    if (wy < this.base(T.floors) - FLOOR_H + 6) f = T.floors;
+    const plan = { floor: f, x: clamp(x, STAIR_X - 6, 388) };
+    for (let d = 0; d < 4; d++) if (Math.abs(x - DOOR_X[d]) < 17) { plan.x = DOOR_X[d] + (x < DOOR_X[d] ? -4 : 4); plan.door = (f - 1) * 4 + d + 1; }
+    if (this.helper.state === 'shown' && f === this.helper.floor && Math.abs(x - this.helper.x) < 12) { plan.x = this.helper.x + 12; plan.npc = 'helper'; plan.door = null; }
+    if (x < STAIR_X + 4) plan.x = STAIR_X - 6;
+    this.plan = plan; sfx.select();
+  },
   walkTo(x) { const h = this.hero; return new Promise(res => { h.goal = x; h.arrive = res; }); },
   /* ---- крысы: бегают по первому этажу, при виде героя прячутся в норы ---- */
   updateRats(dt) {
@@ -1507,12 +1569,9 @@ scenes.tour = {
     if (r.status === 'thinking') { r.mood += 4; await say(Ln('again')); } else await say(Ln('greet'), r.mood < 30 ? 'angry' : 'neutral');
     const hero = e => portrait(SAVE.look, e);
     for (let round = 0; round < 3; round++) {
-      const menu = [{ label: L(UI.cExplain), k: 'explain' }, { label: L(UI.cArgs), k: 'args' }, { label: L(UI.cListen), k: 'listen', dim: r.listened }, { label: L(UI.cLater), k: 'later' }];
-      let c = menu[await ask(menu)].k;
-      if (c === 'args') {
-        const sub = [{ label: L(UI.aFacts), k: 'facts' }, { label: L(UI.aBenefit), k: 'benefit' }, { label: L(UI.aNeighbors), k: 'neighbors' }, { label: L(UI.aOnline), k: 'online' }, { label: L(UI.aBack), k: 'back' }];
-        c = sub[await ask(sub)].k; if (c === 'back') { round--; continue; }
-      }
+      const menu = [{ label: L(UI.cExplain), k: 'explain' }, { label: L(UI.aFacts), k: 'facts' }, { label: L(UI.aBenefit), k: 'benefit' }, { label: L(UI.aNeighbors), k: 'neighbors' },
+        { label: L(UI.aOnline), k: 'online' }, { label: L(UI.cListen), k: 'listen', dim: r.listened }, { label: L(UI.cLater), k: 'later' }];
+      const c = menu[await ask(menu)].k;
       if (c === 'later') { await say(L(GENERIC.bye)); if (r.status !== 'yes') r.status = 'thinking'; return this.endVisit(r); }
       // реплика героя
       const heroLine = { explain: UI.heroExplain, facts: UI.heroFacts, benefit: UI.heroBenefit, neighbors: UI.heroNeighbors, online: UI.heroOnline, listen: UI.heroListen }[c];
@@ -1655,6 +1714,7 @@ scenes.tour = {
     this.drawRats(cy, t);
     // болтун
     const tk = this.talker;
+    if (this.plan && !this.busy) { const P = this.plan, mx = P.x, my = this.base(P.floor) - cy; if (Math.floor(t / 300) % 2) { rect(mx - 3, my - 2, 7, 1, '#f2c94c'); rect(mx - 1, my - 3, 3, 1, '#f2c94c'); } }
     if (!tk.done || (tk.leaving && tk.leaving < 1400)) {
       if (tk.leaving) tk.leaving += dt;
       const x = tk.x + (tk.leaving ? tk.leaving * .05 : 0);
@@ -1692,6 +1752,8 @@ scenes.tour = {
     this.drawHUD();
     dlgDraw();
     if (this.ballot) this.drawBallot();
+    // нажатие по подъезду: герой сам идёт к двери / на нужный этаж
+    if (!this.busy && !DLG.open && !this.ballot && !this.over) { const c = clicks.find(c => c.y > 24); if (c) { clicks.splice(clicks.indexOf(c), 1); this.onTap(c.x, c.y + cy); } }
   },
   drawHUD() {
     const T = this.tour;

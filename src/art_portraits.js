@@ -39,13 +39,32 @@ function portrait(look, expr = 'neutral') {
     if (look.headphones) { r(9, 5, 22, 2, OUT); r(8, 15, 4, 7, '#b8443f'); r(28, 15, 4, 7, '#b8443f'); }
     // головной убор
     if (look.hat === 'scarf') {
-      const sc = look.scarfCol || '#c8414a';
-      ell(20, 15, 12, 13, sc); ell(20, 19, 7, 9, sk);
-      if (expr === 'happy') { for (const x of [15, 23]) { p(x, ey, E); p(x + 1, ey - 1, E); p(x + 2, ey, E); } } else { r(16, ey, 2, 2, E); r(22, ey, 2, 2, E); }
-      if (expr === 'happy') { p(17, 24, M); r(18, 25, 4, 1, M); p(22, 24, M); } else if (expr === 'angry' || expr === 'sad') { r(18, 25, 4, 1, M); p(17, 26, M); p(22, 26, M); } else r(18, 25, 4, 1, M);
-      p(20, 21, skD); p(20, 22, skD); p(15, 21, skD); p(25, 21, skD);
-      const R = rng(7); for (let i = 0; i < 26; i++) { const a = R() * Math.PI * 2, d = 9 + R() * 3; p(20 + Math.cos(a) * d, 15 + Math.sin(a) * d * 1.05, '#f4f3ee'); }
-      r(16, 29, 8, 3, sc); r(22, 31, 3, 4, shade(sc, -25));
+      // әже в орамале: платок обрамляет лицо, седая чёлка, узел под подбородком, мелкий узор только на ткани
+      const [s0, s1, s2] = tones(look.scarfCol || '#c8414a');
+      // платок: круглый сверху, по бокам ровно спадает к узлу под подбородком
+      const inScarf = (x, y) => y <= 16 ? ((x - 20) ** 2) / 132 + ((y - 15) ** 2) / 156 <= 1 : (y <= 31 && x >= 8.5 + (y - 16) * .5 && x <= 31.5 - (y - 16) * .5);
+      const inFace = (x, y) => ((x - 20) ** 2) / 44 + ((y - 20) ** 2) / 66 <= 1;
+      const body = (x, y) => inScarf(x, y) && !inFace(x, y);
+      for (let y = 2; y < 32; y++) for (let x = 7; x < 34; x++) if (body(x, y)) p(x, y, x > 26 ? s2 : x < 13 ? s0 : s1);
+      for (let y = 10; y < 30; y++) for (let x = 12; x < 29; x++) if (inFace(x, y)) p(x, y, sk);
+      // складки и редкий узор — только внутри ткани, не по краю
+      for (let y = 18; y < 30; y++) { const xl = Math.round(10 + (y - 16) * .5); if (body(xl + 1, y)) p(xl + 1, y, s2); }
+      for (let y = 5; y < 30; y += 5) for (let x = 10 + (y % 10 ? 2 : 0); x < 31; x += 5) {
+        let ok = true; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!body(x + dx, y + dy)) ok = false;
+        if (ok) { p(x, y, '#f1e4c4'); p(x + 1, y, shade(s1, 18)); }
+      }
+      r(15, 12, 11, 2, '#c9c6c0'); p(15, 14, '#c9c6c0'); p(25, 14, '#c9c6c0'); r(16, 12, 9, 1, '#e6e3dc');   // седая чёлка
+      for (let y = 17; y < 29; y++) for (let x = 12; x < 29; x++) if (inFace(x, y) && !inFace(x + 1, y)) p(x, y, skD);   // тень на щеке
+      const ey2 = 18;
+      if (expr === 'happy') { for (const x of [15, 22]) { p(x, ey2, E); p(x + 1, ey2 - 1, E); p(x + 2, ey2, E); } }
+      else { r(16, ey2 - 1, 2, 2, E); r(22, ey2 - 1, 2, 2, E); p(16, ey2 - 1, '#f4f3ee'); p(22, ey2 - 1, '#f4f3ee'); }
+      if (expr === 'angry') { line(14, 14, 18, 16, '#8f8a84'); line(21, 16, 25, 14, '#8f8a84'); } else { line(14, 15, 18, 15, '#a8a49c'); line(21, 15, 25, 15, '#a8a49c'); }
+      p(14, ey2 + 1, skD); p(26, ey2 + 1, skD); p(13, ey2, skD); p(27, ey2, skD);        // морщинки у глаз
+      p(19, 20, skD); p(19, 21, skD); r(19, 22, 2, 1, skD);                            // нос
+      p(16, 23, skD); p(24, 23, skD);                                                   // носогубные складки
+      if (expr === 'happy') { p(17, 24, M); r(18, 25, 5, 1, M); p(23, 24, M); } else if (expr === 'angry' || expr === 'sad') { r(18, 25, 5, 1, M); p(17, 26, M); p(23, 26, M); } else r(18, 25, 5, 1, M);
+      p(15, 21, '#e8a08a'); p(25, 21, '#e8a08a');                                       // румянец
+      r(17, 30, 7, 3, s1); r(18, 30, 5, 1, s0); r(15, 33, 4, 5, s2); r(22, 33, 4, 6, s2); p(16, 33, s1); p(23, 33, s1);  // узел и концы
     }
     if (look.hat === 'tyube') { r(11, 5, 18, 5, '#1b1a21'); r(12, 4, 16, 1, '#1b1a21'); for (const x of [13, 17, 21, 25]) { p(x, 6, '#f4f3ee'); p(x + 1, 7, '#f4f3ee'); p(x, 8, '#f4f3ee'); } }
     if (look.hat === 'cap') { const cc = look.capCol || '#b8443f'; ell(20, 8, 10, 4, cc); r(10, 8, 20, 3, cc); r(24, 10, 10, 2, shade(cc, -30)); }

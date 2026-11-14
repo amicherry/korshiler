@@ -92,7 +92,7 @@ function drawDoorPanel(P, x, b, L, w = 26, h = 48) {
   r(x + 7, b - 24, 3, 2, '#c9a95a'); p(x + 9, b - 23, '#7a6532'); p(x - 1, b - 33, OUT); p(x, b - 33, '#6b7a82');
 }
 function drawStairwell(floors, doorLook) {
-  const WH = 60 + floors * FLOOR_H;
+  const WH = 60 + floors * FLOOR_H + 96;   // снизу — подвал, чтобы первый этаж не прятался за окном диалога
   return makeCanvas(W, WH, (P) => {
     const { r, p, line, g } = P, R = rng(41);
     r(0, 0, W, WH, '#141617');
@@ -167,6 +167,14 @@ function drawStairwell(floors, doorLook) {
       }
     }
     r(0, 0, W, 34, '#101213'); r(0, 30, W, 4, '#2c302e');
+    // подвал: трубы, вентиль, капли — сюда потом придёт ремонт протечки
+    { const y0 = floorBase(1, floors) + 7;
+      r(0, y0, W, WH - y0, '#121516'); for (let i = 0; i < 40; i++) r(R() * W, y0 + 4 + R() * 80, 2 + R() * 8, 1, '#191d1e');
+      r(0, y0 + 18, W, 5, '#3a3f3c'); r(0, y0 + 18, W, 1, '#565c58'); r(0, y0 + 30, W, 3, '#5a3d2e'); r(0, y0 + 30, W, 1, '#7a5440');
+      for (let x = 20; x < W; x += 64) { r(x, y0 + 16, 3, 9, '#2a2e2c'); r(x + 30, y0 + 28, 3, 7, '#2a2e2c'); }
+      r(250, y0 + 8, 9, 9, '#8a2e26'); r(253, y0 + 11, 3, 3, '#121516'); r(254, y0 + 17, 1, 2, '#3a3f3c');
+      for (const x of [118, 252, 330]) { r(x, y0 + 24, 1, 3, '#5d8fb0'); p(x, y0 + 40, '#5d8fb0'); p(x - 1, y0 + 41, '#3d6a85'); p(x + 1, y0 + 41, '#3d6a85'); }
+      for (let x = 0; x < W; x += 40) r(x, y0 + 60, 26, 30, '#16191a'); }
   });
 }
 

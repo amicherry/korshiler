@@ -29,18 +29,26 @@ function persist() { API.save(SAVE); }
 const DLG = { open: false, name: '', port: null, voice: 400, text: '', shown: 0, choices: null, cursor: 0, resolve: null, expr: 'neutral', mood: null, blipAt: 0 };
 function dlgOpen(name, port, voice = 400, mood = null) { Object.assign(DLG, { open: true, name, port, voice, mood, text: '', shown: 0, choices: null }); }
 function dlgClose() { DLG.open = false; DLG.choices = null; DLG.resolve = null; }
-function say(t, expr = 'neutral') { return new Promise(res => Object.assign(DLG, { text: t, shown: 0, choices: null, expr, resolve: res })); }
+// длинная реплика делится на страницы по 5 строк — ничего не обрезается
+const DLG_LINES = 5, DLG_TW = 320;
+function sayPage(t, expr) { return new Promise(res => Object.assign(DLG, { text: t, shown: 0, choices: null, expr, resolve: res })); }
+async function say(t, expr = 'neutral') {
+  const lines = wrapText(t, DLG_TW);
+  for (let i = 0; i < lines.length; i += DLG_LINES) await sayPage(lines.slice(i, i + DLG_LINES).join(' '), expr);
+}
 function ask(opts) { return new Promise(res => Object.assign(DLG, { shown: DLG.text.length, choices: opts, cursor: 0, resolve: res })); }
-const CH = { x0: 62, colW: 164, y0: 175, rowH: 14 };
+const CH = { x0: 64, colW: 162, y0: 146, rowH: 18, bw: 156, bh: 16 };
 function dlgUpdate(dt) {
   if (!DLG.open || !DLG.resolve) return;
   if (DLG.choices) {
     const n = DLG.choices.length;
-    if (hit('down') || hit('right')) { DLG.cursor = (DLG.cursor + 1) % n; sfx.select(); }
-    if (hit('up') || hit('left')) { DLG.cursor = (DLG.cursor + n - 1) % n; sfx.select(); }
+    if (hit('right')) { DLG.cursor = (DLG.cursor + 1) % n; sfx.select(); }
+    if (hit('left')) { DLG.cursor = (DLG.cursor + n - 1) % n; sfx.select(); }
+    if (hit('down')) { DLG.cursor = (DLG.cursor + 2) % n; sfx.select(); }
+    if (hit('up')) { DLG.cursor = (DLG.cursor + n - 2) % n; sfx.select(); }
     for (let i = 0; i < n; i++) {
       const x = CH.x0 + (i % 2) * CH.colW, y = CH.y0 + Math.floor(i / 2) * CH.rowH;
-      if (clickIn(x - 8, y - 3, CH.colW - 4, CH.rowH)) { DLG.cursor = i; return choose(); }
+      if (clickIn(x - 1, y - 1, CH.bw + 2, CH.bh + 2)) { DLG.cursor = i; return choose(); }
     }
     if (hit('act')) return choose();
     return;
@@ -66,18 +74,18 @@ function dlgDraw() {
   if (textW(DLG.name) <= 52) text(DLG.name, x + 29, y + 56, { align: 'center', col: '#f2c94c' });
   else { const parts = DLG.name.split(' '); parts.slice(0, 2).forEach((s, i) => text(s.slice(0, 9), x + 29, y + 55 + i * 9, { align: 'center', col: '#f2c94c', size: 6 })); }
   // текст
-  const lines = wrapText(DLG.text.slice(0, Math.floor(DLG.shown)), 320);
-  const full = wrapText(DLG.text, 320);
-  const maxLines = DLG.choices ? 2 : 5;
-  const off = Math.max(0, full.length - maxLines);
-  lines.slice(off, off + maxLines).forEach((l, i) => text(l, x + 58, y + 9 + i * 12));
+  if (!DLG.choices) wrapText(DLG.text.slice(0, Math.floor(DLG.shown)), DLG_TW).slice(0, DLG_LINES).forEach((l, i) => text(l, x + 58, y + 9 + i * 12));
   if (!DLG.choices && DLG.shown >= DLG.text.length && DLG.resolve) { if (Math.floor(performance.now() / 300) % 2) rect(x + w - 14, y + h - 12, 6, 4, '#f2c94c'); }
   if (DLG.choices) {
+    // варианты — крупные кнопки в две колонки, нажимаются пальцем
+    const rowsN = Math.ceil(DLG.choices.length / 2), y0 = y + Math.round((h - rowsN * CH.rowH) / 2) + 1;
+    CH.y0 = y0;
     DLG.choices.forEach((c, i) => {
-      const cx = CH.x0 + (i % 2) * CH.colW, cy = CH.y0 + Math.floor(i / 2) * CH.rowH;
-      const sel = i === DLG.cursor;
-      if (sel) { rect(cx - 9, cy + 1, 5, 5, '#f2c94c'); rect(cx - 8, cy, 3, 7, '#f2c94c'); }
-      text(c.label, cx, cy, { col: sel ? '#f2c94c' : (c.dim ? '#8f949c' : '#f4f3ee') });
+      const cx = CH.x0 + (i % 2) * CH.colW, cy = y0 + Math.floor(i / 2) * CH.rowH, sel = i === DLG.cursor;
+      rect(cx, cy, CH.bw, CH.bh, sel ? '#f2c94c' : '#1d2130'); rect(cx, cy + CH.bh - 2, CH.bw, 2, sel ? '#b8902a' : '#11141d');
+      rect(cx, cy, CH.bw, 1, sel ? '#ffe28a' : '#3a4157');
+      const sz = textW(c.label) > CH.bw - 8 ? 6 : 8;
+      text(c.label, cx + CH.bw / 2, cy + (sz === 8 ? 4 : 5), { align: 'center', size: sz, col: sel ? '#1b1a21' : (c.dim ? '#7d8394' : '#f4f3ee') });
     });
   }
   // настрой жильца
@@ -294,7 +302,8 @@ scenes.tour = {
     this.rats = [{ x: 170, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 300, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
     this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
     API.tourStart(tour.id).then(r => this.run = r);
-    setTimeout(() => { toast('E-KNOT', L(UI.tut1)); setTimeout(() => !this.over && toast('E-KNOT', L(UI.tut2)), 4500); }, 600);
+    this.plan = null;
+    setTimeout(() => { toast('E-KNOT', L(UI.tutTap)); setTimeout(() => !this.over && toast('E-KNOT', L(UI.tut1)), 4500); }, 600);
   },
   focus() { return { x: this.hero.x, y: this.hero.y - this.camY - 14 }; },
   signatures() { return Object.values(this.res).filter(r => r.status === 'yes').length; },
@@ -343,6 +352,21 @@ scenes.tour = {
       this.updateCam(dt); return;
     }
     let dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    if (dir || keys.up || keys.down) this.plan = null;          // клавиши отменяют маршрут
+    if (!dir && this.plan) {
+      const P = this.plan;
+      if (P.floor !== h.floor) {                                   // сначала к лестнице и по этажам
+        const sx = STAIR_X - 6;
+        if (Math.abs(h.x - sx) > 1.5) dir = Math.sign(sx - h.x);
+        else { this.startClimb(Math.sign(P.floor - h.floor)); this.updateCam(dt); return; }
+      } else if (Math.abs(h.x - P.x) > 1.5) dir = Math.sign(P.x - h.x);
+      else {
+        this.plan = null; h.moving = false;
+        if (P.door) { if (P.door === T.heroApt) toast('E-KNOT', L(UI.yourDoor), 2400); else this.visit(this.res[P.door]); this.updateCam(dt); return; }
+        if (P.npc) { this.runHelper(); this.updateCam(dt); return; }
+      }
+      if (dir && Math.abs((P.floor !== h.floor ? STAIR_X - 6 : P.x) - h.x) < dt * .075) { h.x = P.floor !== h.floor ? STAIR_X - 6 : P.x; dir = 0; }
+    }
     h.moving = dir !== 0;
     if (dir) { h.dir = dir; h.x = clamp(h.x + dir * dt * .075, STAIR_X - 6, 388); h.walkT += dt; this.stepAcc += dt; if (this.stepAcc > 230) { this.stepAcc = 0; sfx.step(); } }
     h.y = this.base(h.floor);
@@ -370,6 +394,16 @@ scenes.tour = {
                     : { to: h.floor - 1, t: 0, pts: [[STAIR_X - 4, b], [12, b + 50], [STAIR_X - 8, b + 100]] };
   },
 
+  onTap(x, wy) {
+    const T = this.tour; let f = 1;
+    for (let k = 1; k <= T.floors; k++) { const b = this.base(k); if (wy > b - FLOOR_H + 6 && wy <= b + 8) f = k; }
+    if (wy < this.base(T.floors) - FLOOR_H + 6) f = T.floors;
+    const plan = { floor: f, x: clamp(x, STAIR_X - 6, 388) };
+    for (let d = 0; d < 4; d++) if (Math.abs(x - DOOR_X[d]) < 17) { plan.x = DOOR_X[d] + (x < DOOR_X[d] ? -4 : 4); plan.door = (f - 1) * 4 + d + 1; }
+    if (this.helper.state === 'shown' && f === this.helper.floor && Math.abs(x - this.helper.x) < 12) { plan.x = this.helper.x + 12; plan.npc = 'helper'; plan.door = null; }
+    if (x < STAIR_X + 4) plan.x = STAIR_X - 6;
+    this.plan = plan; sfx.select();
+  },
   walkTo(x) { const h = this.hero; return new Promise(res => { h.goal = x; h.arrive = res; }); },
   /* ---- крысы: бегают по первому этажу, при виде героя прячутся в норы ---- */
   updateRats(dt) {
@@ -437,12 +471,9 @@ scenes.tour = {
     if (r.status === 'thinking') { r.mood += 4; await say(Ln('again')); } else await say(Ln('greet'), r.mood < 30 ? 'angry' : 'neutral');
     const hero = e => portrait(SAVE.look, e);
     for (let round = 0; round < 3; round++) {
-      const menu = [{ label: L(UI.cExplain), k: 'explain' }, { label: L(UI.cArgs), k: 'args' }, { label: L(UI.cListen), k: 'listen', dim: r.listened }, { label: L(UI.cLater), k: 'later' }];
-      let c = menu[await ask(menu)].k;
-      if (c === 'args') {
-        const sub = [{ label: L(UI.aFacts), k: 'facts' }, { label: L(UI.aBenefit), k: 'benefit' }, { label: L(UI.aNeighbors), k: 'neighbors' }, { label: L(UI.aOnline), k: 'online' }, { label: L(UI.aBack), k: 'back' }];
-        c = sub[await ask(sub)].k; if (c === 'back') { round--; continue; }
-      }
+      const menu = [{ label: L(UI.cExplain), k: 'explain' }, { label: L(UI.aFacts), k: 'facts' }, { label: L(UI.aBenefit), k: 'benefit' }, { label: L(UI.aNeighbors), k: 'neighbors' },
+        { label: L(UI.aOnline), k: 'online' }, { label: L(UI.cListen), k: 'listen', dim: r.listened }, { label: L(UI.cLater), k: 'later' }];
+      const c = menu[await ask(menu)].k;
       if (c === 'later') { await say(L(GENERIC.bye)); if (r.status !== 'yes') r.status = 'thinking'; return this.endVisit(r); }
       // реплика героя
       const heroLine = { explain: UI.heroExplain, facts: UI.heroFacts, benefit: UI.heroBenefit, neighbors: UI.heroNeighbors, online: UI.heroOnline, listen: UI.heroListen }[c];
@@ -585,6 +616,7 @@ scenes.tour = {
     this.drawRats(cy, t);
     // болтун
     const tk = this.talker;
+    if (this.plan && !this.busy) { const P = this.plan, mx = P.x, my = this.base(P.floor) - cy; if (Math.floor(t / 300) % 2) { rect(mx - 3, my - 2, 7, 1, '#f2c94c'); rect(mx - 1, my - 3, 3, 1, '#f2c94c'); } }
     if (!tk.done || (tk.leaving && tk.leaving < 1400)) {
       if (tk.leaving) tk.leaving += dt;
       const x = tk.x + (tk.leaving ? tk.leaving * .05 : 0);
@@ -622,6 +654,8 @@ scenes.tour = {
     this.drawHUD();
     dlgDraw();
     if (this.ballot) this.drawBallot();
+    // нажатие по подъезду: герой сам идёт к двери / на нужный этаж
+    if (!this.busy && !DLG.open && !this.ballot && !this.over) { const c = clicks.find(c => c.y > 24); if (c) { clicks.splice(clicks.indexOf(c), 1); this.onTap(c.x, c.y + cy); } }
   },
   drawHUD() {
     const T = this.tour;
