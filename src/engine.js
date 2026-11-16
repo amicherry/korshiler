@@ -14,9 +14,8 @@ if (isTouch) document.documentElement.classList.add('touch');
 
 function fit() {
   const wrap = document.getElementById('wrap');
-  // на телефоне по бокам оставляем колонки под кнопки, чтобы они не закрывали игру
-  const side = isTouch ? Math.min(124, wrap.clientWidth * .17) : 0;
-  const k = Math.min((wrap.clientWidth - side * 2) / W, wrap.clientHeight / H);
+  // на телефоне — максимально крупно; кнопки полупрозрачные и лежат поверх игры
+  const k = Math.min(wrap.clientWidth / W, wrap.clientHeight / H);
   cv.style.width = Math.floor(W * k) + 'px';
   cv.style.height = Math.floor(H * k) + 'px';
 }
@@ -62,10 +61,21 @@ document.querySelectorAll('[data-k]').forEach(b => {
   b.addEventListener('contextmenu', e => e.preventDefault());
 });
 const touchBtn = k => document.querySelector(`[data-k="${k}"]`);
-function setTouch({ act = null, up = false, down = false } = {}) {
+// какие экранные кнопки нужны сейчас: стрелки «влево/вправо» — только там, где герой ходит
+function setTouch({ act = null, up = false, down = false, move = false } = {}) {
   const a = touchBtn('act'); if (a) { a.hidden = act === null; if (act !== null && a.textContent !== act) a.textContent = act; }
   const u = touchBtn('up'), d = touchBtn('down'); if (u) u.hidden = !up; if (d) d.hidden = !down;
+  for (const k of ['left', 'right']) { const b = touchBtn(k); if (b) b.hidden = !move; }
 }
+// на весь экран + альбомная ориентация (Android; на iPhone — через «На экран Домой»)
+{ const fs = document.getElementById('fs'), el = document.documentElement;
+  if (fs && (el.requestFullscreen || el.webkitRequestFullscreen)) {
+    fs.classList.add('ok');
+    fs.addEventListener('click', async () => {
+      try { if (document.fullscreenElement) await document.exitFullscreen(); else { await (el.requestFullscreen || el.webkitRequestFullscreen).call(el); if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape').catch(() => {}); } } catch (err) {}
+      setTimeout(fit, 200);
+    });
+  } }
 
 /* мышь и касания по холсту: щелчки собираются за кадр, кнопки проверяют их сами */
 let clicks = [];
@@ -73,8 +83,9 @@ const pointer = { x: -1, y: -1 };
 function toLogical(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
 cv.addEventListener('pointerdown', e => { audioUnlock(); const p = toLogical(e); clicks.push(p); });
 cv.addEventListener('pointermove', e => { const p = toLogical(e); pointer.x = p.x; pointer.y = p.y; });
+const TAP_PAD = isTouch ? 3 : 0;   // палец толще курсора: зона нажатия чуть больше кнопки
 function clickIn(x, y, w, h) {
-  const i = clicks.findIndex(c => c.x >= x && c.x < x + w && c.y >= y && c.y < y + h);
+  const p = TAP_PAD, i = clicks.findIndex(c => c.x >= x - p && c.x < x + w + p && c.y >= y - p && c.y < y + h + p);
   if (i < 0) return false; clicks.splice(i, 1); return true;
 }
 

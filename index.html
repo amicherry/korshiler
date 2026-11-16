@@ -12,7 +12,7 @@
 /* Layout: one letterboxed pixel canvas; touch pads float over the bottom corners. Single deliberate dark frame. */
 :root{
   --frame:#15161c; --ink:#f4f3ee; --accent:#f2c94c;
-  --pad:rgba(43,42,51,.6); --pad-on:rgba(242,201,76,.6); --line:rgba(244,243,238,.45);
+  --pad:rgba(20,22,32,.38); --pad-on:rgba(242,201,76,.55); --line:rgba(244,243,238,.38);
   --font-pixel:"Press Start 2P", ui-monospace, monospace;
   color-scheme:dark;
 }
@@ -23,20 +23,28 @@ body{height:100%;margin:0;background:var(--frame);color:var(--ink);overflow:hidd
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
   padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0}
 #wrap{width:100%;height:100%;display:grid;place-items:center}
+/* телефон: игра на весь экран, отступы только под вырез и закругления */
+.touch body{padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
 #cv{display:block;image-rendering:pixelated;image-rendering:crisp-edges;background:#0b0c10}
 #touch{display:none;position:fixed;left:0;right:0;bottom:0;z-index:5;pointer-events:none;justify-content:space-between;align-items:flex-end;
   padding:0 calc(12px + env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px))}
 .touch #touch{display:flex}
 .pad{display:flex;gap:6px;pointer-events:auto;align-items:flex-end}
 .col{display:flex;flex-direction:column;gap:8px}
-.btn{width:48px;height:48px;border-radius:50%;background:var(--pad);border:2px solid var(--line);display:grid;place-items:center;
-  color:var(--ink);padding:0;cursor:pointer;touch-action:none;font:9px var(--font-pixel)}
-.btn.small{width:44px;height:44px}
-.btn.act{width:64px;height:64px}
+/* крупные полупрозрачные кнопки поверх игры: не закрывают картинку и легко попадаются пальцем */
+.btn{width:64px;height:64px;border-radius:50%;background:var(--pad);border:2px solid var(--line);display:grid;place-items:center;
+  color:rgba(244,243,238,.9);padding:0;cursor:pointer;touch-action:none;font:10px var(--font-pixel);
+  -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);text-shadow:0 1px 0 #000}
+.btn.small{width:58px;height:58px}
+.btn.act{width:84px;height:84px;font-size:10px;border-color:rgba(242,201,76,.6)}
 .btn.on{background:var(--pad-on)}
+.btn svg{width:26px;height:26px;fill:currentColor}
+#fs{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:calc(8px + env(safe-area-inset-right,0px));z-index:6;width:40px;height:40px;
+  border-radius:8px;background:var(--pad);border:2px solid var(--line);color:var(--ink);display:none;place-items:center;padding:0}
+.touch #fs.ok{display:grid}
+#fs svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2}
 .btn[hidden]{display:none!important}
 .btn:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-.btn svg{width:20px;height:20px;fill:currentColor}
 #nameBox{position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:7;display:flex;flex-direction:column;gap:6px;align-items:center}
 #nameBox label{font:10px var(--font-pixel);color:#2b2a33}
 #nameInput{font:14px var(--font-pixel);padding:8px 10px;width:min(320px,70vw);border:3px solid #1b1a21;background:#f4f3ee;color:#2b2a33;text-align:center}
@@ -48,9 +56,10 @@ body{height:100%;margin:0;background:var(--frame);color:var(--ink);overflow:hidd
 </style>
 </head>
 <body>
-<div id="wrap"><canvas id="cv" aria-label="Игра «Үй №67»"></canvas></div>
+<div id="wrap"><canvas id="cv" aria-label="Игра «Көршілер»"></canvas></div>
 <div id="nameBox" hidden><input id="nameInput" maxlength="12" autocomplete="off" spellcheck="false" aria-label="Имя героя"></div>
 <div id="rotate"></div>
+<button id="fs" aria-label="На весь экран"><svg viewBox="0 0 20 20"><path d="M2 7V2h5M13 2h5v5M18 13v5h-5M7 18H2v-5"/></svg></button>
 <div id="err" hidden></div>
 <div id="touch" aria-label="Экранное управление">
   <div class="pad">
@@ -82,9 +91,8 @@ if (isTouch) document.documentElement.classList.add('touch');
 
 function fit() {
   const wrap = document.getElementById('wrap');
-  // на телефоне по бокам оставляем колонки под кнопки, чтобы они не закрывали игру
-  const side = isTouch ? Math.min(124, wrap.clientWidth * .17) : 0;
-  const k = Math.min((wrap.clientWidth - side * 2) / W, wrap.clientHeight / H);
+  // на телефоне — максимально крупно; кнопки полупрозрачные и лежат поверх игры
+  const k = Math.min(wrap.clientWidth / W, wrap.clientHeight / H);
   cv.style.width = Math.floor(W * k) + 'px';
   cv.style.height = Math.floor(H * k) + 'px';
 }
@@ -130,10 +138,21 @@ document.querySelectorAll('[data-k]').forEach(b => {
   b.addEventListener('contextmenu', e => e.preventDefault());
 });
 const touchBtn = k => document.querySelector(`[data-k="${k}"]`);
-function setTouch({ act = null, up = false, down = false } = {}) {
+// какие экранные кнопки нужны сейчас: стрелки «влево/вправо» — только там, где герой ходит
+function setTouch({ act = null, up = false, down = false, move = false } = {}) {
   const a = touchBtn('act'); if (a) { a.hidden = act === null; if (act !== null && a.textContent !== act) a.textContent = act; }
   const u = touchBtn('up'), d = touchBtn('down'); if (u) u.hidden = !up; if (d) d.hidden = !down;
+  for (const k of ['left', 'right']) { const b = touchBtn(k); if (b) b.hidden = !move; }
 }
+// на весь экран + альбомная ориентация (Android; на iPhone — через «На экран Домой»)
+{ const fs = document.getElementById('fs'), el = document.documentElement;
+  if (fs && (el.requestFullscreen || el.webkitRequestFullscreen)) {
+    fs.classList.add('ok');
+    fs.addEventListener('click', async () => {
+      try { if (document.fullscreenElement) await document.exitFullscreen(); else { await (el.requestFullscreen || el.webkitRequestFullscreen).call(el); if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape').catch(() => {}); } } catch (err) {}
+      setTimeout(fit, 200);
+    });
+  } }
 
 /* мышь и касания по холсту: щелчки собираются за кадр, кнопки проверяют их сами */
 let clicks = [];
@@ -141,8 +160,9 @@ const pointer = { x: -1, y: -1 };
 function toLogical(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
 cv.addEventListener('pointerdown', e => { audioUnlock(); const p = toLogical(e); clicks.push(p); });
 cv.addEventListener('pointermove', e => { const p = toLogical(e); pointer.x = p.x; pointer.y = p.y; });
+const TAP_PAD = isTouch ? 3 : 0;   // палец толще курсора: зона нажатия чуть больше кнопки
 function clickIn(x, y, w, h) {
-  const i = clicks.findIndex(c => c.x >= x && c.x < x + w && c.y >= y && c.y < y + h);
+  const p = TAP_PAD, i = clicks.findIndex(c => c.x >= x - p && c.x < x + w + p && c.y >= y - p && c.y < y + h + p);
   if (i < 0) return false; clicks.splice(i, 1); return true;
 }
 
@@ -1215,6 +1235,7 @@ function portrait(look, expr = 'neutral') {
     if (look.top === 'hoodie') { r(14, 32, 12, 2, shade(tc, -30)); p(17, 35, '#f4f3ee'); p(22, 35, '#f4f3ee'); }
     if (look.top === 'shirt') { r(17, 32, 6, 3, '#f4f3ee'); p(20, 34, shade(tc, -40)); }
     if (look.top === 'jacket') { r(17, 32, 6, 8, '#e9eef5'); r(19, 33, 2, 7, '#b8443f'); }
+    if (look.top === 'leather') { r(16, 32, 8, 8, shade(tc, -35)); r(18, 32, 4, 3, '#2b2a33'); line(15, 32, 12, 38, shade(tc, 25)); line(24, 32, 27, 38, shade(tc, 25)); p(21, 37, '#c9c6c0'); }
     if (look.top === 'chapan') { r(8, 32, 24, 2, '#d9b43a'); r(19, 32, 2, 8, '#d9b43a'); }
     r(17, 27, 6, 6, skD);
     // голова
@@ -1223,6 +1244,12 @@ function portrait(look, expr = 'neutral') {
     if (look.hair === 'short' || look.hair === 'bun') { ell(20, 10, 10, 5, hc); r(11, 10, 2, 8, hc); r(27, 10, 2, 7, hc); r(13, 12, 14, 1, hc); }
     if (look.hair === 'bun') ell(20, 4, 4, 3, hc);
     if (look.hair === 'long') { ell(20, 10, 10, 5, hc); r(10, 10, 3, 20, hc); r(27, 10, 3, 20, hc); r(13, 12, 14, 1, hc); }
+    if (look.hair === 'curly') {   // кудри: пышная шапка из завитков, по бокам до скул
+      ell(20, 9, 12, 7, hc); r(9, 9, 4, 14, hc); r(27, 9, 4, 14, hc); r(13, 12, 14, 2, hc);
+      const hl = shade(hc, 22), hd = shade(hc, -30);
+      for (const [x, y] of [[12, 5], [16, 3], [21, 3], [26, 5], [10, 10], [29, 10], [14, 8], [24, 8], [10, 16], [29, 16], [19, 7]]) { p(x, y, hl); p(x + 1, y + 1, hd); }
+      for (const x of [8, 31]) for (let y = 8; y < 22; y += 3) p(x, y, hc);
+    }
     if (look.hair === 'bald') { r(10, 13, 2, 6, hc); r(28, 13, 2, 6, hc); }
     // глаза и рот
     const E = OUT, ey = 18;
@@ -1329,7 +1356,7 @@ function drawNet(dt) {
 
 /* ---------- Диалоги в стиле Undertale ---------- */
 const DLG = { open: false, name: '', port: null, voice: 400, text: '', shown: 0, choices: null, cursor: 0, resolve: null, expr: 'neutral', mood: null, blipAt: 0 };
-function dlgOpen(name, port, voice = 400, mood = null) { Object.assign(DLG, { open: true, name, port, voice, mood, text: '', shown: 0, choices: null }); }
+function dlgOpen(name, port, voice = 400, mood = null) { setTouch({ act: L(UI.next) }); Object.assign(DLG, { open: true, name, port, voice, mood, text: '', shown: 0, choices: null }); }
 function dlgClose() { DLG.open = false; DLG.choices = null; DLG.resolve = null; }
 // длинная реплика делится на страницы по 5 строк — ничего не обрезается
 const DLG_LINES = 5, DLG_TW = 320;
@@ -1339,7 +1366,9 @@ async function say(t, expr = 'neutral') {
   for (let i = 0; i < lines.length; i += DLG_LINES) await sayPage(lines.slice(i, i + DLG_LINES).join(' '), expr);
 }
 function ask(opts) { return new Promise(res => Object.assign(DLG, { shown: DLG.text.length, choices: opts, cursor: 0, resolve: res })); }
-const CH = { x0: 64, colW: 162, y0: 146, rowH: 18, bw: 156, bh: 16 };
+// на телефоне окно диалога выше, а кнопки выбора крупнее
+const DLG_BOX = isTouch ? { y: 124, h: 98 } : { y: 140, h: 82 };
+const CH = { x0: 64, colW: 162, y0: 146, rowH: isTouch ? 23 : 18, bw: 156, bh: isTouch ? 21 : 16 };
 function dlgUpdate(dt) {
   if (!DLG.open || !DLG.resolve) return;
   if (DLG.choices) {
@@ -1360,14 +1389,14 @@ function dlgUpdate(dt) {
     DLG.shown = Math.min(len, DLG.shown + dt * .06);
     DLG.blipAt -= dt; if (DLG.blipAt <= 0) { sfx.blip(DLG.voice + Math.random() * 40); DLG.blipAt = 55; }
   }
-  if (hit('act') || clickIn(6, 140, W - 12, 82)) {
+  if (hit('act') || clickIn(6, DLG_BOX.y, W - 12, DLG_BOX.h)) {
     if (DLG.shown < len) DLG.shown = len; else { const r = DLG.resolve; DLG.resolve = null; r(); }
   }
   function choose() { const r = DLG.resolve, c = DLG.cursor; DLG.resolve = null; DLG.choices = null; sfx.select(); r(c); }
 }
 function dlgDraw() {
   if (!DLG.open) return;
-  const x = 6, y = 140, w = W - 12, h = 82;
+  const x = 6, y = DLG_BOX.y, w = W - 12, h = DLG_BOX.h;
   rect(x, y, w, h, '#f4f3ee'); rect(x + 2, y + 2, w - 4, h - 4, '#0b0c10');
   // портрет
   rect(x + 7, y + 8, 44, 44, '#f4f3ee'); rect(x + 8, y + 9, 42, 42, '#20222b');
@@ -1387,12 +1416,12 @@ function dlgDraw() {
       rect(cx, cy, CH.bw, CH.bh, sel ? '#f2c94c' : '#1d2130'); rect(cx, cy + CH.bh - 2, CH.bw, 2, sel ? '#b8902a' : '#11141d');
       rect(cx, cy, CH.bw, 1, sel ? '#ffe28a' : '#3a4157');
       const sz = textW(c.label) > CH.bw - 8 ? 6 : 8;
-      text(c.label, cx + CH.bw / 2, cy + (sz === 8 ? 4 : 5), { align: 'center', size: sz, col: sel ? '#1b1a21' : (c.dim ? '#7d8394' : '#f4f3ee') });
+      text(c.label, cx + CH.bw / 2, cy + Math.round((CH.bh - (sz === 8 ? 9 : 7)) / 2), { align: 'center', size: sz, col: sel ? '#1b1a21' : (c.dim ? '#7d8394' : '#f4f3ee') });
     });
   }
   // настрой жильца
   if (DLG.mood) {
-    const m = clamp(DLG.mood(), 0, 100), bx = 268, by = 128, bw = 118;
+    const m = clamp(DLG.mood(), 0, 100), bx = 268, by = DLG_BOX.y - 12, bw = 118;
     rect(bx - 2, by - 2, bw + 4, 10, '#0b0c10'); rect(bx, by, bw, 6, '#2b2a33');
     const col = m < 30 ? '#d9534f' : m < 60 ? '#f2c94c' : '#4caf6e';
     rect(bx, by, Math.round(bw * m / 100), 6, col);
@@ -1484,7 +1513,7 @@ scenes.creator = {
     this.look = Object.assign({}, DEFAULT_LOOK, SAVE.look || {}); this.row = 0; this.t = 0;
     const box = document.getElementById('nameBox'), inp = document.getElementById('nameInput');
     inp.value = SAVE.name || USER.name || ''; inp.placeholder = LANG === 'kz' ? 'Атың' : 'Имя'; box.hidden = false;
-    setTouch({ act: L(UI.ready), up: true, down: true });
+    setTouch({ act: L(UI.ready), up: true, down: true, move: true });
   },
   leave() { document.getElementById('nameBox').hidden = true; },
   focus() { return { x: 100, y: 120 }; },
@@ -1700,7 +1729,7 @@ scenes.tour = {
     // болтун перехватывает
     if (!this.talker.done && h.floor === this.talker.floor && h.x < 170) { this.runTalker(); return; }
     const door = this.nearDoor(), npc = this.nearNPC();
-    setTouch({ act: npc ? L(UI.talk) : door ? L(UI.knock) : null, up: onStairs && h.floor < T.floors, down: onStairs && h.floor > 1 });
+    setTouch({ act: npc ? L(UI.talk) : door ? L(UI.knock) : null, up: onStairs && h.floor < T.floors, down: onStairs && h.floor > 1, move: true });
     if (hit('act')) {
       if (npc === 'helper') this.runHelper();
       else if (door === T.heroApt) toast('E-KNOT', L(UI.yourDoor), 2400);
@@ -1709,7 +1738,7 @@ scenes.tour = {
     this.updateCam(dt);
   },
   updateCam(dt) {
-    const target = clamp(this.hero.y - (DLG.open ? 118 : 165), 0, this.WH - H);
+    const target = clamp(this.hero.y - (DLG.open ? DLG_BOX.y - 22 : 165), 0, this.WH - H);
     this.camY = lerp(this.camY, target, Math.min(1, dt / 160));
   },
   startClimb(d) {

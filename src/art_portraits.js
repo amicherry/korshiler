@@ -10,6 +10,7 @@ function portrait(look, expr = 'neutral') {
     if (look.top === 'hoodie') { r(14, 32, 12, 2, shade(tc, -30)); p(17, 35, '#f4f3ee'); p(22, 35, '#f4f3ee'); }
     if (look.top === 'shirt') { r(17, 32, 6, 3, '#f4f3ee'); p(20, 34, shade(tc, -40)); }
     if (look.top === 'jacket') { r(17, 32, 6, 8, '#e9eef5'); r(19, 33, 2, 7, '#b8443f'); }
+    if (look.top === 'leather') { r(16, 32, 8, 8, shade(tc, -35)); r(18, 32, 4, 3, '#2b2a33'); line(15, 32, 12, 38, shade(tc, 25)); line(24, 32, 27, 38, shade(tc, 25)); p(21, 37, '#c9c6c0'); }
     if (look.top === 'chapan') { r(8, 32, 24, 2, '#d9b43a'); r(19, 32, 2, 8, '#d9b43a'); }
     r(17, 27, 6, 6, skD);
     // голова
@@ -18,6 +19,12 @@ function portrait(look, expr = 'neutral') {
     if (look.hair === 'short' || look.hair === 'bun') { ell(20, 10, 10, 5, hc); r(11, 10, 2, 8, hc); r(27, 10, 2, 7, hc); r(13, 12, 14, 1, hc); }
     if (look.hair === 'bun') ell(20, 4, 4, 3, hc);
     if (look.hair === 'long') { ell(20, 10, 10, 5, hc); r(10, 10, 3, 20, hc); r(27, 10, 3, 20, hc); r(13, 12, 14, 1, hc); }
+    if (look.hair === 'curly') {   // кудри: пышная шапка из завитков, по бокам до скул
+      ell(20, 9, 12, 7, hc); r(9, 9, 4, 14, hc); r(27, 9, 4, 14, hc); r(13, 12, 14, 2, hc);
+      const hl = shade(hc, 22), hd = shade(hc, -30);
+      for (const [x, y] of [[12, 5], [16, 3], [21, 3], [26, 5], [10, 10], [29, 10], [14, 8], [24, 8], [10, 16], [29, 16], [19, 7]]) { p(x, y, hl); p(x + 1, y + 1, hd); }
+      for (const x of [8, 31]) for (let y = 8; y < 22; y += 3) p(x, y, hc);
+    }
     if (look.hair === 'bald') { r(10, 13, 2, 6, hc); r(28, 13, 2, 6, hc); }
     // глаза и рот
     const E = OUT, ey = 18;

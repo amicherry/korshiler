@@ -20,7 +20,7 @@ function drawNet(dt) {
 
 /* ---------- Диалоги в стиле Undertale ---------- */
 const DLG = { open: false, name: '', port: null, voice: 400, text: '', shown: 0, choices: null, cursor: 0, resolve: null, expr: 'neutral', mood: null, blipAt: 0 };
-function dlgOpen(name, port, voice = 400, mood = null) { Object.assign(DLG, { open: true, name, port, voice, mood, text: '', shown: 0, choices: null }); }
+function dlgOpen(name, port, voice = 400, mood = null) { setTouch({ act: L(UI.next) }); Object.assign(DLG, { open: true, name, port, voice, mood, text: '', shown: 0, choices: null }); }
 function dlgClose() { DLG.open = false; DLG.choices = null; DLG.resolve = null; }
 // длинная реплика делится на страницы по 5 строк — ничего не обрезается
 const DLG_LINES = 5, DLG_TW = 320;
@@ -30,7 +30,9 @@ async function say(t, expr = 'neutral') {
   for (let i = 0; i < lines.length; i += DLG_LINES) await sayPage(lines.slice(i, i + DLG_LINES).join(' '), expr);
 }
 function ask(opts) { return new Promise(res => Object.assign(DLG, { shown: DLG.text.length, choices: opts, cursor: 0, resolve: res })); }
-const CH = { x0: 64, colW: 162, y0: 146, rowH: 18, bw: 156, bh: 16 };
+// на телефоне окно диалога выше, а кнопки выбора крупнее
+const DLG_BOX = isTouch ? { y: 124, h: 98 } : { y: 140, h: 82 };
+const CH = { x0: 64, colW: 162, y0: 146, rowH: isTouch ? 23 : 18, bw: 156, bh: isTouch ? 21 : 16 };
 function dlgUpdate(dt) {
   if (!DLG.open || !DLG.resolve) return;
   if (DLG.choices) {
@@ -51,14 +53,14 @@ function dlgUpdate(dt) {
     DLG.shown = Math.min(len, DLG.shown + dt * .06);
     DLG.blipAt -= dt; if (DLG.blipAt <= 0) { sfx.blip(DLG.voice + Math.random() * 40); DLG.blipAt = 55; }
   }
-  if (hit('act') || clickIn(6, 140, W - 12, 82)) {
+  if (hit('act') || clickIn(6, DLG_BOX.y, W - 12, DLG_BOX.h)) {
     if (DLG.shown < len) DLG.shown = len; else { const r = DLG.resolve; DLG.resolve = null; r(); }
   }
   function choose() { const r = DLG.resolve, c = DLG.cursor; DLG.resolve = null; DLG.choices = null; sfx.select(); r(c); }
 }
 function dlgDraw() {
   if (!DLG.open) return;
-  const x = 6, y = 140, w = W - 12, h = 82;
+  const x = 6, y = DLG_BOX.y, w = W - 12, h = DLG_BOX.h;
   rect(x, y, w, h, '#f4f3ee'); rect(x + 2, y + 2, w - 4, h - 4, '#0b0c10');
   // портрет
   rect(x + 7, y + 8, 44, 44, '#f4f3ee'); rect(x + 8, y + 9, 42, 42, '#20222b');
@@ -78,12 +80,12 @@ function dlgDraw() {
       rect(cx, cy, CH.bw, CH.bh, sel ? '#f2c94c' : '#1d2130'); rect(cx, cy + CH.bh - 2, CH.bw, 2, sel ? '#b8902a' : '#11141d');
       rect(cx, cy, CH.bw, 1, sel ? '#ffe28a' : '#3a4157');
       const sz = textW(c.label) > CH.bw - 8 ? 6 : 8;
-      text(c.label, cx + CH.bw / 2, cy + (sz === 8 ? 4 : 5), { align: 'center', size: sz, col: sel ? '#1b1a21' : (c.dim ? '#7d8394' : '#f4f3ee') });
+      text(c.label, cx + CH.bw / 2, cy + Math.round((CH.bh - (sz === 8 ? 9 : 7)) / 2), { align: 'center', size: sz, col: sel ? '#1b1a21' : (c.dim ? '#7d8394' : '#f4f3ee') });
     });
   }
   // настрой жильца
   if (DLG.mood) {
-    const m = clamp(DLG.mood(), 0, 100), bx = 268, by = 128, bw = 118;
+    const m = clamp(DLG.mood(), 0, 100), bx = 268, by = DLG_BOX.y - 12, bw = 118;
     rect(bx - 2, by - 2, bw + 4, 10, '#0b0c10'); rect(bx, by, bw, 6, '#2b2a33');
     const col = m < 30 ? '#d9534f' : m < 60 ? '#f2c94c' : '#4caf6e';
     rect(bx, by, Math.round(bw * m / 100), 6, col);
@@ -175,7 +177,7 @@ scenes.creator = {
     this.look = Object.assign({}, DEFAULT_LOOK, SAVE.look || {}); this.row = 0; this.t = 0;
     const box = document.getElementById('nameBox'), inp = document.getElementById('nameInput');
     inp.value = SAVE.name || USER.name || ''; inp.placeholder = LANG === 'kz' ? 'Атың' : 'Имя'; box.hidden = false;
-    setTouch({ act: L(UI.ready), up: true, down: true });
+    setTouch({ act: L(UI.ready), up: true, down: true, move: true });
   },
   leave() { document.getElementById('nameBox').hidden = true; },
   focus() { return { x: 100, y: 120 }; },
@@ -391,7 +393,7 @@ scenes.tour = {
     // болтун перехватывает
     if (!this.talker.done && h.floor === this.talker.floor && h.x < 170) { this.runTalker(); return; }
     const door = this.nearDoor(), npc = this.nearNPC();
-    setTouch({ act: npc ? L(UI.talk) : door ? L(UI.knock) : null, up: onStairs && h.floor < T.floors, down: onStairs && h.floor > 1 });
+    setTouch({ act: npc ? L(UI.talk) : door ? L(UI.knock) : null, up: onStairs && h.floor < T.floors, down: onStairs && h.floor > 1, move: true });
     if (hit('act')) {
       if (npc === 'helper') this.runHelper();
       else if (door === T.heroApt) toast('E-KNOT', L(UI.yourDoor), 2400);
@@ -400,7 +402,7 @@ scenes.tour = {
     this.updateCam(dt);
   },
   updateCam(dt) {
-    const target = clamp(this.hero.y - (DLG.open ? 118 : 165), 0, this.WH - H);
+    const target = clamp(this.hero.y - (DLG.open ? DLG_BOX.y - 22 : 165), 0, this.WH - H);
     this.camY = lerp(this.camY, target, Math.min(1, dt / 160));
   },
   startClimb(d) {
