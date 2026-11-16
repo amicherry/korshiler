@@ -687,7 +687,7 @@ scenes.tour = {
   },
   drawHUD() {
     const T = this.tour;
-    rect(0, 0, W, 19, 'rgba(14,17,28,.94)'); rect(0, 19, W, 1, '#55607c'); rect(0, 20, W, 1, 'rgba(5,6,10,.6)');
+    rect(0, 0, W, 19, '#0e111c'); rect(0, 19, W, 1, '#55607c'); rect(0, 20, W, 1, 'rgba(5,6,10,.6)');
     rect(126, 3, 1, 13, '#2c3346'); rect(238, 3, 1, 13, '#2c3346');
     const m = Math.floor(this.minute), hh = Math.floor(m / 60), mm = m % 60;
     const left = this.end - this.minute;
