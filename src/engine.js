@@ -241,6 +241,7 @@ function frame(now) {
   ctx.setTransform(S, 0, 0, S, 0, 0); ctx.imageSmoothingEnabled = false;
   if (scene) { scene.update && scene.update(dt); scene.draw && scene.draw(dt); }
   drawToasts(dt);
+  if (typeof drawNet === 'function') drawNet(dt);
   drawIris(dt);
   clicks = []; for (const k in pressed) pressed[k] = false;
   requestAnimationFrame(frame);

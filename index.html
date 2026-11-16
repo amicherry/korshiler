@@ -309,6 +309,7 @@ function frame(now) {
   ctx.setTransform(S, 0, 0, S, 0, 0); ctx.imageSmoothingEnabled = false;
   if (scene) { scene.update && scene.update(dt); scene.draw && scene.draw(dt); }
   drawToasts(dt);
+  if (typeof drawNet === 'function') drawNet(dt);
   drawIris(dt);
   clicks = []; for (const k in pressed) pressed[k] = false;
   requestAnimationFrame(frame);
@@ -404,6 +405,20 @@ const UI = {
   rCoins:     { kz: 'Тиын', ru: 'Монеты' },
   rNext:      { kz: 'Келесі: 2-тур «Жалпы жиналыс» — антенна үшін 50%+1. Жақында!', ru: 'Дальше: тур 2 «Общее собрание» — 50%+1 за антенну. Скоро!' },
   rRetry:     { kz: 'Көршілер есінде сақтайды: келесі жолы оңайырақ болады.', ru: 'Соседи запомнят разговор: в следующий раз будет проще.' },
+  rating:     { kz: 'РЕЙТИНГ', ru: 'РЕЙТИНГ' },
+  tabComplex: { kz: 'МЕНІҢ ЖК', ru: 'МОЙ ЖК' }, tabCity: { kz: 'ҚАЛА', ru: 'ГОРОД' },
+  you:        { kz: 'сіз', ru: 'вы' },
+  noScore:    { kz: 'Сізде әлі ұпай жоқ — турды ойнаңыз!', ru: 'У вас ещё нет очков — сыграйте тур!' },
+  guestMode:  { kz: 'Қонақ режимі', ru: 'Гостевой режим' },
+  guestNote:  { kz: 'Бонустар үшін ойынды E-KNOT қосымшасынан ашыңыз', ru: 'Для бонусов откройте игру из приложения E-KNOT' },
+  netFail:    { kz: 'Серверге қосылу мүмкін болмады', ru: 'Не удалось связаться с сервером' },
+  netSaveFail:{ kz: 'Сақтау сәтсіз, кейін қайталаймыз', ru: 'Не сохранилось, повторим позже' },
+  retry:      { kz: 'ҚАЙТАЛАУ', ru: 'ПОВТОРИТЬ' },
+  rScore:     { kz: 'Ұпай', ru: 'Очки' },
+  rRank:      { kz: 'ЖК-дағы орын', ru: 'Место в ЖК' },
+  rOffline:   { kz: 'Байланыс жоқ: нәтиже рейтингке кірмеді.', ru: 'Нет связи: результат не попал в рейтинг.' },
+  rRewardSent:{ kz: '+{n} бонус E-KNOT қосымшасына жіберілді!', ru: '+{n} бонусов отправлено в приложение E-KNOT!' },
+  rRewardGuest:{ kz: '+{n} бонус күтіп тұр — ойынды E-KNOT қосымшасынан ашыңыз.', ru: '+{n} бонусов ждут — откройте игру из приложения E-KNOT.' },
   again:      { kz: 'ҚАЙТАЛАУ', ru: 'ЕЩЁ РАЗ' }, menu: { kz: 'МӘЗІР', ru: 'МЕНЮ' },
   // болтун и помощница
   talkerName: { kz: 'Жанат аға', ru: 'Жанат-ага' },
@@ -561,6 +576,176 @@ const TOURS = {
     mix: ['apa', 'apa', 'apa', 'student', 'student', 'student', 'mom', 'mom', 'mom', 'grump', 'grump', 'business', 'business', 'night', 'night', 'renter', 'renter', 'mom', 'apa'],
     awayShare: .26, talkerFloor: 3, helperAfter: 3, helperFloor: 5 },
 };
+
+/* ============================================================
+   API — связь игры с сервером E-KNOT.
+   Пока настоящего бэкенда нет, запросы обслуживает заглушка MockServer:
+   она ведёт себя как сервер (задержка, редкие ошибки сети, проверка
+   результатов), а данные хранит в localStorage браузера.
+   Когда появится сервер — в API_CONFIG.baseUrl ставится его адрес,
+   и все те же запросы пойдут через fetch. Игру менять не нужно.
+   Описание запросов: docs/API.md
+   ============================================================ */
+const API_CONFIG = {
+  baseUrl: null,                 // например 'https://api.e-knot.kz/game/v1'
+  latency: [150, 450],           // задержка ответа заглушки, мс
+  failRate: .04,                 // доля «обрывов связи» в заглушке (?stable — без них)
+};
+
+/* ---------------- заглушка сервера ---------------- */
+const MockServer = (() => {
+  const DB_KEY = 'kn_server_db';
+  const load = () => { try { return JSON.parse(loadStr(DB_KEY, '')) || null; } catch (e) { return null; } };
+  const db = load() || { users: {}, profiles: {}, runs: {}, scores: {}, rewards: {} };
+  const commit = () => saveStr(DB_KEY, JSON.stringify(db));
+
+  // тестовые жители: так приложение E-KNOT передало бы токен в ссылке (?token=demo)
+  const TOKENS = {
+    demo:  { userId: 'u-1001', name: 'Әмина', complex: { id: 'c-17', name: 'ЖК «Нұрлы»', city: 'Астана' }, apartment: 13 },
+    demo2: { userId: 'u-1002', name: 'Арман', complex: { id: 'c-17', name: 'ЖК «Нұрлы»', city: 'Астана' }, apartment: 7 },
+  };
+  // соседи и горожане для таблицы рекордов (как будто уже играли)
+  const FAKE = [
+    ['Динара', 'c-17', 1460], ['Ерлан', 'c-17', 1310], ['Роза апа', 'c-17', 980], ['Тимур', 'c-17', 870], ['Әсел', 'c-17', 640],
+    ['Нұрлан', 'c-04', 1720], ['Ольга', 'c-04', 1180], ['Бақыт', 'c-09', 1590], ['Мадина', 'c-09', 1240], ['Асхат', 'c-21', 1390], ['Жанар', 'c-21', 760],
+  ];
+  const err = (status, code) => { const e = new Error(code); e.status = status; e.code = code; throw e; };
+  const me = token => {
+    if (!token) err(401, 'no_session');
+    const u = db.users[token]; if (!u) err(401, 'bad_session'); return u;
+  };
+
+  const routes = {
+    // вход: токен из приложения или гость (без бонусов)
+    'POST /auth'({ body }) {
+      const t = body.token && TOKENS[body.token];
+      let user;
+      if (t) user = { ...t, guest: false };
+      else {
+        const gid = body.deviceId || ('g-' + Math.floor(Math.random() * 1e9));
+        user = { userId: gid, name: null, complex: { id: 'guest', name: null, city: 'Астана' }, apartment: null, guest: true };
+      }
+      const session = 's-' + user.userId;
+      db.users[session] = user; db.profiles[user.userId] = db.profiles[user.userId] || null; commit();
+      return { session, user };
+    },
+    'GET /profile'({ session }) { const u = me(session); return { profile: db.profiles[u.userId] }; },
+    'PUT /profile'({ session, body }) {
+      const u = me(session); const p = body.profile || {};
+      // сервер не даёт игре самой себе начислить монеты: их меняет только итог тура
+      const old = db.profiles[u.userId] || {};
+      db.profiles[u.userId] = { ...p, coins: old.coins || 0, rewardsTotal: old.rewardsTotal || 0 }; commit();
+      return { ok: true };
+    },
+    'DELETE /profile'({ session }) {
+      const u = me(session); db.profiles[u.userId] = null; delete db.scores[u.userId]; db.rewards[u.userId] = []; commit(); return { ok: true };
+    },
+    'POST /tours/start'({ session, body }) {
+      const u = me(session); const tour = TOURS[body.tourId]; if (!tour) err(404, 'no_tour');
+      const runId = 'r-' + Date.now().toString(36) + Math.floor(Math.random() * 1e4);
+      db.runs[runId] = { userId: u.userId, tourId: tour.id, startedAt: Date.now(), finished: false }; commit();
+      return { runId, startedAt: db.runs[runId].startedAt, tour: { id: tour.id, goal: tour.goal, floors: tour.floors, perFloor: tour.perFloor } };
+    },
+    // итог: сервер сам считает подписи по журналу событий и проверяет, что всё правдоподобно
+    'POST /tours/finish'({ session, body }) {
+      const u = me(session); const run = db.runs[body.runId];
+      if (!run || run.userId !== u.userId) err(404, 'no_run');
+      if (run.finished) return run.result;                                     // повторная отправка — тот же ответ
+      const tour = TOURS[run.tourId], maxApt = tour.floors * tour.perFloor;
+      const seconds = (Date.now() - run.startedAt) / 1000;
+      const yes = new Map();
+      for (const e of body.events || []) if (e.t === 'yes' && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt) yes.set(e.apt, e.via || 'door');
+      const suspicious = seconds < 15 && yes.size > 3;                       // 10 подписей за 15 секунд не бывает
+      const signatures = suspicious ? 0 : yes.size, online = [...yes.values()].filter(v => v === 'online').length;
+      const success = signatures >= tour.goal;
+      const score = signatures * 100 + online * 20 + (success ? 300 + Math.max(0, Math.round(600 - seconds) * 2) : 0);
+      const coins = signatures * 5 + (success ? 25 : 0);
+      const prof = db.profiles[u.userId] || (db.profiles[u.userId] = {});
+      prof.coins = (prof.coins || 0) + coins;
+      const prevBest = (db.scores[u.userId] || {}).best || 0, best = Math.max(prevBest, score);
+      db.scores[u.userId] = { name: prof.name || u.name || 'Ойыншы', complex: u.complex.id, best };
+      // бонусы в приложение — только вошедшим через E-KNOT и только за первую победу в туре
+      let reward = null; db.rewards[u.userId] = db.rewards[u.userId] || [];
+      if (success && !db.rewards[u.userId].some(r => r.tourId === tour.id)) {
+        reward = { tourId: tour.id, points: 50, status: u.guest ? 'needs_login' : 'sent', at: Date.now() };
+        if (!u.guest) { db.rewards[u.userId].push(reward); prof.rewardsTotal = (prof.rewardsTotal || 0) + reward.points; }
+      }
+      run.finished = true;
+      run.result = { signatures, online, success, score, best, newBest: score > prevBest, coins, totalCoins: prof.coins, reward, suspicious };
+      commit();
+      return run.result;
+    },
+    'GET /leaderboard'({ session, query }) {
+      const u = me(session); const scope = query.scope === 'city' ? 'city' : 'complex';
+      const rows = FAKE.map(([name, complex, best]) => ({ name, complex, best }));
+      for (const [id, s] of Object.entries(db.scores)) rows.push({ ...s, me: id === u.userId });
+      let list = rows.filter(r => scope === 'city' || r.complex === u.complex.id || r.me);
+      list.sort((a, b) => b.best - a.best);
+      list = list.map((r, i) => ({ rank: i + 1, name: r.name, best: r.best, me: !!r.me }));
+      return { scope, complexName: u.complex.name, top: list.slice(0, 8), mine: list.find(r => r.me) || null };
+    },
+    'GET /rewards'({ session }) { const u = me(session); return { rewards: db.rewards[u.userId] || [], guest: u.guest }; },
+  };
+
+  return {
+    async handle(method, path, { session, body, query }) {
+      const [lo, hi] = API_CONFIG.latency; await wait(lo + Math.random() * (hi - lo));
+      if (!/[?&]stable/.test(location.search) && Math.random() < API_CONFIG.failRate) err(0, 'network');
+      const fn = routes[method + ' ' + path]; if (!fn) err(404, 'no_route');
+      // как настоящий сервер: отдаём копию, а не ссылку на свои данные
+      return JSON.parse(JSON.stringify(fn({ session, body: body || {}, query: query || {} })));
+    },
+  };
+})();
+
+/* ---------------- клиент: одна функция для заглушки и для настоящего сервера ---------------- */
+const NET = { pending: 0, lastError: null };
+async function request(method, path, { body, query } = {}, tries = 3) {
+  NET.pending++;
+  try {
+    for (let i = 0; ; i++) {
+      try {
+        if (!API_CONFIG.baseUrl) return await MockServer.handle(method, path, { session: API.session, body, query });
+        const qs = query ? '?' + new URLSearchParams(query) : '';
+        const res = await fetch(API_CONFIG.baseUrl + path + qs, {
+          method, headers: { 'Content-Type': 'application/json', ...(API.session ? { Authorization: 'Bearer ' + API.session } : {}) },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        if (!res.ok) { const e = new Error('http_' + res.status); e.status = res.status; throw e; }
+        return await res.json();
+      } catch (e) {
+        // сеть мигнула — повторяем с паузой; ошибки вроде 401/404 не повторяем
+        if (e.status || i >= tries - 1) { NET.lastError = e; throw e; }
+        await wait(400 * (i + 1));
+      }
+    }
+  } finally { NET.pending--; }
+}
+
+const API = {
+  session: null, user: null,
+  async auth() {
+    const q = new URLSearchParams(location.search);
+    let deviceId = loadStr('kn_device', ''); if (!deviceId) { deviceId = 'g-' + Math.floor(Math.random() * 1e9); saveStr('kn_device', deviceId); }
+    const r = await request('POST', '/auth', { body: { token: q.get('token'), deviceId } });
+    this.session = r.session; this.user = r.user;
+    return { ...r.user, fromApp: !r.user.guest };
+  },
+  async load() { return (await request('GET', '/profile')).profile; },
+  async save(profile) { return request('PUT', '/profile', { body: { profile } }); },
+  async reset() { return request('DELETE', '/profile'); },
+  async tourStart(tourId) { return request('POST', '/tours/start', { body: { tourId } }); },
+  async tourFinish(run, events) { return request('POST', '/tours/finish', { body: { runId: run && run.runId, events } }, 4); },
+  async leaderboard(scope) { return request('GET', '/leaderboard', { query: { scope } }); },
+  async rewards() { return request('GET', '/rewards'); },
+};
+
+// перенос старого сохранения (до появления заглушки сервера)
+async function migrateOldSave() {
+  const old = loadStr('d67_save', '');
+  if (!old) return null;
+  try { const p = JSON.parse(old); await API.save(p); saveStr('d67_save', ''); return p; } catch (e) { return null; }
+}
 
 /* ============================================================
    ГРАФИКА: всё рисуется кодом в маленькие холсты-спрайты
@@ -1118,27 +1303,20 @@ const ICONS = {}; for (const k of ['yes', 'no', 'thinking', 'away', 'noanswer', 
    ============================================================ */
 
 /* ---------- Mock API: тот же набор запросов, что будет у настоящего сервера ---------- */
-const API = {
-  async auth() {
-    // Из приложения E-KNOT придёт ?token=… и имя; здесь — гость или ?name=Әмина для демонстрации входа
-    const q = new URLSearchParams(location.search);
-    let uid = loadStr('d67_uid', ''); if (!uid) { uid = 'guest-' + Math.floor(Math.random() * 1e9); saveStr('d67_uid', uid); }
-    return { userId: uid, name: q.get('name') || null, fromApp: q.has('token') };
-  },
-  async load() { try { return JSON.parse(loadStr('d67_save', 'null')); } catch (e) { return null; } },
-  async save(s) { saveStr('d67_save', JSON.stringify(s)); },
-  async tourStart(id) { return { run: id + '-' + Date.now(), at: Date.now() }; },
-  // сервер сам пересчитывает итог по событиям, а не верит числу из игры
-  async tourFinish(run, events, tour) {
-    const signed = new Set();
-    for (const e of events) if (e.t === 'yes') signed.add(e.apt);
-    const n = signed.size, ok = n >= tour.goal;
-    return { signatures: n, online: events.filter(e => e.t === 'yes' && e.via === 'online').length, success: ok, coins: n * 5 + (ok ? 25 : 0) };
-  },
-};
 let USER = null, SAVE = null;
 const DEFAULT_LOOK = { skin: '#e3ad86', hair: 'short', hairCol: '#2b2420', top: 'hoodie', topCol: '#2f8577', hat: null };
-function persist() { API.save(SAVE); }
+function persist() { API.save(SAVE).catch(() => toast('E-KNOT', L(UI.netSaveFail), 2400)); }
+const NEW_SAVE = () => ({ created: false, coins: 0, tours: {}, trust: {} });
+// индикатор связи с сервером: крутится в углу, пока идёт запрос дольше 0,3 с
+let netShownAt = 0;
+function drawNet(dt) {
+  if (NET.pending > 0) netShownAt += dt; else netShownAt = 0;
+  if (netShownAt < 300) return;
+  const t = performance.now() / 120, x = W - 12, y = H - 12;
+  rect(x - 7, y - 7, 15, 15, 'rgba(14,17,28,.85)');
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; ctx.globalAlpha = ((i + Math.floor(t)) % 8) / 8; rect(x + Math.round(Math.cos(a) * 4), y + Math.round(Math.sin(a) * 4), 1, 1, '#f2c94c'); }
+  ctx.globalAlpha = 1;
+}
 
 /* ---------- Диалоги в стиле Undertale ---------- */
 const DLG = { open: false, name: '', port: null, voice: 400, text: '', shown: 0, choices: null, cursor: 0, resolve: null, expr: 'neutral', mood: null, blipAt: 0 };
@@ -1252,11 +1430,14 @@ scenes.title = {
     text(L(UI.by), 18, 64, { col: '#9fd9c2', size: 6, shadow: '#0b0c10' });
     if (this.settings) return this.drawSettings();
     // панель меню в рамке
-    const bw = Math.max(textW(L(UI.cont)), textW(L(UI.settings)), 96) + 16, py = SAVE && SAVE.name ? 112 : 124;
-    frameBox(12, py, bw + 12, 196 - py - 8);
-    if (SAVE && SAVE.name) text(L(UI.hello) + SAVE.name + '!', 18, py + 7, { col: '#cfd6e4', size: 6 });
-    if (button(SAVE && SAVE.created ? L(UI.cont) : L(UI.play), 0, 140, 'primary', { left: 18, w: bw })) this.start();
-    if (button(L(UI.settings), 0, 162, 'alt', { left: 18, w: bw })) { this.settings = true; this.sure = false; }
+    const bw = Math.max(textW(L(UI.cont)), textW(L(UI.settings)), textW(L(UI.rating)), 96) + 16, py = 104;
+    frameBox(12, py, bw + 12, 104);
+    const who = SAVE && SAVE.name ? L(UI.hello) + SAVE.name + '!' : '';
+    if (who) text(who, 18, py + 6, { col: '#cfd6e4', size: 6 });
+    text(USER.guest ? L(UI.guestMode) : USER.complex.name + ' · ' + USER.apartment, 18, py + 16, { col: USER.guest ? '#8792ad' : '#9fd9c2', size: 6 });
+    if (button(SAVE && SAVE.created ? L(UI.cont) : L(UI.play), 0, 132, 'primary', { left: 18, w: bw })) this.start();
+    if (button(L(UI.rating), 0, 154, 'alt', { left: 18, w: bw })) irisTo(40, 162, () => go('leaderboard', { from: 'title' }));
+    if (button(L(UI.settings), 0, 176, 'alt', { left: 18, w: bw })) { this.settings = true; this.sure = false; }
   },
   drawSettings() {
     rect(0, 0, W, H, 'rgba(11,12,16,.55)');
@@ -1268,7 +1449,7 @@ scenes.title = {
     text(L(UI.sound), W / 2, 100, { align: 'center', col: INK });
     if (button(SND.on ? L(UI.on) : L(UI.off), W / 2, 114, SND.on ? 'alt' : 'off')) { SND.on = !SND.on; saveStr('d67_sound', SND.on ? '1' : '0'); }
     if (button(this.done ? L(UI.resetDone) : this.sure ? L(UI.resetSure) : L(UI.reset), W / 2, 144, this.done ? 'off' : 'danger')) {
-      if (this.done) {} else if (!this.sure) this.sure = true; else { SAVE = { created: false, coins: 0, tours: {}, trust: {} }; persist(); this.done = true; }
+      if (this.done) {} else if (!this.sure) this.sure = true; else { SAVE = NEW_SAVE(); API.reset().catch(() => {}); this.done = true; }
     }
     if (button(L(UI.back), W / 2, 176, 'alt')) this.settings = false;
   },
@@ -1433,7 +1614,7 @@ scenes.tour = {
     this.helper = { state: 'hidden', floor: 2, x: 104, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
     this.rats = [{ x: 170, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 300, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
     this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
-    API.tourStart(tour.id).then(r => this.run = r);
+    this.run = null; API.tourStart(tour.id).then(r => this.run = r).catch(() => {});
     this.plan = null;
     setTimeout(() => { toast('E-KNOT', L(UI.tutTap)); setTimeout(() => !this.over && toast('E-KNOT', L(UI.tut1)), 4500); }, 600);
   },
@@ -1702,10 +1883,16 @@ scenes.tour = {
     for (const r of Object.values(this.res)) if (r.status === 'online') {
       if (Math.random() < (r.arch === 'night' ? .9 : .82)) { r.status = 'yes'; this.events.push({ t: 'yes', apt: r.apt, via: 'online' }); } else r.status = 'thinking';
     }
-    const result = await API.tourFinish(this.run, this.events, this.tour);
+    let result;
+    try { result = await API.tourFinish(this.run, this.events); }
+    catch (e) {
+      // сервер не ответил — показываем итог, посчитанный в игре, но без рейтинга и бонусов
+      const yes = new Set(this.events.filter(e => e.t === 'yes').map(e => e.apt)), n = yes.size, ok = n >= this.tour.goal;
+      result = { signatures: n, online: this.events.filter(e => e.t === 'yes' && e.via === 'online').length, success: ok, coins: 0, score: null, offline: true };
+    }
     const T = this.tour.id, prev = SAVE.tours[T] || { tries: 0, best: 0, done: false };
     SAVE.tours[T] = { tries: prev.tries + 1, best: Math.max(prev.best, result.signatures), done: prev.done || result.success };
-    SAVE.coins = (SAVE.coins || 0) + result.coins; persist();
+    if (result.totalCoins != null) SAVE.coins = result.totalCoins; persist();
     const stats = { ...result, against: Object.values(this.res).filter(r => r.status === 'no').length, thinking: Object.values(this.res).filter(r => r.status === 'thinking').length };
     setTimeout(() => irisTo(this.hero.x, this.hero.y - this.camY - 14, () => go('result', stats)), timeUp ? 1200 : 200);
   },
@@ -1841,21 +2028,69 @@ function tweenDoor(r, to) { return new Promise(res => { const from = r.door, t0 
    СЦЕНА: итог тура (протокол)
    ============================================================ */
 scenes.result = {
-  enter(d) { this.d = d; this.t = 0; setTouch({ act: L(UI.next) }); if (d.success) setTimeout(() => sfx.stamp(), 500); },
+  enter(d) { this.d = d; this.t = 0; setTouch({ act: L(UI.next) }); if (d.success) setTimeout(() => sfx.stamp(), 500);
+    this.rank = null; if (!d.offline) API.leaderboard('complex').then(r => this.rank = r.mine).catch(() => {}); },
   update(dt) { this.t += dt; if (hit('act')) irisTo(W / 2, 200, () => go('title')); },
   draw(dt) {
     const d = this.d;
     drawNight(dt);
-    paper(60, 16, 280, 196, 11);
-    text(L(UI.protocol), W / 2, 26, { align: 'center', col: INK_MUTED });
-    text(d.success ? L(UI.win) : L(UI.lose), W / 2, 42, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
-    const rows = [[L(UI.rSigned), `${d.signatures}/${TOURS.t1.goal}`], ['  ' + L(UI.rOnline), String(d.online)], [L(UI.rAgainst), String(d.against)], [L(UI.rThinking), String(d.thinking)], [L(UI.rCoins), '+' + d.coins]];
-    rows.forEach(([a, b], i) => { text(a, 80, 66 + i * 14, { col: INK }); text(b, 320, 66 + i * 14, { col: INK, align: 'right' }); rect(80, 76 + i * 14, 240, 1, '#e2d9c2'); });
-    wrapText(d.success ? L(UI.rNext) : L(UI.rRetry), 240).forEach((l, i) => text(l, W / 2, 142 + i * 11, { align: 'center', col: d.success ? INK_TEAL : INK_MUTED }));
-    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(290, 52); ctx.rotate(-.25); ctx.scale(s, s); ctx.globalAlpha = k;
+    paper(56, 10, 288, 210, 11);
+    text(L(UI.protocol), W / 2, 18, { align: 'center', col: INK_MUTED });
+    text(d.success ? L(UI.win) : L(UI.lose), W / 2, 32, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
+    const rows = [[L(UI.rSigned), `${d.signatures}/${TOURS.t1.goal}`], ['  ' + L(UI.rOnline), String(d.online)], [L(UI.rAgainst), String(d.against)], [L(UI.rThinking), String(d.thinking)]];
+    if (!d.offline) rows.push([L(UI.rScore), String(d.score) + (d.newBest ? ' ★' : '')], [L(UI.rRank), this.rank ? '#' + this.rank.rank : '…'], [L(UI.rCoins), '+' + d.coins]);
+    rows.forEach(([a, b], i) => { text(a, 74, 48 + i * 13, { col: INK }); text(b, 326, 48 + i * 13, { col: i === 4 && d.newBest ? INK_GOLD : INK, align: 'right' }); rect(74, 57 + i * 13, 252, 1, '#e2d9c2'); });
+    // бонус в приложение
+    let note, col = INK_MUTED;
+    if (d.offline) note = L(UI.rOffline);
+    else if (d.reward && d.reward.status === 'sent') { note = L(UI.rRewardSent).replace('{n}', d.reward.points); col = INK_TEAL; }
+    else if (d.reward && d.reward.status === 'needs_login') { note = L(UI.rRewardGuest).replace('{n}', d.reward.points); col = INK_GOLD; }
+    else note = d.success ? L(UI.rNext) : L(UI.rRetry);
+    wrapText(note, 200).slice(0, 3).forEach((l, i) => text(l, 172, 140 + i * 10, { align: 'center', col, size: 6 }));
+    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(296, 154); ctx.rotate(-.25); ctx.scale(s, s); ctx.globalAlpha = k;
       ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text('ОСИ', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
-    if (button(L(UI.menu), W / 2 - 60, 186, 'alt')) irisTo(W / 2 - 60, 194, () => go('title'));
-    if (button(L(UI.again), W / 2 + 60, 186, 'primary')) irisTo(W / 2 + 60, 194, () => go('tour', { tour: 't1' }));
+    const bw = 84;
+    if (button(L(UI.menu), 108, 186, 'alt', { w: bw })) irisTo(108, 194, () => go('title'));
+    if (button(L(UI.rating), 200, 186, 'alt', { w: bw })) irisTo(200, 194, () => go('leaderboard', { from: 'result' }));
+    if (button(L(UI.again), 292, 186, 'primary', { w: bw })) irisTo(292, 194, () => go('tour', { tour: 't1' }));
+  },
+};
+
+/* ============================================================
+   СЦЕНА: рейтинг — соседи по ЖК и весь город
+   ============================================================ */
+scenes.leaderboard = {
+  enter(d) { this.from = d && d.from; this.scope = 'complex'; this.fetch(); setTouch({ act: L(UI.back) }); },
+  fetch() {
+    this.data = null; this.err = false; const scope = this.scope;
+    API.leaderboard(scope).then(r => { if (this.scope === scope) this.data = r; }).catch(() => { this.err = true; });
+  },
+  update() { if (hit('act') || hit('back')) irisTo(W / 2, 200, () => go('title')); if (hit('left') || hit('right')) { this.scope = this.scope === 'city' ? 'complex' : 'city'; this.fetch(); } },
+  draw(dt) {
+    drawNight(dt);
+    frameBox(60, 10, 280, 206);
+    text(L(UI.rating), W / 2, 20, { align: 'center', col: '#f4f3ee' });
+    if (button(L(UI.tabComplex), 150, 34, this.scope === 'complex' ? 'primary' : 'off', { w: 92 }) && this.scope !== 'complex') { this.scope = 'complex'; this.fetch(); }
+    if (button(L(UI.tabCity), 250, 34, this.scope === 'city' ? 'primary' : 'off', { w: 92 }) && this.scope !== 'city') { this.scope = 'city'; this.fetch(); }
+    const D = this.data;
+    if (this.err) { text(L(UI.netFail), W / 2, 100, { align: 'center', col: '#e88a7a', size: 6 }); if (button(L(UI.retry), W / 2, 116, 'alt')) this.fetch(); }
+    else if (!D) text('…', W / 2, 100, { align: 'center', col: '#8792ad' });
+    else {
+      if (this.scope === 'complex' && D.complexName) text(D.complexName, W / 2, 56, { align: 'center', col: '#9fd9c2', size: 6 });
+      const row = (r, y) => {
+        if (r.me) rect(72, y - 3, 256, 13, 'rgba(242,201,76,.18)');
+        const c = r.me ? '#f2c94c' : r.rank <= 3 ? '#f4f3ee' : '#cfd6e4';
+        text(String(r.rank), 84, y, { col: r.rank <= 3 ? ['#f2c94c', '#cfd6e4', '#d39a6a'][r.rank - 1] : '#8792ad', align: 'center' });
+        text(r.me ? r.name + ' (' + L(UI.you) + ')' : r.name, 100, y, { col: c });
+        text(String(r.best), 320, y, { col: c, align: 'right' });
+      };
+      const meIn = D.top.some(r => r.me), top = D.mine && !meIn ? D.top.slice(0, 7) : D.top;
+      top.forEach((r, i) => row(r, 68 + i * 14));
+      if (D.mine && !meIn) { text('···', W / 2, 68 + top.length * 14 - 3, { align: 'center', col: '#55607c' }); row(D.mine, 68 + top.length * 14 + 6); }
+      if (!D.mine) text(L(UI.noScore), W / 2, 186, { align: 'center', col: '#8792ad', size: 6 });
+    }
+    if (USER.guest) text(L(UI.guestNote), W / 2, 176, { align: 'center', col: '#8792ad', size: 6 });
+    if (button(L(UI.back), W / 2, 196, 'alt')) irisTo(W / 2, 204, () => go(this.from === 'result' ? 'title' : 'title'));
   },
 };
 
@@ -1864,8 +2099,12 @@ scenes.result = {
    ============================================================ */
 (async function boot() {
   try { if (document.fonts) await Promise.race([document.fonts.load('8px "Press Start 2P"', 'ҮЙ №67 ӘҒҚҢӨҰҮҺІ әғқңөұүһі'), wait(2500)]); } catch (e) {}
-  USER = await API.auth();
-  SAVE = (await API.load()) || { created: false, coins: 0, tours: {}, trust: {} };
+  // вход через сервер (пока — заглушка). Если связи нет, пробуем снова
+  for (let i = 0; ; i++) {
+    try { USER = await API.auth(); SAVE = (await API.load()) || (await migrateOldSave()) || NEW_SAVE(); break; }
+    catch (e) { const m = document.getElementById('err'); m.textContent = 'E-KNOT: байланыс жоқ / нет связи… (' + (i + 1) + ')'; m.hidden = false; await wait(1500); }
+  }
+  document.getElementById('err').hidden = true; document.getElementById('err').textContent = '';
   SAVE.tours = SAVE.tours || {}; SAVE.trust = SAVE.trust || {};
   if (USER.name && !SAVE.name) SAVE.name = USER.name;
   document.getElementById('rotate').textContent = L(UI.rotate);

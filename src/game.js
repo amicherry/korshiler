@@ -3,27 +3,20 @@
    ============================================================ */
 
 /* ---------- Mock API: тот же набор запросов, что будет у настоящего сервера ---------- */
-const API = {
-  async auth() {
-    // Из приложения E-KNOT придёт ?token=… и имя; здесь — гость или ?name=Әмина для демонстрации входа
-    const q = new URLSearchParams(location.search);
-    let uid = loadStr('d67_uid', ''); if (!uid) { uid = 'guest-' + Math.floor(Math.random() * 1e9); saveStr('d67_uid', uid); }
-    return { userId: uid, name: q.get('name') || null, fromApp: q.has('token') };
-  },
-  async load() { try { return JSON.parse(loadStr('d67_save', 'null')); } catch (e) { return null; } },
-  async save(s) { saveStr('d67_save', JSON.stringify(s)); },
-  async tourStart(id) { return { run: id + '-' + Date.now(), at: Date.now() }; },
-  // сервер сам пересчитывает итог по событиям, а не верит числу из игры
-  async tourFinish(run, events, tour) {
-    const signed = new Set();
-    for (const e of events) if (e.t === 'yes') signed.add(e.apt);
-    const n = signed.size, ok = n >= tour.goal;
-    return { signatures: n, online: events.filter(e => e.t === 'yes' && e.via === 'online').length, success: ok, coins: n * 5 + (ok ? 25 : 0) };
-  },
-};
 let USER = null, SAVE = null;
 const DEFAULT_LOOK = { skin: '#e3ad86', hair: 'short', hairCol: '#2b2420', top: 'hoodie', topCol: '#2f8577', hat: null };
-function persist() { API.save(SAVE); }
+function persist() { API.save(SAVE).catch(() => toast('E-KNOT', L(UI.netSaveFail), 2400)); }
+const NEW_SAVE = () => ({ created: false, coins: 0, tours: {}, trust: {} });
+// индикатор связи с сервером: крутится в углу, пока идёт запрос дольше 0,3 с
+let netShownAt = 0;
+function drawNet(dt) {
+  if (NET.pending > 0) netShownAt += dt; else netShownAt = 0;
+  if (netShownAt < 300) return;
+  const t = performance.now() / 120, x = W - 12, y = H - 12;
+  rect(x - 7, y - 7, 15, 15, 'rgba(14,17,28,.85)');
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; ctx.globalAlpha = ((i + Math.floor(t)) % 8) / 8; rect(x + Math.round(Math.cos(a) * 4), y + Math.round(Math.sin(a) * 4), 1, 1, '#f2c94c'); }
+  ctx.globalAlpha = 1;
+}
 
 /* ---------- Диалоги в стиле Undertale ---------- */
 const DLG = { open: false, name: '', port: null, voice: 400, text: '', shown: 0, choices: null, cursor: 0, resolve: null, expr: 'neutral', mood: null, blipAt: 0 };
@@ -137,11 +130,14 @@ scenes.title = {
     text(L(UI.by), 18, 64, { col: '#9fd9c2', size: 6, shadow: '#0b0c10' });
     if (this.settings) return this.drawSettings();
     // панель меню в рамке
-    const bw = Math.max(textW(L(UI.cont)), textW(L(UI.settings)), 96) + 16, py = SAVE && SAVE.name ? 112 : 124;
-    frameBox(12, py, bw + 12, 196 - py - 8);
-    if (SAVE && SAVE.name) text(L(UI.hello) + SAVE.name + '!', 18, py + 7, { col: '#cfd6e4', size: 6 });
-    if (button(SAVE && SAVE.created ? L(UI.cont) : L(UI.play), 0, 140, 'primary', { left: 18, w: bw })) this.start();
-    if (button(L(UI.settings), 0, 162, 'alt', { left: 18, w: bw })) { this.settings = true; this.sure = false; }
+    const bw = Math.max(textW(L(UI.cont)), textW(L(UI.settings)), textW(L(UI.rating)), 96) + 16, py = 104;
+    frameBox(12, py, bw + 12, 104);
+    const who = SAVE && SAVE.name ? L(UI.hello) + SAVE.name + '!' : '';
+    if (who) text(who, 18, py + 6, { col: '#cfd6e4', size: 6 });
+    text(USER.guest ? L(UI.guestMode) : USER.complex.name + ' · ' + USER.apartment, 18, py + 16, { col: USER.guest ? '#8792ad' : '#9fd9c2', size: 6 });
+    if (button(SAVE && SAVE.created ? L(UI.cont) : L(UI.play), 0, 132, 'primary', { left: 18, w: bw })) this.start();
+    if (button(L(UI.rating), 0, 154, 'alt', { left: 18, w: bw })) irisTo(40, 162, () => go('leaderboard', { from: 'title' }));
+    if (button(L(UI.settings), 0, 176, 'alt', { left: 18, w: bw })) { this.settings = true; this.sure = false; }
   },
   drawSettings() {
     rect(0, 0, W, H, 'rgba(11,12,16,.55)');
@@ -153,7 +149,7 @@ scenes.title = {
     text(L(UI.sound), W / 2, 100, { align: 'center', col: INK });
     if (button(SND.on ? L(UI.on) : L(UI.off), W / 2, 114, SND.on ? 'alt' : 'off')) { SND.on = !SND.on; saveStr('d67_sound', SND.on ? '1' : '0'); }
     if (button(this.done ? L(UI.resetDone) : this.sure ? L(UI.resetSure) : L(UI.reset), W / 2, 144, this.done ? 'off' : 'danger')) {
-      if (this.done) {} else if (!this.sure) this.sure = true; else { SAVE = { created: false, coins: 0, tours: {}, trust: {} }; persist(); this.done = true; }
+      if (this.done) {} else if (!this.sure) this.sure = true; else { SAVE = NEW_SAVE(); API.reset().catch(() => {}); this.done = true; }
     }
     if (button(L(UI.back), W / 2, 176, 'alt')) this.settings = false;
   },
@@ -318,7 +314,7 @@ scenes.tour = {
     this.helper = { state: 'hidden', floor: 2, x: 104, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
     this.rats = [{ x: 170, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 300, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
     this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
-    API.tourStart(tour.id).then(r => this.run = r);
+    this.run = null; API.tourStart(tour.id).then(r => this.run = r).catch(() => {});
     this.plan = null;
     setTimeout(() => { toast('E-KNOT', L(UI.tutTap)); setTimeout(() => !this.over && toast('E-KNOT', L(UI.tut1)), 4500); }, 600);
   },
@@ -587,10 +583,16 @@ scenes.tour = {
     for (const r of Object.values(this.res)) if (r.status === 'online') {
       if (Math.random() < (r.arch === 'night' ? .9 : .82)) { r.status = 'yes'; this.events.push({ t: 'yes', apt: r.apt, via: 'online' }); } else r.status = 'thinking';
     }
-    const result = await API.tourFinish(this.run, this.events, this.tour);
+    let result;
+    try { result = await API.tourFinish(this.run, this.events); }
+    catch (e) {
+      // сервер не ответил — показываем итог, посчитанный в игре, но без рейтинга и бонусов
+      const yes = new Set(this.events.filter(e => e.t === 'yes').map(e => e.apt)), n = yes.size, ok = n >= this.tour.goal;
+      result = { signatures: n, online: this.events.filter(e => e.t === 'yes' && e.via === 'online').length, success: ok, coins: 0, score: null, offline: true };
+    }
     const T = this.tour.id, prev = SAVE.tours[T] || { tries: 0, best: 0, done: false };
     SAVE.tours[T] = { tries: prev.tries + 1, best: Math.max(prev.best, result.signatures), done: prev.done || result.success };
-    SAVE.coins = (SAVE.coins || 0) + result.coins; persist();
+    if (result.totalCoins != null) SAVE.coins = result.totalCoins; persist();
     const stats = { ...result, against: Object.values(this.res).filter(r => r.status === 'no').length, thinking: Object.values(this.res).filter(r => r.status === 'thinking').length };
     setTimeout(() => irisTo(this.hero.x, this.hero.y - this.camY - 14, () => go('result', stats)), timeUp ? 1200 : 200);
   },
@@ -726,21 +728,69 @@ function tweenDoor(r, to) { return new Promise(res => { const from = r.door, t0 
    СЦЕНА: итог тура (протокол)
    ============================================================ */
 scenes.result = {
-  enter(d) { this.d = d; this.t = 0; setTouch({ act: L(UI.next) }); if (d.success) setTimeout(() => sfx.stamp(), 500); },
+  enter(d) { this.d = d; this.t = 0; setTouch({ act: L(UI.next) }); if (d.success) setTimeout(() => sfx.stamp(), 500);
+    this.rank = null; if (!d.offline) API.leaderboard('complex').then(r => this.rank = r.mine).catch(() => {}); },
   update(dt) { this.t += dt; if (hit('act')) irisTo(W / 2, 200, () => go('title')); },
   draw(dt) {
     const d = this.d;
     drawNight(dt);
-    paper(60, 16, 280, 196, 11);
-    text(L(UI.protocol), W / 2, 26, { align: 'center', col: INK_MUTED });
-    text(d.success ? L(UI.win) : L(UI.lose), W / 2, 42, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
-    const rows = [[L(UI.rSigned), `${d.signatures}/${TOURS.t1.goal}`], ['  ' + L(UI.rOnline), String(d.online)], [L(UI.rAgainst), String(d.against)], [L(UI.rThinking), String(d.thinking)], [L(UI.rCoins), '+' + d.coins]];
-    rows.forEach(([a, b], i) => { text(a, 80, 66 + i * 14, { col: INK }); text(b, 320, 66 + i * 14, { col: INK, align: 'right' }); rect(80, 76 + i * 14, 240, 1, '#e2d9c2'); });
-    wrapText(d.success ? L(UI.rNext) : L(UI.rRetry), 240).forEach((l, i) => text(l, W / 2, 142 + i * 11, { align: 'center', col: d.success ? INK_TEAL : INK_MUTED }));
-    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(290, 52); ctx.rotate(-.25); ctx.scale(s, s); ctx.globalAlpha = k;
+    paper(56, 10, 288, 210, 11);
+    text(L(UI.protocol), W / 2, 18, { align: 'center', col: INK_MUTED });
+    text(d.success ? L(UI.win) : L(UI.lose), W / 2, 32, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
+    const rows = [[L(UI.rSigned), `${d.signatures}/${TOURS.t1.goal}`], ['  ' + L(UI.rOnline), String(d.online)], [L(UI.rAgainst), String(d.against)], [L(UI.rThinking), String(d.thinking)]];
+    if (!d.offline) rows.push([L(UI.rScore), String(d.score) + (d.newBest ? ' ★' : '')], [L(UI.rRank), this.rank ? '#' + this.rank.rank : '…'], [L(UI.rCoins), '+' + d.coins]);
+    rows.forEach(([a, b], i) => { text(a, 74, 48 + i * 13, { col: INK }); text(b, 326, 48 + i * 13, { col: i === 4 && d.newBest ? INK_GOLD : INK, align: 'right' }); rect(74, 57 + i * 13, 252, 1, '#e2d9c2'); });
+    // бонус в приложение
+    let note, col = INK_MUTED;
+    if (d.offline) note = L(UI.rOffline);
+    else if (d.reward && d.reward.status === 'sent') { note = L(UI.rRewardSent).replace('{n}', d.reward.points); col = INK_TEAL; }
+    else if (d.reward && d.reward.status === 'needs_login') { note = L(UI.rRewardGuest).replace('{n}', d.reward.points); col = INK_GOLD; }
+    else note = d.success ? L(UI.rNext) : L(UI.rRetry);
+    wrapText(note, 200).slice(0, 3).forEach((l, i) => text(l, 172, 140 + i * 10, { align: 'center', col, size: 6 }));
+    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(296, 154); ctx.rotate(-.25); ctx.scale(s, s); ctx.globalAlpha = k;
       ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text('ОСИ', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
-    if (button(L(UI.menu), W / 2 - 60, 186, 'alt')) irisTo(W / 2 - 60, 194, () => go('title'));
-    if (button(L(UI.again), W / 2 + 60, 186, 'primary')) irisTo(W / 2 + 60, 194, () => go('tour', { tour: 't1' }));
+    const bw = 84;
+    if (button(L(UI.menu), 108, 186, 'alt', { w: bw })) irisTo(108, 194, () => go('title'));
+    if (button(L(UI.rating), 200, 186, 'alt', { w: bw })) irisTo(200, 194, () => go('leaderboard', { from: 'result' }));
+    if (button(L(UI.again), 292, 186, 'primary', { w: bw })) irisTo(292, 194, () => go('tour', { tour: 't1' }));
+  },
+};
+
+/* ============================================================
+   СЦЕНА: рейтинг — соседи по ЖК и весь город
+   ============================================================ */
+scenes.leaderboard = {
+  enter(d) { this.from = d && d.from; this.scope = 'complex'; this.fetch(); setTouch({ act: L(UI.back) }); },
+  fetch() {
+    this.data = null; this.err = false; const scope = this.scope;
+    API.leaderboard(scope).then(r => { if (this.scope === scope) this.data = r; }).catch(() => { this.err = true; });
+  },
+  update() { if (hit('act') || hit('back')) irisTo(W / 2, 200, () => go('title')); if (hit('left') || hit('right')) { this.scope = this.scope === 'city' ? 'complex' : 'city'; this.fetch(); } },
+  draw(dt) {
+    drawNight(dt);
+    frameBox(60, 10, 280, 206);
+    text(L(UI.rating), W / 2, 20, { align: 'center', col: '#f4f3ee' });
+    if (button(L(UI.tabComplex), 150, 34, this.scope === 'complex' ? 'primary' : 'off', { w: 92 }) && this.scope !== 'complex') { this.scope = 'complex'; this.fetch(); }
+    if (button(L(UI.tabCity), 250, 34, this.scope === 'city' ? 'primary' : 'off', { w: 92 }) && this.scope !== 'city') { this.scope = 'city'; this.fetch(); }
+    const D = this.data;
+    if (this.err) { text(L(UI.netFail), W / 2, 100, { align: 'center', col: '#e88a7a', size: 6 }); if (button(L(UI.retry), W / 2, 116, 'alt')) this.fetch(); }
+    else if (!D) text('…', W / 2, 100, { align: 'center', col: '#8792ad' });
+    else {
+      if (this.scope === 'complex' && D.complexName) text(D.complexName, W / 2, 56, { align: 'center', col: '#9fd9c2', size: 6 });
+      const row = (r, y) => {
+        if (r.me) rect(72, y - 3, 256, 13, 'rgba(242,201,76,.18)');
+        const c = r.me ? '#f2c94c' : r.rank <= 3 ? '#f4f3ee' : '#cfd6e4';
+        text(String(r.rank), 84, y, { col: r.rank <= 3 ? ['#f2c94c', '#cfd6e4', '#d39a6a'][r.rank - 1] : '#8792ad', align: 'center' });
+        text(r.me ? r.name + ' (' + L(UI.you) + ')' : r.name, 100, y, { col: c });
+        text(String(r.best), 320, y, { col: c, align: 'right' });
+      };
+      const meIn = D.top.some(r => r.me), top = D.mine && !meIn ? D.top.slice(0, 7) : D.top;
+      top.forEach((r, i) => row(r, 68 + i * 14));
+      if (D.mine && !meIn) { text('···', W / 2, 68 + top.length * 14 - 3, { align: 'center', col: '#55607c' }); row(D.mine, 68 + top.length * 14 + 6); }
+      if (!D.mine) text(L(UI.noScore), W / 2, 186, { align: 'center', col: '#8792ad', size: 6 });
+    }
+    if (USER.guest) text(L(UI.guestNote), W / 2, 176, { align: 'center', col: '#8792ad', size: 6 });
+    if (button(L(UI.back), W / 2, 196, 'alt')) irisTo(W / 2, 204, () => go(this.from === 'result' ? 'title' : 'title'));
   },
 };
 
@@ -749,8 +799,12 @@ scenes.result = {
    ============================================================ */
 (async function boot() {
   try { if (document.fonts) await Promise.race([document.fonts.load('8px "Press Start 2P"', 'ҮЙ №67 ӘҒҚҢӨҰҮҺІ әғқңөұүһі'), wait(2500)]); } catch (e) {}
-  USER = await API.auth();
-  SAVE = (await API.load()) || { created: false, coins: 0, tours: {}, trust: {} };
+  // вход через сервер (пока — заглушка). Если связи нет, пробуем снова
+  for (let i = 0; ; i++) {
+    try { USER = await API.auth(); SAVE = (await API.load()) || (await migrateOldSave()) || NEW_SAVE(); break; }
+    catch (e) { const m = document.getElementById('err'); m.textContent = 'E-KNOT: байланыс жоқ / нет связи… (' + (i + 1) + ')'; m.hidden = false; await wait(1500); }
+  }
+  document.getElementById('err').hidden = true; document.getElementById('err').textContent = '';
   SAVE.tours = SAVE.tours || {}; SAVE.trust = SAVE.trust || {};
   if (USER.name && !SAVE.name) SAVE.name = USER.name;
   document.getElementById('rotate').textContent = L(UI.rotate);
