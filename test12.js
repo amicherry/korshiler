@@ -17,6 +17,8 @@ const {chromium}=require('playwright'); const fs=require('fs');
     for (const k of ['menu','rating','again']) if (textW(L(UI[k])) > 80) bad.push('btn '+k);
     for (const k of ['tabComplex','tabCity']) if (textW(L(UI[k])) > 88) bad.push('tab '+k);
     for (const k of ['noScore','netFail']) if (textW(L(UI[k]),6) > 270) bad.push('note '+k);
+    // настройки тура: ни одно поле не потерялось
+    for (const k of ['floors','perFloor','goal','heroApt','start','duration','secPerMin','raccoon','mix','awayShare','talkerFloor','helperAfter','helperFloor']) if (TOURS.t1[k] === undefined) bad.push('tour.'+k);
     return bad; });
   console.log(lang, rep); await pg.close();
  }
