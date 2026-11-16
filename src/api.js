@@ -148,7 +148,9 @@ const API = {
   async auth() {
     const q = new URLSearchParams(location.search);
     let deviceId = loadStr('kn_device', ''); if (!deviceId) { deviceId = 'g-' + Math.floor(Math.random() * 1e9); saveStr('kn_device', deviceId); }
-    const r = await request('POST', '/auth', { body: { token: q.get('token'), deviceId } });
+    // токен из ссылки приложения: ?token=demo (или #demo — так работает и опубликованная страница)
+    const token = q.get('token') || (/^#[A-Za-z0-9-]+$/.test(location.hash) ? location.hash.slice(1) : null);
+    const r = await request('POST', '/auth', { body: { token, deviceId } });
     this.session = r.session; this.user = r.user;
     return { ...r.user, fromApp: !r.user.guest };
   },
