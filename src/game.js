@@ -130,11 +130,13 @@ scenes.title = {
     text(L(UI.by), 18, 64, { col: '#9fd9c2', size: 6, shadow: '#0b0c10' });
     if (this.settings) return this.drawSettings();
     // панель меню в рамке
-    const bw = Math.max(textW(L(UI.cont)), textW(L(UI.settings)), textW(L(UI.rating)), 96) + 16, py = 104;
+    let bw = Math.max(textW(L(UI.cont)), textW(L(UI.settings)), textW(L(UI.rating)), 96) + 16; const py = 104;
+    let nm = SAVE && SAVE.name ? SAVE.name : ''; if (nm.length > 12) nm = nm.slice(0, 11) + '…';
+    const who = nm ? L(UI.hello) + nm + '!' : '', sub = USER.guest ? L(UI.guestMode) : USER.complex.name + ' · ' + USER.apartment;
+    bw = Math.min(W - 40, Math.max(bw, textW(who, 6) + 4, textW(sub, 6) + 4));
     frameBox(12, py, bw + 12, 104);
-    const who = SAVE && SAVE.name ? L(UI.hello) + SAVE.name + '!' : '';
     if (who) text(who, 18, py + 6, { col: '#cfd6e4', size: 6 });
-    text(USER.guest ? L(UI.guestMode) : USER.complex.name + ' · ' + USER.apartment, 18, py + 16, { col: USER.guest ? '#8792ad' : '#9fd9c2', size: 6 });
+    text(sub, 18, py + 16, { col: USER.guest ? '#8792ad' : '#9fd9c2', size: 6 });
     if (button(SAVE && SAVE.created ? L(UI.cont) : L(UI.play), 0, 132, 'primary', { left: 18, w: bw })) this.start();
     if (button(L(UI.rating), 0, 154, 'alt', { left: 18, w: bw })) irisTo(40, 162, () => go('leaderboard', { from: 'title' }));
     if (button(L(UI.settings), 0, 176, 'alt', { left: 18, w: bw })) { this.settings = true; this.sure = false; }
@@ -480,7 +482,9 @@ scenes.tour = {
     // у каждого жильца свой вариант приветствия/истории/ответа; реакции чередуются без повторов подряд
     const Ln = k => { const v = A.lines[k] || GENERIC[k]; if (!Array.isArray(v)) return L(v);
       if (['good', 'meh', 'bad'].includes(k)) { let i; do i = Math.floor(Math.random() * v.length); while (v.length > 1 && i === r.last[k]); r.last[k] = i; return L(v[i]); }
-      return L(v[r.v % v.length]); };
+      let line = v[r.v % v.length]; const top = Math.ceil(r.apt / this.tour.perFloor) === this.tour.floors;
+      if (top && line.top) line = line.top; else if (!top && line.low) line = line.low;
+      return L(line); };
     if (A.renter) { await say(Ln('greet')); r.status = 'renter'; return this.endVisit(r); }
     if (r.status === 'yes') { await say(L(GENERIC.already), 'happy'); return this.endVisit(r); }
     if (r.status === 'no') { await say(L(GENERIC.againNo), 'angry'); return this.endVisit(r); }
@@ -760,7 +764,7 @@ scenes.result = {
    СЦЕНА: рейтинг — соседи по ЖК и весь город
    ============================================================ */
 scenes.leaderboard = {
-  enter(d) { this.from = d && d.from; this.scope = 'complex'; this.fetch(); setTouch({ act: L(UI.back) }); },
+  enter(d) { this.from = d && d.from; this.scope = USER.guest ? 'city' : 'complex'; this.fetch(); setTouch({ act: L(UI.back) }); },
   fetch() {
     this.data = null; this.err = false; const scope = this.scope;
     API.leaderboard(scope).then(r => { if (this.scope === scope) this.data = r; }).catch(() => { this.err = true; });
@@ -776,7 +780,8 @@ scenes.leaderboard = {
     if (this.err) { text(L(UI.netFail), W / 2, 100, { align: 'center', col: '#e88a7a', size: 6 }); if (button(L(UI.retry), W / 2, 116, 'alt')) this.fetch(); }
     else if (!D) text('…', W / 2, 100, { align: 'center', col: '#8792ad' });
     else {
-      if (this.scope === 'complex' && D.complexName) text(D.complexName, W / 2, 56, { align: 'center', col: '#9fd9c2', size: 6 });
+      if (USER.guest) wrapText(L(UI.guestNote), 260, 6).slice(0, 2).forEach((l, i) => text(l, W / 2, 53 + i * 7, { align: 'center', col: '#8792ad', size: 6 }));
+      else if (this.scope === 'complex' && D.complexName) text(D.complexName, W / 2, 56, { align: 'center', col: '#9fd9c2', size: 6 });
       const row = (r, y) => {
         if (r.me) rect(72, y - 3, 256, 13, 'rgba(242,201,76,.18)');
         const c = r.me ? '#f2c94c' : r.rank <= 3 ? '#f4f3ee' : '#cfd6e4';
@@ -789,7 +794,6 @@ scenes.leaderboard = {
       if (D.mine && !meIn) { text('···', W / 2, 68 + top.length * 14 - 3, { align: 'center', col: '#55607c' }); row(D.mine, 68 + top.length * 14 + 6); }
       if (!D.mine) text(L(UI.noScore), W / 2, 186, { align: 'center', col: '#8792ad', size: 6 });
     }
-    if (USER.guest) text(L(UI.guestNote), W / 2, 176, { align: 'center', col: '#8792ad', size: 6 });
     if (button(L(UI.back), W / 2, 196, 'alt')) irisTo(W / 2, 204, () => go(this.from === 'result' ? 'title' : 'title'));
   },
 };
