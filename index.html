@@ -2119,6 +2119,7 @@ scenes.leaderboard = {
   }
   document.getElementById('err').hidden = true; document.getElementById('err').textContent = '';
   SAVE.tours = SAVE.tours || {}; SAVE.trust = SAVE.trust || {};
+  SAVE.look = { ...DEFAULT_LOOK, ...(SAVE.look || {}) };   // неполное сохранение не должно ломать отрисовку героя
   if (USER.name && !SAVE.name) SAVE.name = USER.name;
   document.getElementById('rotate').textContent = L(UI.rotate);
   go('title');
