@@ -599,7 +599,7 @@ const NAMES = {
 /* ---------- туры ---------- */
 const TOURS = {
   t1: { id: 't1', floors: 5, perFloor: 4, goal: 10, heroApt: 13,
-    start: 18 * 60, duration: 50, secPerMin: 4, raccoon: 1,
+    start: 18 * 60, duration: 90, secPerMin: 5,   // 18:00 → 19:30, около 7,5 минуты реального времени raccoon: 1,
     mix: ['apa', 'apa', 'apa', 'student', 'student', 'student', 'mom', 'mom', 'mom', 'grump', 'grump', 'business', 'business', 'night', 'night', 'renter', 'renter', 'mom', 'apa'],
     awayShare: .26, talkerFloor: 3, helperAfter: 3, helperFloor: 5 },
 };
@@ -1701,7 +1701,7 @@ scenes.tour = {
       const a = pts[seg], b = pts[seg + 1];
       h.x = lerp(a[0], b[0], Math.min(1, k)); h.y = lerp(a[1], b[1], Math.min(1, k)); h.dir = b[0] < a[0] ? -1 : 1; h.walkT += dt;
       this.stepAcc += dt; if (this.stepAcc > 260) { this.stepAcc = 0; sfx.step(); }
-      if (c.t >= 1) { h.floor = c.to; h.x = pts[2][0]; h.y = this.base(c.to); h.climb = null; this.addTime(1); }
+      if (c.t >= 1) { h.floor = c.to; h.x = pts[2][0]; h.y = this.base(c.to); h.climb = null; this.addTime(.5); }
       this.updateCam(dt); return;
     }
     let dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);

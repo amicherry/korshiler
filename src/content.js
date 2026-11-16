@@ -262,7 +262,7 @@ const NAMES = {
 /* ---------- туры ---------- */
 const TOURS = {
   t1: { id: 't1', floors: 5, perFloor: 4, goal: 10, heroApt: 13,
-    start: 18 * 60, duration: 50, secPerMin: 4, raccoon: 1,
+    start: 18 * 60, duration: 90, secPerMin: 5,   // 18:00 → 19:30, около 7,5 минуты реального времени raccoon: 1,
     mix: ['apa', 'apa', 'apa', 'student', 'student', 'student', 'mom', 'mom', 'mom', 'grump', 'grump', 'business', 'business', 'night', 'night', 'renter', 'renter', 'mom', 'apa'],
     awayShare: .26, talkerFloor: 3, helperAfter: 3, helperFloor: 5 },
 };

@@ -365,7 +365,7 @@ scenes.tour = {
       const a = pts[seg], b = pts[seg + 1];
       h.x = lerp(a[0], b[0], Math.min(1, k)); h.y = lerp(a[1], b[1], Math.min(1, k)); h.dir = b[0] < a[0] ? -1 : 1; h.walkT += dt;
       this.stepAcc += dt; if (this.stepAcc > 260) { this.stepAcc = 0; sfx.step(); }
-      if (c.t >= 1) { h.floor = c.to; h.x = pts[2][0]; h.y = this.base(c.to); h.climb = null; this.addTime(1); }
+      if (c.t >= 1) { h.floor = c.to; h.x = pts[2][0]; h.y = this.base(c.to); h.climb = null; this.addTime(.5); }
       this.updateCam(dt); return;
     }
     let dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
