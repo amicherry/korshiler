@@ -35,10 +35,6 @@ function buildHouseArt() {
       const mix = (a, b) => Math.round(parseInt(a, 16) + (parseInt(b, 16) - parseInt(a, 16)) * t);
       r(0, y, W, 1, `rgb(${mix(c0.slice(1, 3), c1.slice(1, 3))},${mix(c0.slice(3, 5), c1.slice(3, 5))},${mix(c0.slice(5, 7), c1.slice(5, 7))})`); }
     for (let i = 0; i < 70; i++) { const x = R() * W, y = R() * 90; p(x, y, R() < .25 ? '#f4f3ee' : '#a99fc8'); if (R() < .08) { p(x - 1, y, '#a99fc8'); p(x + 1, y, '#a99fc8'); p(x, y - 1, '#a99fc8'); p(x, y + 1, '#a99fc8'); } }
-    // луна с кратерами
-    { const mx = 352, my = 30, mr = 13; for (let y = -mr; y <= mr; y++) for (let x = -mr; x <= mr; x++) { const d = x * x + y * y; if (d > mr * mr) continue;
-      p(mx + x, my + y, d > (mr - 1.5) ** 2 ? '#b9b0a0' : (x + y > 8 ? '#cfc6b4' : '#e6dfcf')); }
-      for (const [cx, cy, cr] of [[-4, -3, 3], [4, 4, 2], [-2, 6, 2], [5, -5, 1.5]]) for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) if (x * x + y * y <= cr * cr) p(mx + cx + x, my + cy + y, '#bdb3a2'); }
     // облака: пухлые слои с подсветкой сверху и тенью снизу
     const cloud = (cx, cy, n, sc) => { const blobs = []; for (let i = 0; i < n; i++) blobs.push([cx + (i - n / 2) * 9 * sc + (R() - .5) * 6, cy - Math.sin(i / (n - 1) * Math.PI) * 7 * sc, (6 + R() * 5) * sc]);
       for (const [bx, by, br] of blobs) { g.fillStyle = HP.cloudD; g.beginPath(); g.arc(Math.round(bx), Math.round(by + 2), br, 0, 7); g.fill(); }
@@ -243,8 +239,9 @@ scenes.house = {
     if (!this.anim) for (const id of ids) {
       const st = this.status(id), [cx, cy] = HSPOT[id]; if (st.kind === 'done') continue;
       const pulse = Math.floor(this.t / 350) % 2;
-      if (st.kind === 'buy') { rect(cx - 5, cy - 5, 10, 10, HOUSE_STATE.coins >= st.cost ? (pulse ? '#f2c94c' : '#e0b03a') : '#8792ad'); text('!', cx, cy - 3, { align: 'center', col: '#1b1a21', size: 6 }); }
-      else if (st.kind === 'vote') { rect(cx - 5, cy - 5, 10, 10, pulse ? '#7fc4a8' : '#5fa488'); text('?', cx, cy - 3, { align: 'center', col: '#1b1a21', size: 6 }); }
+      const mk = (bg, ch) => { const y = cy - 7 - (pulse ? 1 : 0); rect(cx - 7, y + 1, 14, 14, 'rgba(10,8,20,.5)'); rect(cx - 7, y, 14, 14, '#1b1a21'); rect(cx - 6, y + 1, 12, 12, bg); rect(cx - 6, y + 1, 12, 1, '#fff6c8'); text(ch, cx, y + 3, { align: 'center', col: '#1b1a21' }); };
+      if (st.kind === 'buy') mk(HOUSE_STATE.coins >= st.cost ? '#f2c94c' : '#a99fc8', '!');
+      else if (st.kind === 'vote') mk('#7fc4a8', '?');
       else if (PROBLEMS.some(p => p.id === id)) { ctx.globalAlpha = .55; rect(cx - 3, cy - 2, 6, 5, '#55607c'); rect(cx - 2, cy - 5, 4, 3, '#55607c'); ctx.globalAlpha = 1; }
     }
     // верхняя панель
@@ -257,7 +254,13 @@ scenes.house = {
       API.claim().then(r => { HOUSE_STATE = r.house; toast('E-KNOT', L(r.reward.status === 'sent' ? UI.rRewardSent : UI.rRewardGuest).replace('{n}', r.reward.points), 3200); }).catch(() => {});
     // выбор вещи на карте
     if (!this.anim && !this.busy) {
-      for (const id of ids) { const [cx, cy, w, h] = HSPOT[id]; if (clickIn(cx - w / 2 - 4, cy - h / 2 - 4, w + 8, h + 8) && this.status(id).kind !== 'done') { this.sel = this.sel === id ? null : id; sfx.select(); } }
+      // нажатие: берём ближайшую вещь к пальцу (зона не меньше 30×30), чтобы маленькие цели тоже нажимались
+      const c = clicks.find(c => c.y > 22 && (!this.sel || c.y < 150));
+      if (c) { let best = null, bd = 1e9;
+        for (const id of ids) { if (this.status(id).kind === 'done') continue; const [cx, cy, w, h] = HSPOT[id];
+          const dx = Math.max(0, Math.abs(c.x - cx) - Math.max(15, w / 2)), dy = Math.max(0, Math.abs(c.y - cy) - Math.max(15, h / 2)), d = dx + dy + Math.hypot(c.x - cx, c.y - cy) * .01;
+          if (dx === 0 && dy === 0 && d < bd) { bd = d; best = id; } }
+        if (best) { clicks.splice(clicks.indexOf(c), 1); this.sel = this.sel === best ? null : best; sfx.select(); } }
     }
     if (this.sel && !this.anim) this.drawPanel(this.sel);
 

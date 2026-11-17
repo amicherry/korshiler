@@ -20,7 +20,7 @@ function fillPoly(g, pts, col) {
 const lerp2 = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
 
 // главная высотка: фасад (справа, широкий) и торец (слева, узкий, в тени)
-const BLD = { TL: [198, 80], TR: [384, 93], BL: [186, 240], BR: [404, 240], STL: [158, 96], SBL: [142, 240], rows: 17, cols: 16 };
+const BLD = { TL: [198, 80], TR: [384, 93], BL: [186, 240], BR: [404, 240], STL: [158, 96], SBL: [142, 240], rows: 9, cols: 16 };
 const persp = v => Math.pow(v, 1.2);           // снизу этажи ближе — выше
 function FF(u, v) { const T = lerp2(BLD.TL, BLD.TR, u), B = lerp2(BLD.BL, BLD.BR, u); return lerp2(T, B, persp(v)); }
 function SF(u, v) { const T = lerp2(BLD.STL, BLD.TL, u), B = lerp2(BLD.SBL, BLD.BL, u); return lerp2(T, B, persp(v)); }
@@ -32,19 +32,24 @@ function buildNight() {
   const R = rng(7);
   NIGHT.windows = []; NIGHT.blinkers = [];
   const win = (x, y, w, h, o = {}) => NIGHT.windows.push(Object.assign({ x: Math.round(x), y: Math.round(y), w: Math.max(2, Math.round(w)), h: Math.max(2, Math.round(h)),
-    on: R() < .2, tv: R() < .02, warm: pick(R, ['#f2c66a', '#f7e3a1', '#e8a85a', '#f2c66a']), off: pick(R, ['#1c2233', '#20273a', '#252c40']) }, o));
+    on: R() < .2, tv: R() < .02, warm: pick(R, ['#f2c66a', '#f7e3a1', '#e8a85a', '#f2c66a']), off: pick(R, ['#2a2440', '#2a2342', '#3a3356']) }, o));
 
   // ---- небо ----
-  NIGHT.sky = makeCanvas(W, H, ({ r }) => {
-    for (let y = 0; y < H; y++) { const k = y / H; r(0, y, W, 1, `rgb(${13 + k * 22 | 0},${22 + k * 30 | 0},${44 + k * 40 | 0})`); }
-    // зарево города у горизонта
-    for (let y = 120; y < H; y++) { const k = (y - 120) / (H - 120); r(0, y, W, 1, `rgba(214,120,84,${(k * k * .28).toFixed(3)})`); }
+  NIGHT.sky = makeCanvas(W, H, ({ r, g }) => {
+    const top = [28, 23, 52], mid = [59, 47, 92], low = [150, 100, 130];
+    for (let y = 0; y < H; y++) { const k = y / H, A = k < .55 ? top : mid, B = k < .55 ? mid : low, t = k < .55 ? k / .55 : (k - .55) / .45;
+      r(0, y, W, 1, `rgb(${A[0] + (B[0] - A[0]) * t | 0},${A[1] + (B[1] - A[1]) * t | 0},${A[2] + (B[2] - A[2]) * t | 0})`); }
+    const RC = rng(12);
+    const cloud = (cx, cy, n, sc) => { const bl = []; for (let i = 0; i < n; i++) bl.push([cx + (i - n / 2) * 9 * sc + (RC() - .5) * 6, cy - Math.sin(i / (n - 1) * Math.PI) * 7 * sc, (6 + RC() * 5) * sc]);
+      for (const [x, y, rr] of bl) { g.fillStyle = '#43386a'; g.beginPath(); g.arc(Math.round(x), Math.round(y + 2), rr, 0, 7); g.fill(); }
+      for (const [x, y, rr] of bl) { g.fillStyle = '#5e4f86'; g.beginPath(); g.arc(Math.round(x), Math.round(y), rr, 0, 7); g.fill(); }
+      for (const [x, y, rr] of bl) { g.fillStyle = '#8676ad'; g.beginPath(); g.arc(Math.round(x - rr * .3), Math.round(y - rr * .35), rr * .55, 0, 7); g.fill(); } };
+    cloud(70, 96, 6, .9); cloud(300, 40, 6, .8); cloud(170, 64, 4, .7);
   });
-
   // ---- город, соседние дома, главная высотка ----
   NIGHT.mid = makeCanvas(W, H, ({ r, p, line, g }) => {
     // дальний город: ряды силуэтов с редкими огнями
-    for (const [base, col, hMin, hMax, dens] of [[196, '#1b2338', 10, 36, .05], [204, '#151c2e', 14, 48, .08]]) {
+    for (const [base, col, hMin, hMax, dens] of [[196, '#2e2648', 10, 36, .05], [204, '#261f3d', 14, 48, .08]]) {
       let x = -4;
       while (x < W) {
         const w = 8 + Math.floor(R() * 20), h = hMin + Math.floor(R() * (hMax - hMin));
@@ -55,34 +60,34 @@ function buildNight() {
       }
     }
     // далёкая башня между домами
-    r(116, 104, 26, 140, '#1d243a'); r(116, 104, 26, 1, '#2c3550'); r(128, 96, 2, 8, '#1d243a');
+    r(116, 104, 26, 140, '#2a2244'); r(116, 104, 26, 1, '#3a3058'); r(128, 96, 2, 8, '#2a2244');
     NIGHT.blinkers.push({ x: 128, y: 95, ph: 1 });
     for (let yy = 108; yy < 210; yy += 5) for (let xx = 119; xx < 140; xx += 4) if (R() < .18) r(xx, yy, 2, 2, '#c9a65e');
     // соседний дом слева (девятиэтажка, прямо)
     const nx = -6, nw = 98, ny = 124;
-    r(nx, ny, nw, H - ny, '#2a3248'); r(nx, ny - 3, nw + 2, 3, '#20273a'); r(nx, ny - 3, nw + 2, 1, '#3a4460');
+    r(nx, ny, nw, H - ny, '#3b3256'); r(nx, ny - 3, nw + 2, 3, '#2a2342'); r(nx, ny - 3, nw + 2, 1, '#4a4068');
     r(40, ny - 14, 1, 11, '#141a28'); r(36, ny - 12, 9, 1, '#141a28'); r(38, ny - 9, 5, 1, '#141a28');
     for (let row = 0; row < 9; row++) {
-      const y = ny + 5 + row * 11; r(nx, y + 8, nw, 1, '#38415a');
+      const y = ny + 5 + row * 11; r(nx, y + 8, nw, 1, '#4a4068');
       for (let c = 0; c < 7; c++) { if (c === 3) { win(nx + 6 + c * 13 + 2, y + 3, 3, 4, { on: R() < .6, warm: '#b8c9a8' }); continue; } win(nx + 6 + c * 13, y + 1, 7, 6); }
     }
     // ===== главная высотка =====
     const { TL, TR, BL, BR, STL, SBL, rows, cols } = BLD;
-    fillPoly(g, [STL, TL, BL, SBL], '#2b3247');                         // торец
-    fillPoly(g, [TL, TR, BR, BL], '#58627d');                            // фасад
+    fillPoly(g, [STL, TL, BL, SBL], '#4a4366');                         // торец
+    fillPoly(g, [TL, TR, BR, BL], '#6d6488');                            // фасад
     // фасад темнеет кверху (дальше от фонарей двора)
     g.save(); g.beginPath(); g.moveTo(TL[0], TL[1]); g.lineTo(TR[0], TR[1]); g.lineTo(BR[0], BR[1]); g.lineTo(BL[0], BL[1]); g.closePath(); g.clip();
     for (let y = TL[1] - 2; y < 170; y += 2) { const k = 1 - (y - TL[1]) / (170 - TL[1]); g.fillStyle = `rgba(14,18,32,${(Math.max(0, k) * .4).toFixed(3)})`; g.fillRect(0, y, W, 2); }
     g.restore();
     // вертикальные швы панелей и колонна лестничной клетки
-    for (let c = 2; c < cols; c += 2) { const a = FF(c / cols, 0), b = FF(c / cols, 1); line(a[0], a[1], b[0], b[1], '#4c5570'); }
+    for (let c = 2; c < cols; c += 2) { const a = FF(c / cols, 0), b = FF(c / cols, 1); line(a[0], a[1], b[0], b[1], '#5b5378'); }
     const sc0 = 7 / cols, sc1 = 8 / cols;
-    fillPoly(g, [FF(sc0, 0), FF(sc1, 0), FF(sc1, 1), FF(sc0, 1)], '#4b5470');
+    fillPoly(g, [FF(sc0, 0), FF(sc1, 0), FF(sc1, 1), FF(sc0, 1)], '#625a80');
     // этажи: плиты балконов (светлые полосы) и окна
     for (let row = 0; row < rows; row++) {
       const vb = (row + .86) / rows, a = FF(0, vb), b = FF(1, vb);
-      line(a[0], a[1], b[0], b[1], '#8792ad'); line(a[0], a[1] + 1, b[0], b[1] + 1, '#3a4258');
-      const sa = SF(0, vb), sb = SF(1, vb); line(sa[0], sa[1], sb[0], sb[1], '#3a4360');
+      line(a[0], a[1], b[0], b[1], '#8f86a8'); line(a[0], a[1] + 1, b[0], b[1] + 1, '#4a4268');
+      const sa = SF(0, vb), sb = SF(1, vb); line(sa[0], sa[1], sb[0], sb[1], '#5a527a');
       for (let c = 0; c < cols; c++) {
         if (c === 7) { const p0 = FF((c + .3) / cols, (row + .4) / rows), p1 = FF((c + .7) / cols, (row + .62) / rows);
           win(p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1], { on: R() < .7, warm: '#c4d6b4', off: '#232a3c' }); continue; }
@@ -91,25 +96,25 @@ function buildNight() {
         win(Math.round(ctr[0] - ww / 2), Math.round(ctr[1]), ww, hh, { front: true });
       }
       for (let c = 0; c < 3; c++) { const p0 = SF((c + .3) / 3, (row + .26) / rows), p1 = SF((c + .62) / 3, (row + .66) / rows);
-        win(p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1], { on: R() < .14, off: '#1a2030' }); }
+        win(p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1], { on: R() < .14, off: '#262036' }); }
     }
     // угол дома — светлое ребро; парапет и надстройки на крыше
-    line(TL[0], TL[1], BL[0], BL[1], '#6d7893');
-    fillPoly(g, [[STL[0] - 1, STL[1] - 3], [TL[0], TL[1] - 3], [TL[0], TL[1]], [STL[0] - 1, STL[1]]], '#252c40');
-    fillPoly(g, [[TL[0], TL[1] - 3], [TR[0] + 1, TR[1] - 3], [TR[0] + 1, TR[1]], [TL[0], TL[1]]], '#3b4460');
-    line(TL[0], TL[1] - 3, TR[0] + 1, TR[1] - 3, '#5d6884');
+    line(TL[0], TL[1], BL[0], BL[1], '#857ca0');
+    fillPoly(g, [[STL[0] - 1, STL[1] - 3], [TL[0], TL[1] - 3], [TL[0], TL[1]], [STL[0] - 1, STL[1]]], '#3a3356');
+    fillPoly(g, [[TL[0], TL[1] - 3], [TR[0] + 1, TR[1] - 3], [TR[0] + 1, TR[1]], [TL[0], TL[1]]], '#4e4569');
+    line(TL[0], TL[1] - 3, TR[0] + 1, TR[1] - 3, '#7a6f98');
     // стойки вывески
     for (const u of [.2, .5, .8]) { const q = FF(u, 0); r(q[0], q[1] - 9, 1, 7, '#1a1e2a'); }
   });
 
   // ---- передний план: крыша, на которой «стоит» зритель, и угол дома справа ----
   NIGHT.fg = makeCanvas(W, H, ({ r, p, line, g }) => {
-    fillPoly(g, [[0, 205], [206, 212], [206, H], [0, H]], '#0a0d14');
-    line(0, 205, 206, 212, '#1f2533');
-    r(46, 176, 1, 30, '#141925'); r(38, 180, 17, 1, '#141925'); r(41, 185, 11, 1, '#141925'); r(43, 190, 7, 1, '#141925');
-    r(150, 196, 6, 13, '#11151f'); r(149, 195, 8, 2, '#1a2030');
-    fillPoly(g, [[368, 128], [400, 120], [400, H], [362, H]], '#0c0f17');
-    line(368, 128, 400, 120, '#1b2130');
+    fillPoly(g, [[0, 205], [206, 212], [206, H], [0, H]], '#120e1c');
+    line(0, 205, 206, 212, '#2a2238');
+    r(46, 176, 1, 30, '#1c1626'); r(38, 180, 17, 1, '#1c1626'); r(41, 185, 11, 1, '#1c1626'); r(43, 190, 7, 1, '#1c1626');
+    r(150, 196, 6, 13, '#1a1424'); r(149, 195, 8, 2, '#262036');
+    fillPoly(g, [[368, 128], [400, 120], [400, H], [362, H]], '#150f1e');
+    line(368, 128, 400, 120, '#2a2238');
   });
   // окна дома на переднем плане
   for (const [x, y, on] of [[376, 146, true], [388, 143, false], [376, 172, false], [388, 170, true], [376, 198, true]])

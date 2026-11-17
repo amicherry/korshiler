@@ -24,15 +24,15 @@ function dlgOpen(name, port, voice = 400, mood = null) { setTouch({ act: L(UI.ne
 function dlgClose() { DLG.open = false; DLG.choices = null; DLG.resolve = null; }
 // длинная реплика делится на страницы по 5 строк — ничего не обрезается
 const DLG_LINES = 5, DLG_TW = 320;
-function sayPage(t, expr) { return new Promise(res => Object.assign(DLG, { text: t, shown: 0, choices: null, expr, resolve: res })); }
+function sayPage(t, expr) { setTouch({ act: L(UI.next) }); return new Promise(res => Object.assign(DLG, { text: t, shown: 0, choices: null, expr, resolve: res })); }
 async function say(t, expr = 'neutral') {
   const lines = wrapText(t, DLG_TW);
   for (let i = 0; i < lines.length; i += DLG_LINES) await sayPage(lines.slice(i, i + DLG_LINES).join(' '), expr);
 }
-function ask(opts) { return new Promise(res => Object.assign(DLG, { shown: DLG.text.length, choices: opts, cursor: 0, resolve: res })); }
+function ask(opts) { setTouch({}); return new Promise(res => Object.assign(DLG, { shown: DLG.text.length, choices: opts, cursor: 0, resolve: res })); }
 // на телефоне окно диалога выше, а кнопки выбора крупнее
-const DLG_BOX = isTouch ? { y: 124, h: 98 } : { y: 140, h: 82 };
-const CH = { x0: 64, colW: 162, y0: 146, rowH: isTouch ? 23 : 18, bw: 156, bh: isTouch ? 21 : 16 };
+const DLG_BOX = isTouch ? { y: 132, h: 90 } : { y: 140, h: 82 };
+const CH = { x0: 64, colW: 162, y0: 146, rowH: isTouch ? 20 : 18, bw: 156, bh: isTouch ? 18 : 16 };
 function dlgUpdate(dt) {
   if (!DLG.open || !DLG.resolve) return;
   if (DLG.choices) {
@@ -102,10 +102,11 @@ function drawPops(dt, ox = 0, oy = 0) {
 }
 
 /* ---------- мелкие спрайты подъезда ---------- */
-const PIXPAL = { k: '#2b2a33', g: '#8f949c', l: '#d8dad6', n: '#e79aa6', e: '#e9a23b', w: '#f4f3ee', c: '#5b8bd6' };
+const PIXPAL = { r: '#6e6872', k: '#2b2a33', g: '#8f949c', l: '#d8dad6', n: '#e79aa6', e: '#e9a23b', w: '#f4f3ee', c: '#5b8bd6' };
 const fromRows = rows => makeCanvas(Math.max(...rows.map(r => r.length)), rows.length, ({ p }) => rows.forEach((row, y) => [...row].forEach((ch, x) => PIXPAL[ch] && p(x, y, PIXPAL[ch]))));
-const RAT = [fromRows(["....kk..........", "...knnk.........", "..kgggkkkkkk....", ".kgkgggggggkk...", "nkggggggggggk...", ".kkgggggggggk.kk", "...kgk..kgk.kkk.", "...kk...kk......"]),
-             fromRows(["....kk..........", "...knnk.........", "..kgggkkkkkk....", ".kgkgggggggkk...", "nkggggggggggk...", ".kkgggggggggk.kk", "....kgkkgk..kkk.", "....kk..kk......"])];
+// крыса — маленькая (12×5), смотрит влево: розовый нос, уши, хвост
+const RAT = [fromRows(["...kk.......", "..krrkkk....", "nkrrrrrrrk..", ".krrrrrrrkkk", "..k.k..k.k.."]),
+             fromRows(["...kk.......", "..krrkkk....", "nkrrrrrrrk..", ".krrrrrrrkkk", "...k.kk.k..."])];
 const CAT = fromRows(["k...k....", "kkkkk....", "kekek....", "kkkkk....", ".kkkk...k", ".kkkkk.k.", ".kkkkkk..", ".kk.kk..."]);
 const PLANE = fromRows(["w.....", "www...", "wwwww.", "www...", "w....."]);
 
@@ -492,28 +493,28 @@ scenes.tour = {
           const away = RAT_HOLES.filter(x => Math.sign(x - r.x) !== Math.sign(h.x - r.x) || h.climb);
           r.hole = (away.length ? away : RAT_HOLES).reduce((a, x) => Math.abs(x - r.x) < Math.abs(a - r.x) ? x : a); r.dir = Math.sign(r.hole - r.x) || 1; }
       } else if (r.st === 'flee') {
-        const goal = r.hole - r.dir * 9, d = goal - r.x; r.x += Math.sign(d) * Math.min(Math.abs(d), dt * .2);
+        const goal = r.hole - r.dir * 7, d = goal - r.x; r.x += Math.sign(d) * Math.min(Math.abs(d), dt * .2);
         if (Math.abs(d) < 1) { r.st = 'in'; r.k = 0; }
       } else if (r.st === 'in') { if (r.k > 320) { r.st = 'hidden'; r.k = 0; } }
       else if (r.st === 'hidden') { if (near) r.k = 0; else if (r.k > 2200 + Math.random() * 800) { r.st = 'out'; r.k = 0; r.dir = Math.random() < .5 ? -1 : 1; } }
-      else if (r.st === 'out') { if (r.k > 320) { r.st = 'roam'; r.k = 0; r.x = r.hole + r.dir * 9; } }
+      else if (r.st === 'out') { if (r.k > 320) { r.st = 'roam'; r.k = 0; r.x = r.hole + r.dir * 7; } }
     }
   },
   drawRats(cy, t) {
     const b = this.base(1) - cy;
     for (const r of this.rats) {
       const fr = RAT[r.st === 'flee' ? Math.floor(r.t / 60) % 2 : r.st === 'roam' && r.pause <= 0 ? Math.floor(r.t / 120) % 2 : 0];
-      if (r.st === 'hidden') { if (Math.floor(t / 1700 + r.x) % 3 === 0 && (t % 1700) < 1200) { rect(r.hole - 2, b - 5, 1, 1, '#e8d36a'); rect(r.hole + 1, b - 5, 1, 1, '#e8d36a'); } continue; }
+      if (r.st === 'hidden') { if (Math.floor(t / 1700 + r.x) % 3 === 0 && (t % 1700) < 1200) { rect(r.hole - 1, b - 3, 1, 1, '#e8d36a'); rect(r.hole + 1, b - 3, 1, 1, '#e8d36a'); } continue; }
       if (r.st === 'in' || r.st === 'out') {
         // ныряет в нору головой вперёд (или вылезает): часть за краем норы скрыта
-        const k = Math.min(1, r.k / 320), x = r.st === 'in' ? r.hole - r.dir * 9 + r.dir * 18 * k : r.hole - r.dir * 9 + r.dir * 18 * k;
+        const k = Math.min(1, r.k / 320), x = r.hole - r.dir * 7 + r.dir * 14 * k;
         const hideSide = r.st === 'in' ? r.dir : -r.dir;
         ctx.save(); ctx.beginPath(); if (hideSide > 0) ctx.rect(0, 0, r.hole, H); else ctx.rect(r.hole + 1, 0, W, H); ctx.clip();
-        sprite(fr, Math.round(x - 8), b - 8, r.dir > 0); ctx.restore();
+        sprite(fr, Math.round(x - 6), b - 5, r.dir > 0); ctx.restore();
         continue;
       }
-      sprite(fr, Math.round(r.x - 8), b - 8, r.dir > 0);
-      if (r.st === 'alert') text('!', r.x, b - 18, { col: '#f2c94c', align: 'center', size: 6, shadow: '#0b0c10' });
+      sprite(fr, Math.round(r.x - 6), b - 5, r.dir > 0);
+      if (r.st === 'alert') text('!', r.x, b - 14, { col: '#f2c94c', align: 'center', size: 6, shadow: '#0b0c10' });
     }
   },
 
