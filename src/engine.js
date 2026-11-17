@@ -222,20 +222,26 @@ const sfx = {
 const trans = { phase: null, t: 0, x: W / 2, y: H / 2, cb: null };
 function irisTo(x, y, cb) { if (trans.phase) return; Object.assign(trans, { phase: 'out', t: 0, x, y, cb }); }
 function irisFrom(x, y) { Object.assign(trans, { phase: 'in', t: 0, x, y, cb: null }); }
+// переход «пиксельным градиентом»: экран заполняется квадратами сверху вниз,
+// край размыт случайным шумом (как в референсе), потом так же открывается
+const TR_CELL = 8, TR_COLS = Math.ceil(W / TR_CELL), TR_ROWS = Math.ceil(H / TR_CELL);
+const TR_NOISE = Array.from({ length: TR_COLS * TR_ROWS }, (_, i) => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); });
+function drawTrCells(k, cover) {
+  ctx.fillStyle = '#0b0c10';
+  for (let ry = 0; ry < TR_ROWS; ry++) for (let cx = 0; cx < TR_COLS; cx++) {
+    const th = (ry / TR_ROWS) * .6 + TR_NOISE[ry * TR_COLS + cx] * .4;   // порог клетки: ниже — позже, плюс шум
+    const v = (k * 1.4 - th) / .25;                                     // 0..1 — клетка «вырастает» из точки в квадрат
+    const s = cover ? v : 1 - v; if (s <= 0) continue;
+    const sz = Math.min(TR_CELL, Math.ceil(TR_CELL * Math.min(1, s) / 2) * 2), o = (TR_CELL - sz) / 2;
+    ctx.fillRect(cx * TR_CELL + o, ry * TR_CELL + o, sz, sz);
+  }
+}
 function drawIris(dt) {
   if (!trans.phase) return;
-  trans.t += dt; const D = 320, R = Math.hypot(W, H) + 10;
-  const k = Math.min(1, trans.t / D);
-  ctx.fillStyle = '#0b0c10';
-  if (trans.phase === 'out') {
-    const r = Math.ceil(R * k * k / 6) * 6; ctx.beginPath(); ctx.arc(trans.x, trans.y, r, 0, Math.PI * 2); ctx.fill();
-    if (k >= 1) { const cb = trans.cb; trans.phase = 'hold'; trans.t = 0; cb && cb(); }
-  } else if (trans.phase === 'hold') { ctx.fillRect(0, 0, W, H); }
-  else {
-    const r = Math.max(0, Math.ceil(R * (1 - (1 - k) * (1 - k)) / 6) * 6);
-    ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.arc(trans.x, trans.y, r, 0, Math.PI * 2, true); ctx.fill('evenodd');
-    if (k >= 1) trans.phase = null;
-  }
+  trans.t += dt; const D = 380, k = Math.min(1, trans.t / D);
+  if (trans.phase === 'out') { drawTrCells(k, true); if (k >= 1) { const cb = trans.cb; trans.phase = 'hold'; trans.t = 0; cb && cb(); } }
+  else if (trans.phase === 'hold') { ctx.fillStyle = '#0b0c10'; ctx.fillRect(0, 0, W, H); }
+  else { drawTrCells(k, false); if (k >= 1) trans.phase = null; }
 }
 
 /* ---------- сцены и главный цикл ---------- */
