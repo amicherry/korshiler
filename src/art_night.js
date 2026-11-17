@@ -223,14 +223,14 @@ function buildStreet() {
     for (const x of [74, 134, 286, 330]) { r(x, 181, 10, 4, '#120e1c'); for (let i = 0; i < 5; i++) r(x + 1 + i * 2, 181, 1, 4, '#3a3356'); }
     // водосток и жёлтая газовая труба
     r(fx + 4, 0, 3, 186, '#8a80a8'); r(fx + 4, 0, 1, 186, '#a198bd'); for (let y = 10; y < 186; y += 31) r(fx + 3, y, 5, 1, '#4e4569');
-    r(fx + 8, 168, fw - 12, 3, '#d9b43a'); r(fx + 8, 168, fw - 12, 1, '#f2d26a'); for (let x = fx + 14; x < fx + fw; x += 24) r(x, 171, 1, 3, '#6a5a2a');
+    r(fx + 8, 127, fw - 12, 3, '#d9b43a'); r(fx + 8, 127, fw - 12, 1, '#f2d26a'); for (let x = fx + 14; x < fx + fw; x += 24) r(x, 130, 1, 3, '#6a5a2a'); r(fx + fw - 10, 127, 3, 59, '#d9b43a'); r(fx + fw - 10, 127, 1, 59, '#f2d26a');
     // окна квартир: рамы, подоконники; у некоторых балкон с бельём или цветами, кондиционер
     for (const fy of [-2, 60, 122]) for (const x of [64, 104, 144, 254, 294, 334]) {
-      r(x - 2, fy + 13, 24, 30, '#4a3f62'); r(x - 3, fy + 42, 26, 2, '#8f86a8');
-      const w = { x, y: fy + 15, w: 20, h: 26, on: R() < .45, warm: pick(R, ['#f2b84a', '#f5c96a', '#e8913a', '#ec9d8f', '#9a6ad0']), curtain: R() < .4, ac: R() < .2, plants: R() < .3 };
+      r(x - 4, fy + 10, 30, 36, '#4a3f62'); r(x - 5, fy + 45, 32, 2, '#8f86a8');
+      const w = { x: x - 2, y: fy + 12, w: 26, h: 32, on: R() < .45, warm: pick(R, ['#f2b84a', '#f5c96a', '#e8913a', '#ec9d8f', '#9a6ad0']), curtain: R() < .4, ac: R() < .2, plants: R() < .3 };
       STREET.windows.push(w);
-      if (w.ac) { r(x + 22, fy + 30, 10, 8, '#cfcbd8'); r(x + 22, fy + 30, 10, 1, '#e8e4f0'); for (let i = 0; i < 3; i++) r(x + 23, fy + 32 + i * 2, 8, 1, '#8a849a'); }
-      if (w.plants) { r(x - 1, fy + 39, 5, 3, '#9a4a3a'); r(x, fy + 36, 3, 3, '#4a8a52'); p(x + 1, fy + 35, '#e05a7a'); }
+      if (w.ac && fy > 0) { r(x + 2, fy + 48, 17, 10, '#cfcbd8'); r(x + 2, fy + 48, 17, 1, '#e8e4f0'); for (let i = 0; i < 4; i++) r(x + 4, fy + 50 + i * 2, 9, 1, '#8a849a'); r(x + 14, fy + 51, 4, 4, '#8a849a'); }
+      if (w.plants) { r(x - 1, fy + 41, 5, 3, '#9a4a3a'); r(x, fy + 38, 3, 3, '#4a8a52'); p(x + 1, fy + 37, '#e05a7a'); }
     }
     // окна лестницы над входом
     for (const y of [36, 98]) { r(STREET_DOOR_X - 7, y - 1, 15, 22, '#4a3f62'); r(STREET_DOOR_X - 5, y + 1, 11, 18, '#3a3450'); r(STREET_DOOR_X - 5, y + 9, 11, 1, '#4a3f62'); }
@@ -242,10 +242,10 @@ function buildStreet() {
     r(dx - 11, 143, 9, 14, '#1a1424'); r(dx + 3, 143, 8, 14, '#2a2a3a'); p(dx + 5, 146, '#8a849a'); p(dx + 8, 150, '#8a849a');
     for (let y = 160; y < 186; y += 4) r(dx - 13, y, 13, 1, '#5a3e30'); r(dx - 4, 165, 3, 3, '#c9a95a');
     r(dx - 10, 172, 6, 1, '#b8443f'); r(dx - 9, 174, 4, 1, '#b8443f');                     // граффити на двери
-    r(dx + 18, 150, 8, 13, '#1b1f27'); r(dx + 19, 151, 6, 4, '#2a3030'); for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) p(dx + 20 + j * 3, 157 + i * 2, '#5a6270');
+    r(dx + 18, 152, 5, 9, '#1b1f27'); r(dx + 19, 153, 3, 2, '#2a3030'); for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) p(dx + 19 + j * 2, 156 + i * 2, '#5a6270');
     r(dx - 20, 186, 40, 3, '#8a809e'); r(dx - 24, 189, 48, 3, '#7a7090'); r(dx - 20, 186, 40, 1, '#a59cbc');
     // объявления у двери
-    r(dx - 28, 145, 9, 12, '#d8d2bf'); r(dx - 27, 147, 7, 1, '#7a7466'); r(dx - 27, 150, 5, 1, '#7a7466'); r(dx - 29, 160, 8, 9, '#c9d6e6'); r(dx - 27, 143, 4, 2, 'rgba(220,206,150,.8)');
+    r(dx - 26, 148, 5, 7, '#d8d2bf'); r(dx - 25, 150, 3, 1, '#7a7466'); r(dx - 25, 152, 3, 1, '#7a7466'); r(dx - 26, 158, 5, 7, '#c9d6e6'); r(dx - 25, 147, 3, 1, 'rgba(220,206,150,.8)');
     // земля: тротуар, бордюр, асфальт с трещинами и лужами, опавшие листья
     r(0, 186, W, 26, '#55466a'); for (let i = 0; i < 180; i++) p(R() * W, 188 + R() * 22, pick(R, ['#4e4064', '#5e4e74', '#46395a']));
     r(0, 186, W, 1, '#8a78a0');
@@ -254,16 +254,18 @@ function buildStreet() {
     for (const [px, py, pw] of [[120, 200, 26], [250, 220, 30]]) { r(px, py, pw, 3, '#2c2a4a'); r(px + 3, py + 1, pw / 3, 1, '#6a5f8e'); }
     for (let i = 0; i < 40; i++) p(R() * W, 188 + R() * 26, pick(R, ['#c4622f', '#e8913a', '#b8562e']));
     // лавочка
-    const bx = 276; r(bx, 192, 2, 8, '#1a1424'); r(bx + 28, 192, 2, 8, '#1a1424'); r(bx - 2, 190, 34, 3, '#8a5a3a'); r(bx - 2, 183, 34, 3, '#8a5a3a'); r(bx - 2, 183, 34, 1, '#a87a5a');
+    const bx = 132; r(bx, 192, 2, 8, '#1a1424'); r(bx + 38, 192, 2, 8, '#1a1424'); r(bx - 2, 190, 44, 3, '#8a5a3a'); r(bx - 2, 182, 44, 3, '#8a5a3a'); r(bx - 2, 182, 44, 1, '#a87a5a'); r(bx + 1, 185, 1, 5, '#1a1424'); r(bx + 37, 185, 1, 5, '#1a1424');
     // фонарь
-    r(84, 104, 2, 106, '#1a1424'); r(84, 104, 14, 2, '#1a1424'); r(94, 106, 7, 3, '#2a2238');
+    r(84, 74, 2, 136, '#1a1424'); r(83, 204, 4, 6, '#1a1424'); r(84, 74, 16, 2, '#1a1424'); r(95, 76, 8, 3, '#2a2238');
     // осеннее дерево слева
     r(20, 130, 4, 80, '#4a3028'); for (const [cx, cy, rr, c] of [[22, 120, 22, '#7a3b2a'], [22, 116, 20, '#c4622f'], [16, 110, 10, '#e8913a'], [30, 122, 9, '#e8913a']]) { g.fillStyle = c; g.beginPath(); g.arc(cx, cy, rr, 0, 7); g.fill(); }
   });
-  STREET.car = makeCanvas(76, 24, ({ r }) => {
-    r(4, 9, 68, 10, '#6a2e3a'); r(16, 2, 38, 8, '#6a2e3a'); r(18, 3, 15, 6, '#2a2238'); r(35, 3, 17, 6, '#2a2238');
-    r(4, 9, 68, 1, '#8a4a52'); r(16, 2, 38, 1, '#8a4a52'); r(70, 11, 2, 3, '#f2d27a'); r(4, 11, 2, 3, '#b8443f'); r(4, 16, 68, 3, '#3a1a24');
-    for (const x of [14, 54]) { r(x, 15, 9, 9, '#120e1c'); r(x + 3, 18, 3, 3, '#4a4458'); }
+  STREET.car = makeCanvas(102, 34, ({ r, p }) => {
+    r(4, 14, 96, 13, '#6a2e3a'); r(22, 3, 52, 12, '#6a2e3a'); r(25, 5, 22, 9, '#2a2238'); r(50, 5, 21, 9, '#2a2238'); r(48, 5, 2, 9, '#6a2e3a');
+    r(26, 6, 6, 1, '#4a4060'); r(51, 6, 6, 1, '#4a4060');
+    r(4, 14, 96, 1, '#8a4a52'); r(22, 3, 52, 1, '#8a4a52'); r(4, 20, 96, 1, '#5a2430'); r(48, 15, 1, 11, '#5a2430'); r(40, 18, 4, 1, '#c9cdd6'); r(64, 18, 4, 1, '#c9cdd6');
+    r(96, 16, 4, 4, '#f2d27a'); r(4, 16, 3, 4, '#b8443f'); r(2, 23, 100, 4, '#3a1a24');
+    for (const x of [14, 74]) { r(x - 2, 20, 17, 8, '#3a1a24'); r(x, 21, 13, 13, '#120e1c'); r(x + 4, 25, 5, 5, '#6a6478'); p(x + 6, 27, '#a9a2b8'); }
   });
   // вместо снега — падающие листья
   STREET.snow = Array.from({ length: 26 }, () => ({ x: R() * W, y: R() * H, v: .01 + R() * .015, dx: (R() - .3) * .02, c: pick(R, ['#c4622f', '#e8913a', '#b8562e']) }));
@@ -274,9 +276,9 @@ function drawStreet(dt, t) {
   ctx.save(); ctx.translate(0, -STREET_UP);
   sprite(STREET.bg, 0, 0);
   if (Math.random() < dt / 700) { const w = pick(Math.random, STREET.windows); w.on = !w.on; }
-  for (const w of STREET.windows) { rect(w.x, w.y, w.w, w.h, w.on ? w.warm : '#2a2440'); if (w.on && w.curtain) rect(w.x, w.y, 5, w.h, shade(w.warm, -35)); rect(w.x + 9, w.y, 2, w.h, '#4a3f62'); rect(w.x, w.y + 9, w.w, 2, '#4a3f62');
+  for (const w of STREET.windows) { rect(w.x, w.y, w.w, w.h, w.on ? w.warm : '#2a2440'); if (w.on && w.curtain) rect(w.x, w.y, 5, w.h, shade(w.warm, -35)); rect(w.x + 12, w.y, 2, w.h, '#4a3f62'); rect(w.x, w.y + 11, w.w, 2, '#4a3f62');
     if (w.on) { ctx.fillStyle = 'rgba(242,198,106,.07)'; ctx.fillRect(w.x - 3, w.y - 3, w.w + 6, w.h + 6); } }
-  sprite(STREET.car, 314, 196);
+  sprite(STREET.car, 292, 187);
   // свет над подъездом и фонарь: тёплые пятна на снегу
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   const lamp = (x, y, rad, a) => { const gr = ctx.createRadialGradient(x, y, 1, x, y, rad); gr.addColorStop(0, `rgba(255,214,140,${a})`); gr.addColorStop(1, 'rgba(255,190,110,0)'); ctx.fillStyle = gr; ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2); };

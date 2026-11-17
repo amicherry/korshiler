@@ -81,8 +81,8 @@ function buildHouseArt() {
     for (const dx of [121, 277]) { r(dx - 1, top - 3, 4, 3, '#7a6f98'); r(dx, top, 2, HM.bottom - top + 3, '#8a80a8'); r(dx, top, 1, HM.bottom - top + 3, '#a198bd');
       for (let yy = top + 6; yy < HM.bottom; yy += 15) r(dx - 1, yy, 4, 1, '#4e4569'); r(dx - 1, HM.bottom + 3, 5, 2, '#8a80a8'); }
     // ===== жёлтая газовая труба вдоль фасада, с опусками и кронштейнами =====
-    r(122, 178, 154, 2, '#d9b43a'); r(122, 178, 154, 1, '#f2d26a'); for (let xx = 128; xx < 276; xx += 16) r(xx, 180, 1, 2, '#6a5a2a');
-    r(170, 178, 2, 8, '#d9b43a'); r(169, 184, 4, 2, '#8a7a3a'); r(250, 160, 2, 18, '#d9b43a'); r(249, 159, 4, 2, '#8a7a3a');
+    r(122, 164, 154, 2, '#d9b43a'); r(122, 164, 154, 1, '#f2d26a'); for (let xx = 128; xx < 276; xx += 16) r(xx, 166, 1, 1, '#6a5a2a');
+    r(124, 164, 2, 22, '#d9b43a'); r(123, 183, 4, 3, '#8a7a3a'); r(250, 158, 2, 6, '#d9b43a'); r(249, 157, 4, 2, '#8a7a3a');
     // ===== вход в подвал: пристройка с наклонной крышей, железная дверь и табличка =====
     r(104, 177, 16, 9, '#5b5378'); r(103, 175, 18, 2, '#8f86a8'); for (let i = 0; i < 5; i++) r(103 + i * 4, 174 - Math.floor(i / 2), 4, 1, '#8f86a8');
     r(108, 179, 7, 7, '#2a2440'); r(109, 180, 5, 6, '#4a5260'); r(112, 182, 1, 1, '#c9a95a');
@@ -156,7 +156,7 @@ function drawHouseItem(id, k, t) {
       break; }
     case 'basement': {   // подвал: до — бегают крысы, лужа; после — решётки на продухах
       for (const vx of [134, 160, 240, 266]) { rect(vx, 182, 8, 3, '#0b0d12'); A(k, () => { for (let i = 0; i < 4; i++) rect(vx + 1 + i * 2, 182, 1, 3, '#8792ad'); }); }
-      A(1 - k, () => { rect(244, 186, 20, 2, '#3d5a7a'); for (let i = 0; i < 2; i++) { const rx = 120 + ((t / 18 + i * 130) % 180); rect(rx, 184, 4, 2, '#5b5f66'); rect(rx + 4, 185, 2, 1, '#5b5f66'); } });
+      A(1 - k, () => { rect(244, 186, 20, 2, '#3d5a7a'); for (let i = 0; i < 2; i++) { const rx = 120 + ((t / 18 + i * 130) % 180); rect(rx, 185, 2, 1, '#5b5f66'); p(rx + 2, 185, '#3a3e46'); } });
       break; }
     case 'playground': {
       const X0 = 302, X1 = 394, Y0 = 194, Y1 = 222;
@@ -178,9 +178,9 @@ function drawHouseItem(id, k, t) {
         // задний забор — зелёный штакетник
         for (let x = X0; x <= X1; x += 3) { rect(x, Y0 - 1, 2, 6, '#4a8a5a'); p(x, Y0 - 2, '#6aaa7a'); } rect(X0, Y0 + 1, X1 - X0 + 1, 1, '#2f5a3e');
         // качели: стойки, перекладина, две сидушки на цепях
-        rect(310, 199, 2, 15, '#e05a4a'); rect(336, 199, 2, 15, '#e05a4a'); rect(309, 198, 30, 2, '#f2c94c'); rect(309, 213, 4, 1, '#2a2238'); rect(335, 213, 4, 1, '#2a2238');
+        rect(310, 202, 2, 12, '#e05a4a'); rect(336, 202, 2, 12, '#e05a4a'); rect(309, 201, 30, 2, '#f2c94c'); rect(309, 213, 4, 1, '#2a2238'); rect(335, 213, 4, 1, '#2a2238');
         const sw = Math.sin(t / 420) * 3;
-        for (const sx of [316, 328]) { const o = sx === 316 ? sw : -sw; rect(sx + o, 200, 1, 8, '#cfd6e4'); rect(sx + 5 + o, 200, 1, 8, '#cfd6e4'); rect(sx - 1 + o, 208, 8, 2, '#4c9a84'); }
+        for (const sx of [316, 328]) { const o = sx === 316 ? sw : -sw; rect(sx + 1 + o, 203, 1, 7, '#cfd6e4'); rect(sx + 3 + o, 203, 1, 7, '#cfd6e4'); rect(sx + o, 210, 5, 1, '#4c9a84'); }
         // горка с лесенкой
         rect(344, 200, 2, 14, '#3f6f8c'); rect(350, 200, 2, 14, '#3f6f8c'); for (let yy = 202; yy < 214; yy += 3) rect(344, yy, 8, 1, '#5a8ab0');
         rect(343, 198, 10, 2, '#3f6f8c'); rect(342, 196, 2, 3, '#e05a4a'); rect(351, 196, 2, 3, '#e05a4a');
@@ -190,7 +190,7 @@ function drawHouseItem(id, k, t) {
         for (let i = 0; i < 10; i++) p(370 + (i * 7) % 18, 208 + (i * 3) % 5, '#e8d39a');
         rect(372, 208, 3, 3, '#e05a4a'); p(373, 207, '#e05a4a'); rect(380, 209, 4, 1, '#3f6f8c'); rect(383, 208, 1, 2, '#3f6f8c'); rect(385, 207, 2, 2, '#f2c94c');
         // лавочка, урна, куст
-        rect(318, 211, 14, 2, '#8a5a3a'); rect(318, 209, 14, 1, '#8a5a3a'); rect(319, 213, 1, 2, '#2a2238'); rect(330, 213, 1, 2, '#2a2238');
+        rect(320, 212, 10, 1, '#8a5a3a'); rect(320, 210, 10, 1, '#8a5a3a'); rect(321, 213, 1, 2, '#2a2238'); rect(328, 213, 1, 2, '#2a2238');
         rect(336, 210, 4, 5, '#4a5a6a'); rect(336, 210, 4, 1, '#6a7a8a');
         ctx.fillStyle = '#2f6a3e'; ctx.fillRect(380, 214, 10, 5); ctx.fillStyle = '#4a8a52'; ctx.fillRect(381, 213, 7, 3); rect(383, 213, 1, 1, '#e05a7a');
         // передний забор с калиткой
@@ -227,7 +227,7 @@ function drawHouseItem(id, k, t) {
         text(ch, x0 + acc, 24, { size: 6, col: on ? '#ff6a45' : '#3c1714' }); acc += textW(ch, 6); });
       if (k >= 1) A(.25 + .05 * Math.sin(t / 140), () => { ctx.save(); ctx.globalCompositeOperation = 'lighter'; rect(x0 - 6, 20, textW(s, 6) + 12, 15, '#ff4a30'); ctx.restore(); });
       break; }
-    case 'bench': A(k, () => { for (const bx of [228, 252]) { rect(bx, 193, 14, 2, '#8a5a3a'); rect(bx, 190, 14, 1, '#8a5a3a'); rect(bx + 1, 195, 1, 3, '#2a2a2a'); rect(bx + 12, 195, 1, 3, '#2a2a2a'); } }); break;
+    case 'bench': A(k, () => { for (const bx of [230, 256]) { rect(bx, 193, 10, 2, '#8a5a3a'); rect(bx, 190, 10, 1, '#8a5a3a'); rect(bx + 1, 195, 1, 2, '#2a2a2a'); rect(bx + 8, 195, 1, 2, '#2a2a2a'); } }); break;
     case 'flowers': A(k, () => { for (const fx of [126, 150, 228, 254]) { rect(fx, 186, 20, 3, '#4a3a2a'); for (let i = 0; i < 6; i++) rect(fx + 1 + i * 3, 184 + (i % 2), 2, 2, ['#e05a7a', '#f2c94c', '#f4f3ee'][i % 3]); } }); break;
     case 'trees': A(k, () => { for (const [tx, s] of [[44, 1.1], [70, .9]]) { const h = Math.round(22 * s * Math.min(1, k * 1.2));
       ctx.fillStyle = 'rgba(10,6,20,.35)'; ctx.fillRect(tx - 9, 200, 20, 2);                                  // тень
@@ -235,8 +235,8 @@ function drawHouseItem(id, k, t) {
       ctx.fillStyle = '#e8913a'; ctx.beginPath(); ctx.arc(tx - 2, 198 - h, 4 * s * Math.min(1, k * 1.2), 0, Math.PI * 2); ctx.fill(); } }); break;
     case 'lamps': A(k, () => { for (const lx of [84, 396]) { rect(lx, 160, 1, 32, '#1a1e28'); rect(lx - 3, 159, 7, 2, '#2a2f3c'); rect(lx - 2, 161, 5, 1, '#fff1b8');
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .18; ctx.fillStyle = '#ffd890'; ctx.beginPath(); ctx.moveTo(lx - 2, 162); ctx.lineTo(lx + 3, 162); ctx.lineTo(lx + 14, 192); ctx.lineTo(lx - 13, 192); ctx.fill(); ctx.restore(); } }); break;
-    case 'parking': A(k, () => { rect(8, 204, 84, 18, '#2c2640'); for (let i = 0; i <= 4; i++) rect(8 + i * 21, 204, 1, 18, '#cfd6e4');
-      for (const [cx, col] of [[12, '#b8443f'], [54, '#3f6f8c']]) { rect(cx, 210, 16, 6, col); rect(cx + 3, 207, 10, 3, col); rect(cx + 4, 208, 3, 2, '#1b2030'); rect(cx + 8, 208, 4, 2, '#1b2030'); rect(cx + 2, 216, 3, 2, '#0d0f14'); rect(cx + 11, 216, 3, 2, '#0d0f14'); } }); break;
+    case 'parking': A(k, () => { rect(6, 204, 88, 18, '#2c2640'); for (let i = 0; i <= 3; i++) rect(8 + i * 28, 204, 1, 18, '#cfd6e4');
+      for (const [cx, col] of [[10, '#b8443f'], [66, '#3f6f8c']]) { rect(cx, 211, 24, 5, col); rect(cx + 5, 207, 13, 4, col); rect(cx + 6, 208, 5, 2, '#1b2030'); rect(cx + 12, 208, 5, 2, '#1b2030'); rect(cx + 23, 212, 1, 1, '#f2d27a'); rect(cx + 3, 215, 4, 3, '#0d0f14'); rect(cx + 17, 215, 4, 3, '#0d0f14'); } }); break;
   }
 }
 
