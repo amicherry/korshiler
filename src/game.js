@@ -325,7 +325,7 @@ scenes.tour = {
     this.talker = { floor: tour.talkerFloor, x: 95, done: false, look: { skin: '#d6a07a', hair: 'short', hairCol: '#3a2a20', top: 'hoodie', topCol: '#3b3f55', pants: '#2b2a33', hat: 'cap', capCol: '#3f6f8c', beard: true } };
     this.helper = { state: 'hidden', floor: 2, x: 351, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
     this.rats = this.fixed.has('basement') ? [] : [{ x: 80, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 320, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
-    this.liftPick = false; this.drops = [];
+    this.liftPick = false; this.drops = []; this.paused = false;
     this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
     this.run = null; API.tourStart(tour.id).then(r => this.run = r).catch(() => {});
     this.plan = null;
@@ -365,6 +365,9 @@ scenes.tour = {
 
   update(dt) {
     if (this.over) return;
+    // пауза: время стоит, можно продолжить или выйти из уровня
+    if (this.paused) { setTouch({}); if (hit('back')) this.paused = false; return; }
+    if (hit('back') && !this.busy && !DLG.open && !this.ballot && !this.liftPick) { this.paused = true; return; }
     dlgUpdate(dt);
     const h = this.hero, T = this.tour;
     // время идёт, пока игрок ходит (в диалоге и в бюллетене — пауза)
@@ -751,6 +754,15 @@ scenes.tour = {
     this.drawHUD();
     dlgDraw();
     if (this.ballot) this.drawBallot();
+    if (this.paused) {
+      rect(0, 0, W, H, 'rgba(11,10,20,.65)'); frameBox(120, 50, 160, 120);
+      text(L(UI.pause), W / 2, 62, { align: 'center', col: '#f4f3ee' });
+      wrapText(L(UI.pauseNote), 140, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, 76 + i * 8, { align: 'center', col: '#8f86a8', size: 6 }));
+      if (button(L(UI.resume), W / 2, 104, 'primary', { w: 130 })) this.paused = false;
+      if (button(L(UI.quitLevel), W / 2, 130, 'alt', { w: 130 })) { this.over = true; this.paused = false; DLG.open = false; setTouch({});
+        irisTo(W / 2, 110, () => go(HOUSE_STATE.won.length ? 'house' : 'title')); }
+      clicks.length = 0; return;
+    }
     if (this.liftPick) {
       rect(0, 0, W, H, 'rgba(11,12,16,.5)'); frameBox(120, 40, 160, 140); text(L(UI.lift), W / 2, 50, { align: 'center', col: '#f4f3ee' });
       for (let k = 1; k <= 9; k++) { const c = (k - 1) % 3, rr = 2 - Math.floor((k - 1) / 3), bx = 150 + c * 36, by = 66 + rr * 30;
@@ -767,9 +779,10 @@ scenes.tour = {
     const m = Math.floor(this.minute), hh = Math.floor(m / 60), mm = m % 60;
     const left = this.end - this.minute;
     // часы
-    rect(6, 4, 9, 9, '#f4f3ee'); rect(7, 5, 7, 7, '#2b2a33'); rect(10, 6, 1, 3, '#f4f3ee'); rect(10, 8, 2, 1, '#f4f3ee');
-    text(`${hh}:${String(mm).padStart(2, '0')}`, 19, 5, { col: left < 8 ? '#e98f6f' : '#f4f3ee' });
-    rect(64, 6, 60, 6, '#2b2a33'); rect(64, 6, Math.round(60 * clamp(left / T.duration, 0, 1)), 6, left < 8 ? '#e98f6f' : '#7fc4a8');
+    // кнопка паузы вместо значка часов
+    if (button('II', 0, 1, 'dark', { left: 1, w: 16 }) && !this.busy && !DLG.open) this.paused = true;
+    text(`${hh}:${String(mm).padStart(2, '0')}`, 22, 5, { col: left < 8 ? '#e98f6f' : '#f4f3ee' });
+    rect(68, 6, 55, 6, '#2b2a33'); rect(68, 6, Math.round(55 * clamp(left / T.duration, 0, 1)), 6, left < 8 ? '#e98f6f' : '#7fc4a8');
     // подписи
     const n = this.votes();
     text(`${L(T.remote ? UI.votes : UI.signs)} ${n}/${T.goal}`, 132, 5, { col: n >= T.goal ? '#4caf6e' : '#f2c94c' });
