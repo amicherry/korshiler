@@ -166,11 +166,13 @@ function drawNight(dt) {
   for (const w of NIGHT.windows) if (!w.fg) drawWin(w);
   // вывеска: горит целиком, изредка одна буква подмигивает
   if (t > S.until) { S.flick = Math.random() < .5 ? Math.floor(Math.random() * S.letters.length) : -1; S.until = t + (S.flick >= 0 ? 160 + Math.random() * 380 : 900 + Math.random() * 2400); }
-  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .55 + .08 * Math.sin(t / 140); ctx.drawImage(S.glow, S.x - 12, S.y - 12); ctx.restore();
-  ctx.drawImage(S.on, S.x, S.y);
+  const signOk = typeof HOUSE_STATE !== 'undefined' && HOUSE_STATE.fixed.includes('sign');
+  if (signOk) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .55 + .08 * Math.sin(t / 140); ctx.drawImage(S.glow, S.x - 12, S.y - 12); ctx.restore(); ctx.drawImage(S.on, S.x, S.y); }
+  else { ctx.drawImage(S.off, S.x, S.y);   // вывеска сломана: светятся лишь некоторые буквы — её чинят в последнем собрании
+    S.letters.forEach(([lx, lw], i) => { if (i % 3 === 1 && Math.sin(t / 170 + i * 2) > -.4) ctx.drawImage(S.on, lx, 0, lw, S.on.height, S.x + lx, S.y, lw, S.on.height); }); }
   if (S.flick >= 0 && Math.floor(t / 60) % 3) { const [lx, lw] = S.letters[S.flick]; ctx.drawImage(S.off, lx, 0, lw, S.off.height, S.x + lx, S.y, lw, S.off.height); }
   // после 2-го тура на крыше стоит антенна (награда видна прямо в меню)
-  if (typeof SAVE !== 'undefined' && SAVE && SAVE.tours && SAVE.tours.t2 && SAVE.tours.t2.done) {
+  if (typeof HOUSE_STATE !== 'undefined' && HOUSE_STATE.fixed.includes('antenna')) {
     const q = FF(.95, 0), x = Math.round(q[0]), y = Math.round(q[1]) - 3;
     rect(x, y - 12, 1, 12, '#8792ad'); rect(x - 3, y - 4, 7, 1, '#5d6884');
     rect(x - 5, y - 17, 3, 7, '#cfd6e4'); rect(x - 4, y - 18, 4, 1, '#cfd6e4'); rect(x - 2, y - 15, 3, 1, '#8792ad');

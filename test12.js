@@ -18,16 +18,16 @@ const {chromium}=require('playwright'); const fs=require('fs');
     for (const k of ['tabComplex','tabCity']) if (textW(L(UI[k])) > 88) bad.push('tab '+k);
     for (const k of ['noScore','netFail']) if (textW(L(UI[k]),6) > 270) bad.push('note '+k);
     // настройки тура: ни одно поле не потерялось
-    for (const k of ['floors','perFloor','goal','heroApt','start','duration','secPerMin','raccoon','mix','awayShare','talkerFloor','helperAfter','helperFloor']) if (TOURS.t1[k] === undefined) bad.push('tour.'+k);
+    for (const k of ['floors','perFloor','goal','heroApt','start','duration','secPerMin','raccoon','mix','awayShare','talkerFloor','helperAfter','helperFloor']) if (TOURS.L1[k] === undefined) bad.push('tour.'+k);
     return bad; });
   console.log(lang, rep); await pg.close();
  }
  // 2) ночной работник на 5 этаже — про крышу, на 2 этаже — про мебель сверху
  const pg=await b.newPage(); pg.on('pageerror',e=>console.log('PAGEERR',e.stack)); await pg.route('**/fonts.googleapis.com/**', r=>r.abort());
  await pg.addInitScript({content:`localStorage.setItem('d67_lang','ru');localStorage.setItem('d67_save', JSON.stringify({created:true,seenIntro:true,name:'А',look:{},coins:0,tours:{},trust:{}}));`});
- await pg.goto('file://'+process.cwd()+'/index.html?stable'); await pg.waitForTimeout(1200); await pg.keyboard.press('Enter'); for(let i=0;i<60 && !(await pg.evaluate(()=>scene===scenes.tour && !!scene.res));i++) await pg.waitForTimeout(100); console.log('scene:', await pg.evaluate(()=>Object.keys(scenes).find(k=>scenes[k]===scene)));
+ await pg.goto('file://'+process.cwd()+'/index.html?stable'); await pg.waitForTimeout(2600); await pg.keyboard.press('Enter'); for(let i=0;i<60 && !(await pg.evaluate(()=>scene===scenes.tour && !!scene.res));i++) await pg.waitForTimeout(100); console.log('scene:', await pg.evaluate(()=>Object.keys(scenes).find(k=>scenes[k]===scene)));
  console.log(await pg.evaluate(async()=>{ const out=[]; const sc=scene;
-   for (const apt of [19, 6]) { const r=sc.res[apt]; r.arch='night'; r.A=ARCH.night; r.v=1; r.away=false; r.knocks=9; r.sleeping=false;
+   for (const apt of [50, 6]) { const r=sc.res[apt]; r.arch='night'; r.A=ARCH.night; r.v=1; r.away=false; r.knocks=9; r.sleeping=false;
      // повторяем логику выбора строки как в visit
      const v=r.A.lines.story; let line=v[r.v%v.length]; const top=Math.ceil(r.apt/sc.tour.perFloor)===sc.tour.floors; if(top&&line.top) line=line.top; else if(!top&&line.low) line=line.low; out.push(apt+': '+L(line)); }
    return out; }));

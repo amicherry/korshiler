@@ -17,7 +17,8 @@ const API_CONFIG = {
 const MockServer = (() => {
   const DB_KEY = 'kn_server_db';
   const load = () => { try { return JSON.parse(loadStr(DB_KEY, '')) || null; } catch (e) { return null; } };
-  const db = load() || { users: {}, profiles: {}, runs: {}, scores: {}, rewards: {} };
+  const db = load() || {};
+  for (const k of ['users', 'profiles', 'runs', 'scores', 'rewards', 'houses']) db[k] = db[k] || {};
   const commit = () => saveStr(DB_KEY, JSON.stringify(db));
 
   // тестовые жители: так приложение E-KNOT передало бы токен в ссылке (?token=demo)
@@ -31,6 +32,15 @@ const MockServer = (() => {
     ['Нұрлан', 'c-04', 1720], ['Ольга', 'c-04', 1180], ['Бақыт', 'c-09', 1590], ['Мадина', 'c-09', 1240], ['Асхат', 'c-21', 1390], ['Жанар', 'c-21', 760],
   ];
   const err = (status, code) => { const e = new Error(code); e.status = status; e.code = code; throw e; };
+  // дом игрока: отремонтированные проблемы, украшения, выигранные собрания, бонус дня
+  const house = id => db.houses[id] || (db.houses[id] = { fixed: [], decor: [], won: [], claimDay: null });
+  const houseScore = H => H.fixed.reduce((s, id) => s + PROBLEMS.find(p => p.id === id).pts, 0) + H.decor.reduce((s, id) => s + DECOR.find(d => d.id === id).pts, 0);
+  const today = () => new Date().toISOString().slice(0, 10);
+  const houseView = (u) => { const H = house(u.userId), prof = db.profiles[u.userId] || {}, score = houseScore(H);
+    return { fixed: H.fixed, decor: H.decor, won: H.won, coins: prof.coins || 0, score, bonus: Math.floor(score / 10), claimable: H.claimDay !== today() && score > 0 }; };
+  const unlocked = (u, n) => n === 1 || house(u.userId).fixed.includes(PROBLEMS[n - 2].id);
+  const FAKE_HOUSES = [['ЖК «Нұрлы»', 'Динара', 'c-17', 880], ['ЖК «Нұрлы»', 'Ерлан', 'c-17', 640], ['ЖК «Нұрлы»', 'Роза апа', 'c-17', 360],
+    ['ЖК «Самал»', 'Нұрлан', 'c-04', 1250], ['ЖК «Самал»', 'Ольга', 'c-04', 520], ['ЖК «Көктем»', 'Бақыт', 'c-09', 1010], ['ЖК «Арай»', 'Асхат', 'c-21', 760]];
   const me = token => {
     if (!token) err(401, 'no_session');
     const u = db.users[token]; if (!u) err(401, 'bad_session'); return u;
@@ -59,10 +69,12 @@ const MockServer = (() => {
       return { ok: true };
     },
     'DELETE /profile'({ session }) {
-      const u = me(session); db.profiles[u.userId] = null; delete db.scores[u.userId]; db.rewards[u.userId] = []; commit(); return { ok: true };
+      const u = me(session); db.profiles[u.userId] = null; delete db.scores[u.userId]; db.rewards[u.userId] = []; delete db.houses[u.userId]; commit(); return { ok: true };
     },
     'POST /tours/start'({ session, body }) {
       const u = me(session); const tour = TOURS[body.tourId]; if (!tour) err(404, 'no_tour');
+      // перепрыгнуть нельзя: собрание открывается, только когда предыдущая проблема исправлена
+      if (!unlocked(u, tour.n)) err(403, 'locked');
       const runId = 'r-' + Date.now().toString(36) + Math.floor(Math.random() * 1e4);
       db.runs[runId] = { userId: u.userId, tourId: tour.id, startedAt: Date.now(), finished: false }; commit();
       return { runId, startedAt: db.runs[runId].startedAt, tour: { id: tour.id, goal: tour.goal, floors: tour.floors, perFloor: tour.perFloor } };
@@ -78,13 +90,13 @@ const MockServer = (() => {
       for (const e of body.events || []) if (e.t === 'yes' && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt) yes.set(e.apt, e.via || 'door');
       const suspicious = seconds < 15 && yes.size > 3;                       // 10 подписей за 15 секунд не бывает
       const own = suspicious ? 0 : yes.size, online = [...yes.values()].filter(v => v === 'online').length;
-      // тур 2: онлайн-голоса других подъездов по формуле от «да» в своём подъезде и рассылок енота
-      const broadcasts = Math.min(tour.raccoon || 0, (body.events || []).filter(e => e.t === 'broadcast').length);
-      const remote = tour.remote && !suspicious ? Math.min(tour.remote.max, Math.floor(own * tour.remote.perYes + broadcasts * tour.remote.perBroadcast)) : 0;
-      const signatures = own + remote;
+      const remote = 0, signatures = own;
       const success = signatures >= tour.goal;
       const score = signatures * 100 + online * 20 + (success ? 300 + Math.max(0, Math.round(600 - seconds) * 2) : 0);
-      const coins = signatures * 5 + (success ? 25 : 0);
+      // бюджет: за первую победу на собрании — больше, за повтор — меньше; сверх нормы — доплата за подпись
+      const H = house(u.userId), first = success && !H.won.includes(tour.id);
+      const coins = success ? (first ? tour.reward.first : tour.reward.replay) + Math.max(0, own - tour.goal) * tour.reward.perExtra : own * 4;
+      if (success && first) H.won.push(tour.id);
       const prof = db.profiles[u.userId] || (db.profiles[u.userId] = {});
       prof.coins = (prof.coins || 0) + coins;
       const prevBest = (db.scores[u.userId] || {}).best || 0, best = Math.max(prevBest, score);
@@ -96,12 +108,52 @@ const MockServer = (() => {
         if (!u.guest) { db.rewards[u.userId].push(reward); prof.rewardsTotal = (prof.rewardsTotal || 0) + reward.points; }
       }
       run.finished = true;
-      run.result = { signatures, own, remote, online, success, score, best, newBest: score > prevBest, coins, totalCoins: prof.coins, reward, suspicious };
+      run.result = { signatures, own, remote, online, success, first, score, best, newBest: score > prevBest, coins, totalCoins: prof.coins, reward, suspicious, problem: tour.problem };
       commit();
       return run.result;
     },
+    'GET /house'({ session }) { return houseView(me(session)); },
+    // покупка ремонта или украшения: сервер проверяет порядок, одобрение собрания и бюджет
+    'POST /house/buy'({ session, body }) {
+      const u = me(session), H = house(u.userId), prof = db.profiles[u.userId] || (db.profiles[u.userId] = {});
+      const pi = PROBLEMS.findIndex(p => p.id === body.id), dc = DECOR.find(d => d.id === body.id);
+      let cost;
+      if (pi >= 0) {
+        const p = PROBLEMS[pi];
+        if (H.fixed.includes(p.id)) err(409, 'already');
+        if (pi > 0 && !H.fixed.includes(PROBLEMS[pi - 1].id)) err(403, 'order');
+        if (!H.won.includes('L' + (pi + 1))) err(403, 'no_vote');
+        cost = p.cost;
+      } else if (dc) {
+        if (H.decor.includes(dc.id)) err(409, 'already');
+        if (H.fixed.length < dc.after) err(403, 'locked');
+        cost = dc.cost;
+      } else err(404, 'no_item');
+      if ((prof.coins || 0) < cost) err(402, 'no_money');
+      prof.coins -= cost; (pi >= 0 ? H.fixed : H.decor).push(body.id);
+      db.scores[u.userId] = { ...(db.scores[u.userId] || { name: prof.name || u.name || 'Ойыншы', complex: u.complex.id, best: 0 }), house: houseScore(H) };
+      commit(); return houseView(u);
+    },
+    // бонус дня в приложение — от того, насколько хорош дом
+    'POST /house/claim'({ session }) {
+      const u = me(session), H = house(u.userId), v = houseView(u);
+      if (!v.claimable) err(409, 'claimed');
+      H.claimDay = today(); db.rewards[u.userId] = db.rewards[u.userId] || [];
+      const reward = { tourId: 'daily', points: v.bonus, status: u.guest ? 'needs_login' : 'sent', at: Date.now() };
+      if (!u.guest) db.rewards[u.userId].push(reward);
+      commit(); return { reward, house: houseView(u) };
+    },
     'GET /leaderboard'({ session, query }) {
-      const u = me(session); const scope = query.scope === 'city' ? 'city' : 'complex';
+      const u = me(session);
+      if (query.scope === 'house') {   // лучший ЖК: по состоянию дома — из них выбирают победителей розыгрыша
+        const rows = FAKE_HOUSES.map(([complex, name, cid, best]) => ({ name: complex + ' · ' + name, best }));
+        const mineScore = houseScore(house(u.userId)); const nm = (db.profiles[u.userId] || {}).name || u.name || 'Ойыншы';
+        rows.push({ name: (u.complex.name || 'ЖК') + ' · ' + nm, best: mineScore, me: true });
+        rows.sort((a, b) => b.best - a.best);
+        const list = rows.map((r, i) => ({ rank: i + 1, name: r.name, best: r.best, me: !!r.me }));
+        return { scope: 'house', top: list.slice(0, 8), mine: list.find(r => r.me) };
+      }
+      const scope = query.scope === 'city' ? 'city' : 'complex';
       const rows = FAKE.map(([name, complex, best]) => ({ name, complex, best }));
       for (const [id, s] of Object.entries(db.scores)) rows.push({ ...s, me: id === u.userId });
       let list = rows.filter(r => scope === 'city' || r.complex === u.complex.id || r.me);
@@ -113,6 +165,7 @@ const MockServer = (() => {
   };
 
   return {
+    debugDB: () => db,   // только для автотестов
     async handle(method, path, { session, body, query }) {
       const [lo, hi] = API_CONFIG.latency; await wait(lo + Math.random() * (hi - lo));
       if (!/[?&]stable/.test(location.search) && Math.random() < API_CONFIG.failRate) err(0, 'network');
@@ -165,6 +218,9 @@ const API = {
   async tourFinish(run, events) { return request('POST', '/tours/finish', { body: { runId: run && run.runId, events } }, 4); },
   async leaderboard(scope) { return request('GET', '/leaderboard', { query: { scope } }); },
   async rewards() { return request('GET', '/rewards'); },
+  async house() { return request('GET', '/house'); },
+  async buy(id) { return request('POST', '/house/buy', { body: { id } }); },
+  async claim() { return request('POST', '/house/claim'); },
 };
 
 // перенос старого сохранения (до появления заглушки сервера)
