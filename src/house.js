@@ -15,7 +15,7 @@ function levelInfo(i) {
 const HM = { x0: 120, x1: 280, top: 46, fh: 15, floors: 9, ground: 186 };
 HM.bottom = HM.top + HM.fh * HM.floors;   // 181
 const HSPOT = {   // где на карте каждая вещь (для подсветки и нажатия)
-  light: [200, 112, 20, 120], door: [200, 174, 22, 16], roof: [170, 46, 60, 12], basement: [108, 182, 22, 14],
+  light: [200, 112, 20, 120], door: [200, 174, 22, 16], roof: [170, 46, 60, 12], basement: [112, 181, 20, 12],
   playground: [348, 206, 90, 30], lift: [144, 38, 30, 14], antenna: [268, 30, 22, 24], sign: [200, 28, 130, 14],
   bench: [246, 194, 40, 10], flowers: [252, 186, 50, 6], trees: [58, 180, 60, 40], lamps: [84, 176, 16, 40], parking: [48, 212, 80, 18],
 };
@@ -47,6 +47,17 @@ function buildHouseArt() {
     // дальние дома: сиреневые силуэты с тёплыми окнами
     let x = -4; while (x < W) { const w = 16 + R() * 26, h = 30 + R() * 55; r(x, 186 - h, w, h, HP.far); r(x, 186 - h, w, 1, '#463a66');
       for (let yy = 190 - h; yy < 182; yy += 6) for (let xx = x + 2; xx < x + w - 3; xx += 5) if (R() < .18) r(xx, yy, 3, 3, pick(R, ['#e8a24a', '#d98a6a', '#c9a65e'])); x += w + 3; }
+    // ===== соседние дома ЖК: такие же панельки, но дальше и в дымке =====
+    const neighbour = (x0, x1, top, fh, floors) => {
+      const bot = top + fh * floors;
+      r(x0, top, x1 - x0, bot - top + 6, '#433c62'); r(x0, top - 3, x1 - x0, 3, '#3e3760'); r(x0, top - 3, x1 - x0, 1, '#6a6090');
+      for (let f = 0; f < floors; f++) { const y = top + f * fh; r(x0, y, x1 - x0, 1, '#433c66');
+        for (let wx = x0 + 5; wx < x1 - 8; wx += 13) { const lit = R() < .3; r(wx, y + 3, 8, 6, lit ? pick(R, ['#c8935a', '#b8805a', '#a87a8a']) : '#2e2848'); if (R() < .25) r(wx - 1, y + 9, 10, 1, '#6a6090'); } }
+      for (let i = 0; i < 20; i++) r(x0 + R() * (x1 - x0), top + R() * (bot - top), 1, 3 + R() * 8, '#463f68');
+      r(x0, bot, x1 - x0, 6, '#3a3356');
+      for (let y = top - 3; y < bot + 6; y++) r(x0, y, x1 - x0, 1, 'rgba(24,18,44,.28)');                     // дымка: соседи темнее нашего дома
+    };
+    neighbour(-14, 104, 70, 13, 9); neighbour(298, 414, 64, 13, 9);
     // земля двора
     r(0, HM.ground, W, H - HM.ground, HP.ground); r(0, HM.ground, W, 6, HP.groundL); r(0, HM.ground, W, 1, '#8a78a0');
     for (let i = 0; i < 140; i++) p(R() * W, HM.ground + 7 + R() * 32, pick(R, ['#332a42', '#46395a', '#4e4064']));
@@ -73,15 +84,14 @@ function buildHouseArt() {
     r(122, 178, 154, 2, '#d9b43a'); r(122, 178, 154, 1, '#f2d26a'); for (let xx = 128; xx < 276; xx += 16) r(xx, 180, 1, 2, '#6a5a2a');
     r(170, 178, 2, 8, '#d9b43a'); r(169, 184, 4, 2, '#8a7a3a'); r(250, 160, 2, 18, '#d9b43a'); r(249, 159, 4, 2, '#8a7a3a');
     // ===== вход в подвал: пристройка с наклонной крышей, железная дверь и табличка =====
-    r(98, 174, 22, 12, '#5b5378'); r(97, 172, 24, 2, '#8f86a8'); for (let i = 0; i < 6; i++) r(97 + i * 4, 171 - Math.floor(i / 2), 4, 1, '#8f86a8');
-    r(103, 176, 10, 10, '#2a2440'); r(104, 177, 8, 9, '#4a5260'); for (let yy = 179; yy < 186; yy += 3) r(104, yy, 8, 1, '#3a4250'); r(110, 181, 1, 2, '#c9a95a');
-    r(101, 186, 16, 1, '#2a2238');
+    r(104, 177, 16, 9, '#5b5378'); r(103, 175, 18, 2, '#8f86a8'); for (let i = 0; i < 5; i++) r(103 + i * 4, 174 - Math.floor(i / 2), 4, 1, '#8f86a8');
+    r(108, 179, 7, 7, '#2a2440'); r(109, 180, 5, 6, '#4a5260'); r(112, 182, 1, 1, '#c9a95a');
     // ===== площадка для мусора: бетонная плита, забор, два контейнера =====
-    r(4, 190, 30, 3, '#5a4a6a'); r(4, 180, 1, 12, '#4a3e5a'); r(33, 180, 1, 12, '#4a3e5a'); r(4, 180, 30, 1, '#4a3e5a');
-    for (const [cx, col] of [[7, '#3f6f5a'], [20, '#3f5a7a']]) { r(cx, 182, 11, 8, col); r(cx, 181, 11, 1, shade(col, 25)); r(cx + 1, 184, 9, 1, shade(col, -25)); r(cx + 1, 190, 2, 1, '#1a1424'); r(cx + 8, 190, 2, 1, '#1a1424'); }
-    p(31, 188, '#d8d2bf'); p(29, 189, '#b8443f');                                                    // мусор рядом
+    r(8, 191, 20, 2, '#5a4a6a'); r(8, 184, 1, 8, '#4a3e5a'); r(27, 184, 1, 8, '#4a3e5a'); r(8, 184, 20, 1, '#4a3e5a');
+    for (const [cx, col] of [[10, '#3f6f5a'], [18, '#3f5a7a']]) { r(cx, 186, 7, 5, col); r(cx, 185, 7, 1, shade(col, 25)); r(cx + 1, 191, 1, 1, '#1a1424'); r(cx + 5, 191, 1, 1, '#1a1424'); }
+    p(26, 190, '#d8d2bf');                                                    // мусор рядом
     // ===== табличка с адресом на столбе =====
-    r(305, 164, 1, 28, '#3a3050'); r(286, 151, 38, 15, '#1b4a8a'); r(287, 152, 36, 13, '#2e64ad'); r(287, 152, 36, 1, '#5a8ad0');
+    r(170, 157, 14, 8, '#1b4a8a'); r(171, 158, 12, 6, '#2e64ad'); r(171, 158, 12, 1, '#5a8ad0');          // номер дома на стене
     // ===== асфальт: трещины, бордюр, лужи =====
     r(0, 192, W, 1, '#2a2238');
     for (const [cx0, cy0] of [[60, 205], [150, 214], [228, 206], [270, 220]]) { let cx = cx0, cy = cy0; for (let k = 0; k < 14; k++) { p(cx, cy, '#2a2238'); cx += 1; cy += R() < .5 ? 1 : (R() < .5 ? -1 : 0); } }
@@ -168,9 +178,9 @@ function drawHouseItem(id, k, t) {
         // задний забор — зелёный штакетник
         for (let x = X0; x <= X1; x += 3) { rect(x, Y0 - 1, 2, 6, '#4a8a5a'); p(x, Y0 - 2, '#6aaa7a'); } rect(X0, Y0 + 1, X1 - X0 + 1, 1, '#2f5a3e');
         // качели: стойки, перекладина, две сидушки на цепях
-        rect(310, 196, 2, 18, '#e05a4a'); rect(336, 196, 2, 18, '#e05a4a'); rect(309, 195, 30, 2, '#f2c94c'); rect(309, 213, 4, 1, '#2a2238'); rect(335, 213, 4, 1, '#2a2238');
+        rect(310, 199, 2, 15, '#e05a4a'); rect(336, 199, 2, 15, '#e05a4a'); rect(309, 198, 30, 2, '#f2c94c'); rect(309, 213, 4, 1, '#2a2238'); rect(335, 213, 4, 1, '#2a2238');
         const sw = Math.sin(t / 420) * 3;
-        for (const sx of [316, 328]) { const o = sx === 316 ? sw : -sw; rect(sx + o, 197, 1, 10, '#cfd6e4'); rect(sx + 5 + o, 197, 1, 10, '#cfd6e4'); rect(sx - 1 + o, 207, 8, 2, '#4c9a84'); }
+        for (const sx of [316, 328]) { const o = sx === 316 ? sw : -sw; rect(sx + o, 200, 1, 8, '#cfd6e4'); rect(sx + 5 + o, 200, 1, 8, '#cfd6e4'); rect(sx - 1 + o, 208, 8, 2, '#4c9a84'); }
         // горка с лесенкой
         rect(344, 200, 2, 14, '#3f6f8c'); rect(350, 200, 2, 14, '#3f6f8c'); for (let yy = 202; yy < 214; yy += 3) rect(344, yy, 8, 1, '#5a8ab0');
         rect(343, 198, 10, 2, '#3f6f8c'); rect(342, 196, 2, 3, '#e05a4a'); rect(351, 196, 2, 3, '#e05a4a');
@@ -233,11 +243,13 @@ function drawHouseItem(id, k, t) {
 function drawHouseMap(t, anim) {
   if (!HOUSE_ART.built) buildHouseArt();
   sprite(HOUSE_ART.bg, 0, 0);
-  text(LANG === 'kz' ? 'ДОСТЫҚ' : 'ДОСТЫК', 305, 153, { size: 6, col: '#f4f3ee', align: 'center' }); text(LANG === 'kz' ? '14 үй' : 'дом 14', 305, 159, { size: 6, col: '#cfe0f5', align: 'center' });
+  text('14', 177, 158, { size: 6, col: '#f4f3ee', align: 'center' });
   if (Math.random() < 1 / 40) { const w = pick(Math.random, HOUSE_ART.win); w.on = !w.on; }
   for (const w of HOUSE_ART.win) drawHouseWindow(w, t);
   // провода между домом и столбом, кабель интернета по фасаду
-  for (let k = 0; k <= 40; k++) { p(280 + k, 60 + Math.round(Math.sin(k / 40 * Math.PI) * 6), '#1c1626'); p(280 + k, 64 + Math.round(Math.sin(k / 40 * Math.PI) * 5), '#1c1626'); }
+  for (let k = 0; k <= 18; k++) { p(280 + k, 62 + Math.round(Math.sin(k / 18 * Math.PI) * 4), '#1c1626'); p(280 + k, 66 + Math.round(Math.sin(k / 18 * Math.PI) * 3), '#1c1626'); }
+  for (let k = 0; k <= 16; k++) p(104 + k, 76 + Math.round(Math.sin(k / 16 * Math.PI) * 3), '#1c1626');
+  rect(296, 61, 2, 2, '#3a3050'); rect(296, 65, 2, 2, '#3a3050'); rect(102, 75, 2, 2, '#3a3050'); rect(120, 75, 2, 2, '#3a3050');
   for (let yy = HM.top; yy < HM.bottom; yy++) if (yy % 15 !== 0) p(224, yy, '#2a2238');
   // свет у входа: настенный фонарь под козырьком, тёплое пятно на ступенях, лёгкое мерцание
   { const fl = Math.sin(t / 61) > -.92 ? 1 : .45, glow = ctx.createRadialGradient(200, 168, 1, 200, 178, 34);
