@@ -176,6 +176,17 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
       // объявления: пачки бумажек, как на референсе
       for (const [nx, ny] of [[131, top + 14], [95, top + 22], [258, top + 30]].slice(0, 1 + (f % 3))) {
         for (let i = 0; i < 3; i++) { const qx = nx + (i % 2) * 5 - 2, qy = ny + i * 4; r(qx, qy, 6, 7, i === 1 ? '#c9c2ae' : '#d8d2bf'); r(qx + 1, qy + 2, 4, 1, '#8a8472'); r(qx + 1, qy + 4, 3, 1, '#8a8472'); r(qx + 2, qy - 1, 2, 1, 'rgba(220,206,150,.8)'); } }
+      // стояки: отопление (рыжий) и холодная вода (серо-синий) в углах крыльев, с вентилями и счётчиком
+      for (const [sx, col, colL] of [[10, '#7a4a32', '#9a6248'], [16, '#4a5e6a', '#6a8090'], [384, '#7a4a32', '#9a6248'], [378, '#4a5e6a', '#6a8090']]) {
+        r(sx, top - 8, 3, FLOOR_H, col); r(sx, top - 8, 1, FLOOR_H, colL); r(sx - 1, top + 30, 5, 2, '#2a302a'); }
+      r(8, top + 46, 6, 4, '#b8443f'); p(10, top + 45, '#b8443f'); r(14, top + 54, 7, 7, '#2a302a'); r(15, top + 55, 5, 5, '#d8d6c8'); p(17, top + 57, '#2a2a2a'); p(18, top + 56, '#b8443f');
+      if (f % 3 === 2) { r(382, top + 50, 6, 4, '#b8443f'); p(384, top + 49, '#b8443f'); }
+      // выключатели у ламп и провод к ним
+      for (const sx of [56, 344]) { r(sx, b - 58, 4, 6, '#d8d2bf'); p(sx + 1, b - 56, '#8a8472'); line(sx + 2, top + 6, sx + 2, b - 58, '#121512'); }
+      // трещины и следы ремонта
+      for (let i = 0; i < 3; i++) { let cx = 30 + R() * 340, cy = top + 12 + R() * 30; if (cx > CORE_L - 10 && cx < CORE_R + 10) cx += 120; if (cx > W - 30) cx -= 200;
+        for (let k = 0; k < 12; k++) { p(Math.round(cx), Math.round(cy), '#2c3428'); cx += R() < .5 ? 1 : 0; cy += 1; if (R() < .3) p(Math.round(cx) + 1, Math.round(cy), '#2c3428'); } }
+      { const px = 40 + R() * 300; if (px < CORE_L - 20 || px > CORE_R + 10) { r(px, b - 56, 12, 8, '#7a8468'); r(px, b - 56, 12, 1, '#8a9478'); } }
       // щиток и звонки у дверей
       r(87, top + 8, 14, 20, '#2a302a'); r(88, top + 9, 12, 18, '#3f4a42'); r(88, top + 9, 12, 1, '#56645b'); p(97, top + 22, '#d9b43a'); r(90, top + 12, 3, 4, '#2a302a');
       // номер этажа: крупно на стене клетки
@@ -183,6 +194,8 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
       // лифт: тёмный портал, створки, кнопка
       { const lx = LIFT_X, w0 = 24, h0 = 46;
         r(lx - w0 / 2 - 4, b - h0 - 4, w0 + 8, h0 + 4, '#1a1d1b'); r(lx - w0 / 2 - 3, b - h0 - 3, w0 + 6, 1, '#56645b');
+        // табло этажа над дверями лифта
+        r(lx - 6, b - h0 - 11, 12, 6, '#0e100e'); g.fillStyle = fixed.has('lift') ? '#7fe08a' : '#6a2a22'; g.font = '8px ' + FONT; g.textAlign = 'center'; g.fillText(fixed.has('lift') ? String(f) : '--', lx, b - h0 - 12, 10); g.textAlign = 'left';
         r(lx - w0 / 2, b - h0, w0, h0, '#5f676a'); r(lx - 1, b - h0, 2, h0, '#2a2e30'); r(lx - w0 / 2, b - h0, w0, 1, '#8a9396');
         dirt(P, lx - w0 / 2, b - h0, w0, h0, ['#6d7578', '#555c5f'], .2, R);
         r(lx + w0 / 2 + 5, b - 30, 4, 7, '#2a2e30'); p(lx + w0 / 2 + 6, b - 28, fixed.has('lift') ? '#7fe08a' : '#6a2a22');
@@ -223,21 +236,37 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
         stairs(STAIR_TOP + 2, mid, -1);
         railing(STAIR_FOOT, b - 1, 1); railing(STAIR_TOP, mid - 1, -1);
       } else {
-        // последний этаж: железная лестница к люку на крышу
-        const lx = STAIR_FOOT + 26;
-        r(lx, top - 8, 2, b - top + 8, '#2a302a'); r(lx + 12, top - 8, 2, b - top + 8, '#2a302a'); r(lx + 1, top - 8, 1, b - top + 8, '#56645b');
-        for (let y = top; y < b; y += 6) { r(lx, y, 14, 2, '#3a4234'); r(lx, y, 14, 1, '#626d58'); }
-        r(lx - 4, top - 9, 22, 3, '#2a302a'); r(lx - 3, top - 8, 20, 1, '#56645b'); p(lx + 6, top - 6, '#d9b43a');
-        r(lx + 18, top + 30, 20, 9, '#d8d2bf'); g.fillStyle = '#7a3b28'; g.font = '8px ' + FONT; g.fillText(LANG === 'kz' ? 'ШАТЫР' : 'КРЫША', lx + 19, top + 30, 18);
-      }
-      if (f === 1) {
-        // первый этаж: спуск в подвал — пролёт вниз, в полу проём
-        r(STAIR_FOOT - 4, b, 70, 9, '#070807');
-        for (let i = 0; i < 9; i++) { const sx = STAIR_FOOT + i * 6.4, sy = b + 5 + i * 5; r(Math.round(sx), sy, 7, 5, C.step); r(Math.round(sx), sy, 7, 1, C.stepT); }
-        for (let k = 0; k <= 58; k++) p(Math.round(STAIR_FOOT + k), Math.round(b - 13 + k * 50 / 64), C.rail);
-        for (let i = 0; i <= 14; i++) { const xx = STAIR_FOOT + i * 4, yy = b - 1 + i * 50 / 64 * 4; line(xx, yy, xx, yy - 12, C.rail); }
+        // последний этаж: пролёт на площадку, там железная дверь на крышу (над шахтой лифта)
+        const mid = b - 50;
+        stairs(STAIR_FOOT - 2, b, 1); r(STAIR_TOP - 8, mid, 46, 5, C.slab); r(STAIR_TOP - 8, mid, 46, 1, C.stepT);
+        railing(STAIR_FOOT, b - 1, 1);
+        const dx = STAIR_TOP + 22, dt = mid - 30;
+        r(dx - 11, dt - 2, 22, 32, '#1a1d1b'); r(dx - 10, dt - 1, 20, 1, '#56645b');
+        r(dx - 9, dt, 18, 30, '#4a5260'); r(dx - 9, dt, 18, 1, '#6a7480'); r(dx - 9, dt, 1, 30, '#5a6270'); r(dx + 8, dt, 1, 30, '#2e343c');
+        for (let yy = dt + 3; yy < mid - 2; yy += 7) r(dx - 7, yy, 14, 1, '#3a4250');                      // рёбра жёсткости
+        r(dx - 8, dt + 13, 16, 2, '#2a2e30'); r(dx + 3, dt + 12, 4, 6, '#8a6a2a'); r(dx + 4, dt + 14, 2, 2, '#c9a95a');   // засов и замок
+        r(dx - 8, dt - 9, 16, 6, '#d8d2bf'); g.fillStyle = '#7a3b28'; g.font = '8px ' + FONT; g.textAlign = 'center'; g.fillText(LANG === 'kz' ? 'ШАТЫР' : 'КРЫША', dx, dt - 10, 16); g.textAlign = 'left';
+        for (let k = 0; k < 4; k++) p(dx - 12 - k, dt + 6 + k * 2, '#f2c94c');                              // стрелка вверх на стене
       }
     }
+    // первый этаж: проём в полу и пролёт вниз до подвальной площадки, дальше — решётчатая дверь
+    const descent = (b) => {
+      const bb = b + 55, C2 = C;
+      r(STAIR_FOOT - 4, b, 72, 9, '#0a0c0a'); r(STAIR_FOOT - 4, b, 72, 1, C2.slabT);
+      r(STAIR_FOOT - 4, b + 1, 72, 54, '#151916'); dirt(P, STAIR_FOOT - 4, b + 1, 72, 54, ['#1c211d', '#101311'], .1, R);
+      for (let i = 0; i < 10; i++) { const sx = STAIR_FOOT + i * 6.2, sy = b + 6 + i * 5; r(Math.round(sx), sy, 7, 5, C2.step); r(Math.round(sx), sy, 7, 1, C2.stepT); }
+      for (let k = 0; k <= 62; k++) r(Math.round(STAIR_FOOT + k), Math.round(b + 9 + k * 50 / 62), 1, 3, C2.slab);
+      for (let k = 0; k <= 62; k++) p(Math.round(STAIR_FOOT + k), Math.round(b - 13 + k * 50 / 62), C2.rail);
+      for (let i = 0; i <= 15; i++) { const xx = Math.round(STAIR_FOOT + i * 4), yy = Math.round(b + i * 4 * 50 / 62); line(xx, yy - 1, xx, yy - 13, C2.rail); }
+      r(STAIR_TOP - 4, bb, 52, 5, C2.slab); r(STAIR_TOP - 4, bb, 52, 1, C2.stepT);
+      const gx = STAIR_TOP + 26;
+      r(gx - 11, bb - 34, 22, 34, '#0e100e'); r(gx - 10, bb - 33, 20, 33, '#1c201c');
+      for (let xx = gx - 9; xx <= gx + 8; xx += 3) r(xx, bb - 33, 1, 33, '#4a5048');
+      for (const yy of [bb - 30, bb - 17, bb - 4]) r(gx - 10, yy, 20, 2, '#3a403a');
+      r(gx + 5, bb - 18, 3, 4, '#8a6a2a'); r(gx - 8, bb - 42, 16, 6, '#d8d2bf');
+      g.fillStyle = '#2a2a2a'; g.font = '8px ' + FONT; g.textAlign = 'center'; g.fillText(LANG === 'kz' ? 'ЖЕРТӨЛЕ' : 'ПОДВАЛ', gx, bb - 43, 16); g.textAlign = 'left';
+      r(gx - 1, bb - 46, 3, 3, fixed.has('basement') ? '#fff1b8' : '#3a3a30');
+    };
     r(0, 0, W, 34, '#0c0e0c'); r(0, 30, W, 4, '#1e231d');
     // подвал: трубы. До ремонта — ржавые и текут, после — новые, покрашенные
     { const y0 = floorBase(1, floors) + 9, ok = fixed.has('basement');
@@ -245,8 +274,9 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
       r(0, y0 + 18, W, 5, ok ? '#5d7f96' : '#3a3f3c'); r(0, y0 + 18, W, 1, ok ? '#8fb0c4' : '#565c58');
       r(0, y0 + 30, W, 3, ok ? '#9a4a3a' : '#5a3d2e'); r(0, y0 + 30, W, 1, ok ? '#c0705a' : '#7a5440');
       for (let x = 20; x < W; x += 64) { r(x, y0 + 16, 3, 9, '#2a2e2c'); r(x + 30, y0 + 28, 3, 7, '#2a2e2c'); }
-      r(250, y0 + 8, 9, 9, ok ? '#c94a3a' : '#8a2e26'); r(253, y0 + 11, 3, 3, '#101311');
+      r(320, y0 + 8, 9, 9, ok ? '#c94a3a' : '#8a2e26'); r(323, y0 + 11, 3, 3, '#101311');
       if (!ok) for (let i = 0; i < 14; i++) r(R() * W, y0 + 22 + R() * 6, 2 + R() * 6, 2, 'rgba(120,70,40,.6)'); }
+    descent(floorBase(1, floors));
   });
 }
 

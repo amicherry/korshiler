@@ -227,13 +227,13 @@ function irisFrom(x, y) { Object.assign(trans, { phase: 'in', t: 0, x, y, cb: nu
 const TR_CELL = 8, TR_COLS = Math.ceil(W / TR_CELL), TR_ROWS = Math.ceil(H / TR_CELL);
 const TR_NOISE = Array.from({ length: TR_COLS * TR_ROWS }, (_, i) => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); });
 function drawTrCells(k, cover) {
-  ctx.fillStyle = '#0b0c10';
+  // клетки всегда целые квадраты; край волны — 3 ступени серого, как пиксельный градиент
+  const shades = ['rgba(11,12,16,.35)', 'rgba(11,12,16,.65)', '#0b0c10'];
   for (let ry = 0; ry < TR_ROWS; ry++) for (let cx = 0; cx < TR_COLS; cx++) {
-    const th = (ry / TR_ROWS) * .6 + TR_NOISE[ry * TR_COLS + cx] * .4;   // порог клетки: ниже — позже, плюс шум
-    const v = (k * 1.4 - th) / .25;                                     // 0..1 — клетка «вырастает» из точки в квадрат
-    const s = cover ? v : 1 - v; if (s <= 0) continue;
-    const sz = Math.min(TR_CELL, Math.ceil(TR_CELL * Math.min(1, s) / 2) * 2), o = (TR_CELL - sz) / 2;
-    ctx.fillRect(cx * TR_CELL + o, ry * TR_CELL + o, sz, sz);
+    const th = (ry / TR_ROWS) * .65 + TR_NOISE[ry * TR_COLS + cx] * .35;
+    let v = (k * 1.45 - th) / .2; v = cover ? v : 1 - v; if (v <= 0) continue;
+    ctx.fillStyle = shades[Math.min(2, Math.floor(v * 3))];
+    ctx.fillRect(cx * TR_CELL, ry * TR_CELL, TR_CELL, TR_CELL);
   }
 }
 function drawIris(dt) {
