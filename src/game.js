@@ -260,6 +260,7 @@ scenes.prologue = {
     drawStreet(dt, this.t);
     const fr = this.moving ? 'walk' + (Math.floor(this.t / 95) % 8) : 'idle' + (Math.floor(this.t / 500) % 2);
     sprite(personSprite(SAVE.look, fr), Math.round(this.hx) - 9, STREET_GROUND - PH);
+    drawStreetFront();
     dlgDraw();
   },
 };

@@ -37,13 +37,8 @@ function buildHouseArt() {
       const mix = (a, b) => Math.round(parseInt(a, 16) + (parseInt(b, 16) - parseInt(a, 16)) * t);
       r(0, y, W, 1, `rgb(${mix(c0.slice(1, 3), c1.slice(1, 3))},${mix(c0.slice(3, 5), c1.slice(3, 5))},${mix(c0.slice(5, 7), c1.slice(5, 7))})`); }
     for (let i = 0; i < 70; i++) { const x = R() * W, y = R() * 90; p(x, y, R() < .25 ? '#f4f3ee' : '#a99fc8'); if (R() < .08) { p(x - 1, y, '#a99fc8'); p(x + 1, y, '#a99fc8'); p(x, y - 1, '#a99fc8'); p(x, y + 1, '#a99fc8'); } }
-    // облака: пухлые слои с подсветкой сверху и тенью снизу
-    const cloud = (cx, cy, n, sc) => { const blobs = []; for (let i = 0; i < n; i++) blobs.push([cx + (i - n / 2) * 9 * sc + (R() - .5) * 6, cy - Math.sin(i / (n - 1) * Math.PI) * 7 * sc, (6 + R() * 5) * sc]);
-      for (const [bx, by, br] of blobs) { g.fillStyle = HP.cloudD; g.beginPath(); g.arc(Math.round(bx), Math.round(by + 2), br, 0, 7); g.fill(); }
-      for (const [bx, by, br] of blobs) { g.fillStyle = HP.cloud; g.beginPath(); g.arc(Math.round(bx), Math.round(by), br, 0, 7); g.fill(); }
-      for (const [bx, by, br] of blobs) { g.fillStyle = HP.cloudL; g.beginPath(); g.arc(Math.round(bx - br * .3), Math.round(by - br * .35), br * .55, 0, 7); g.fill(); }
-      r(cx - n * 5 * sc, cy + 4 * sc, n * 10 * sc, 3, HP.cloudD); };
-    cloud(60, 52, 7, 1); cloud(250, 40, 6, .8); cloud(330, 70, 5, .9); cloud(150, 82, 5, .7);
+    // облака: пиксельные, приглушённые
+    pxCloud(r, R, 60, 54, 70); pxCloud(r, R, 250, 40, 52); pxCloud(r, R, 336, 72, 46); pxCloud(r, R, 150, 84, 40);
     // дальние дома: сиреневые силуэты с тёплыми окнами
     let x = -4; while (x < W) { const w = 16 + R() * 26, h = 30 + R() * 55; r(x, 186 - h, w, h, HP.far); r(x, 186 - h, w, 1, '#463a66');
       for (let yy = 190 - h; yy < 182; yy += 6) for (let xx = x + 2; xx < x + w - 3; xx += 5) if (R() < .18) r(xx, yy, 3, 3, pick(R, ['#e8a24a', '#d98a6a', '#c9a65e'])); x += w + 3; }
