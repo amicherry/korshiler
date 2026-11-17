@@ -35,7 +35,10 @@ function portrait(look, expr = 'neutral') {
     if (expr === 'sad') { line(14, 16, 18, 14, hc); line(22, 14, 26, 16, hc); }
     if (expr !== 'think' && expr !== 'angry' && expr !== 'sad') { line(14, 15, 17, 15, shade(hc, 10)); line(23, 15, 26, 15, shade(hc, 10)); }
     p(20, 21, skD); p(20, 22, skD);
-    const M = '#7a3b34';
+    const fem = look.body ? look.body === 'f' : (look.hair === 'long' || look.hair === 'bun' || look.hat === 'scarf');
+    const M = fem ? '#b8545e' : '#7a3b34';
+    if (fem && expr !== 'happy') { p(14, ey - 1, OUT); p(25, ey - 1, OUT); }            // ресницы
+    if (fem) { p(14, 22, shade(sk, -8) === sk ? '#e8a08a' : '#e8a08a'); p(26, 22, '#e8a08a'); }   // румянец
     if (expr === 'happy') { p(17, 24, M); r(18, 25, 4, 1, M); p(22, 24, M); }
     else if (expr === 'angry' || expr === 'sad') { r(18, 25, 4, 1, M); p(17, 26, M); p(22, 26, M); }
     else if (expr === 'think') { r(19, 25, 3, 1, M); }

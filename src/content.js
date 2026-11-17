@@ -23,6 +23,8 @@ const UI = {
   back:       { kz: 'АРТҚА', ru: 'НАЗАД' },
   creator:    { kz: 'КЕЙІПКЕР', ru: 'ПЕРСОНАЖ' },
   name:       { kz: 'АТЫҢ', ru: 'ИМЯ' },
+  body:       { kz: 'ЖЫНЫС', ru: 'ПОЛ' },
+  bottom:     { kz: 'ТӨМЕНІ', ru: 'НИЗ' },
   skin:       { kz: 'ТЕРІ', ru: 'КОЖА' },
   hair:       { kz: 'ШАШ', ru: 'ПРИЧЁСКА' },
   hairCol:    { kz: 'ШАШ ТҮСІ', ru: 'ЦВЕТ ВОЛОС' },
@@ -170,7 +172,7 @@ const UI = {
 const ARCH = {
   apa: { mood: 45, deaf: .1, voice: 380, onlineOk: false, listen: 26,
     likes: { explain: 8, facts: -2, benefit: 4, neighbors: 14, online: -6 },
-    look: { skin: '#d9a77c', hair: 'scarf', hairCol: '#9c9a96', top: 'shirt', topCol: '#7d4f8a', hat: 'scarf', scarfCol: '#c8414a', old: true },
+    look: { skin: '#d9a77c', hair: 'scarf', hairCol: '#9c9a96', top: 'shirt', topCol: '#7d4f8a', hat: 'scarf', scarfCol: '#c8414a', old: true, body: 'f', bottom: 'skirt', skirtCol: '#4a3a52' },
     lines: {
       greet: { kz: 'Ой, балам, кімсің? Тағы бір жиналыс па?', ru: 'Ой, балам, ты кто? Опять какое-то собрание?' },
       again: { kz: 'Қайта келдің бе? Шай ішесің бе?', ru: 'Опять пришёл? Чаю будешь?' },

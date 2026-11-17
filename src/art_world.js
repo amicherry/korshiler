@@ -1,7 +1,9 @@
 /* ============================================================
-   ЛЮДИ: 18×42, пропорции ближе к реальным (по референсу автора),
-   каждая вещь в три тона: свет слева сверху, тень справа.
-   frame: idle0 idle1 walk0..3 knock climb0..3
+   ЛЮДИ: 18×42, вид сбоку (смотрят вправо), как в референсе автора.
+   Походка — 8 кадров: ноги «шарнирные» (бедро + голень), руки
+   качаются навстречу ногам, корпус чуть проседает на шаге.
+   frame: idle0 idle1 walk0..7 climb0..3 knock
+   body: 'm' | 'f' (если не задано — по причёске/платку)
    ============================================================ */
 const tones = c => [shade(c, 24), c, shade(c, -28), shade(c, -50)];
 const PERSON_CACHE = new Map();
@@ -9,58 +11,86 @@ function personSprite(look, frame) {
   const key = JSON.stringify(look) + '|' + frame;
   if (PERSON_CACHE.has(key)) return PERSON_CACHE.get(key);
   const c = makeCanvas(18, 42, ({ r, p }) => {
+    const fem = look.body ? look.body === 'f' : (look.hair === 'long' || look.hair === 'bun' || look.hat === 'scarf');
     const [skL, sk, skD] = tones(look.skin), hair = tones(look.hairCol), top = tones(look.topCol);
-    const pants = tones(look.pants || (look.top === 'jacket' ? '#3a3d48' : '#3d5277')), shoe = '#241f1d';
-    const walkI = frame.startsWith('walk') ? +frame[4] : frame.startsWith('climb') ? +frame[5] : -1;
-    const stride = walkI < 0 ? 0 : [1, 3, 1, -3][walkI] * (frame.startsWith('climb') ? .7 : 1);
-    const bob = walkI === 1 || walkI === 3 ? 1 : 0, breath = frame === 'idle1' ? 1 : 0, Y = bob;
-    const leg = (x0, dx, col, colD, lift) => {
-      for (let y = 25; y <= 39; y++) { const x = Math.round(x0 + dx * (y - 25) / 14); r(x, y - (y > 33 ? lift : 0), 3, 1, col); p(x + 2, y - (y > 33 ? lift : 0), colD); }
-      const fx = Math.round(x0 + dx); r(fx, 40 - lift, 5, 1, shoe); r(fx, 41 - lift, 5, 1, '#151211');
+    const pants = tones(look.pants || (look.top === 'jacket' ? '#3a3d48' : '#3d5277')), shoe = '#241f1d', shoeL = '#3a322d';
+    const skirt = look.bottom === 'skirt';
+    // фаза шага: walkN — 8 кадров, climbN — 4 кадра
+    let ph = -1, climb = false;
+    if (frame.startsWith('walk')) ph = (+frame.slice(4) % 8) / 8 * Math.PI * 2;
+    if (frame.startsWith('climb')) { ph = (+frame.slice(5) % 4) / 4 * Math.PI * 2; climb = true; }
+    const moving = ph >= 0, breath = frame === 'idle1' ? 1 : 0;
+    const bob = moving && Math.abs(Math.sin(ph)) > .7 ? 1 : 0;           // на широком шаге корпус ниже
+    const hipX = 9, hipY = 24 + bob, D = Math.PI / 180;
+    // конечность: отрезок толщиной w пикселей, тень на заднем крае
+    const seg = (x0, y0, ang, len, w, col, colD) => {
+      for (let i = 0; i <= len; i++) { const x = x0 + Math.sin(ang) * i, y = y0 + Math.cos(ang) * i;
+        r(Math.round(x - w / 2), Math.round(y), w, 1, col); p(Math.round(x - w / 2), Math.round(y), colD); }
+      return [x0 + Math.sin(ang) * len, y0 + Math.cos(ang) * len];
+    };
+    const leg = (phase, near) => {
+      const a = (moving ? 24 * Math.sin(phase) : 0) * D, bend = (moving ? 38 * Math.max(0, Math.cos(phase)) + 6 * Math.max(0, -Math.sin(phase)) : 0) * D;
+      const lift = climb ? 3 * Math.max(0, Math.sin(phase)) : 0;
+      // в юбке ноги в тёмных колготках и тоньше
+      const col = skirt ? (near ? '#3b3742' : '#2a2730') : near ? pants[1] : pants[2], colD = skirt ? '#1d1b22' : near ? pants[2] : pants[3];
+      const [kx, ky] = seg(hipX + (near ? 0 : -1), hipY, a, 8, skirt ? 2 : 3, col, colD);
+      const [fx, fy] = seg(kx, ky - lift, a - bend, 8, skirt ? 2 : 3, col, colD);
+      const X = Math.round(fx), Y = Math.min(41, Math.round(fy));
+      r(X - 1, Y - 1, 5, 2, near ? shoe : '#1a1615'); p(X + 3, Y - 1, near ? shoeL : shoe);
+    };
+    const arm = (phase, near) => {
+      const a = (moving ? -22 * Math.sin(phase) : 0) * D, elbow = (moving ? 12 + 14 * Math.max(0, -Math.sin(phase)) : 6) * D;
+      const col = near ? top[1] : top[2], colD = near ? top[2] : top[3];
+      const sy = 13 + bob + breath;
+      const [ex, ey] = seg(9 + (near ? 1 : -1), sy, a, 6, 2, col, colD);
+      const [hx, hy] = seg(ex, ey, a + elbow, 5, 2, col, colD);
+      r(Math.round(hx - 1), Math.round(hy), 2, 2, near ? sk : skD);
     };
     const longTop = look.top === 'chapan';
-    // дальняя нога и рука (темнее)
-    leg(7, -stride, pants[2], pants[3], frame.startsWith('climb') && walkI % 2 ? 2 : 0);
-    const arm = (x0, y0, dx, dy, col, colD) => { for (let i = 0; i < 11; i++) { const x = Math.round(x0 + dx * i / 10), y = y0 + Math.round(dy * i / 10) + i; r(x, y, 2, 1, col); p(x + 1, y, colD); }
-      r(Math.round(x0 + dx) , y0 + 11 + dy, 2, 2, skD); };
-    arm(4, 13 + breath, stride * .6, 0, top[2], top[3]);
-    // ближняя нога
-    leg(10, stride, pants[1], pants[2], frame.startsWith('climb') && walkI % 2 === 0 && walkI >= 0 ? 2 : 0);
-    // корпус
-    const ty = 12 + breath, th = longTop ? 22 : 13 - breath;
-    r(5, ty, 9, th, top[1]); r(4, ty + 1, 11, 3, top[1]);
-    r(5, ty + 1, 1, th - 1, top[0]); r(13, ty + 1, 1, th - 1, top[2]); r(14, ty + 1, 1, 3, top[2]);
-    if (!longTop) { r(5, 24, 9, 1, '#2a2422'); p(9, 24, '#9a8a6a'); }
-    if (look.top === 'hoodie') { r(6, ty - 1, 6, 2, top[2]); r(7, ty + 7, 5, 3, top[2]); p(9, ty + 2, '#f4f3ee'); p(10, ty + 3, '#f4f3ee'); }
-    if (look.top === 'shirt') { r(8, ty, 3, 2, '#f4f3ee'); for (let y = ty + 3; y < 24; y += 3) p(10, y, top[3]); }
-    if (look.top === 'jacket') { r(8, ty, 4, 10, '#e9eef5'); r(9, ty + 1, 2, 7, '#b8443f'); p(8, ty + 1, top[3]); p(11, ty + 1, top[3]); r(7, ty, 1, 9, top[2]); r(12, ty, 1, 9, top[2]); }
-    if (look.top === 'leather') { r(8, ty, 4, 11, '#e6dcc4'); r(7, ty, 1, 11, top[3]); r(12, ty, 1, 11, top[3]); p(6, ty + 2, top[0]); }
-    if (longTop) { r(5, ty, 1, th, '#d9b43a'); r(13, ty, 1, th, '#d9b43a'); r(5, ty + th - 1, 9, 1, '#d9b43a'); r(5, 23, 9, 1, '#8a6a1e'); }
-    // ближняя рука
-    if (frame === 'knock') { for (let i = 0; i < 5; i++) r(12 + i, ty + 2 - Math.floor(i / 2), 2, 2, top[1]); r(16, ty - 2, 2, 2, sk); }
-    else arm(12, 13 + breath, -stride * .6, 0, top[1], top[2]);
-    // шея и голова
-    const hy = breath + 0;
-    r(8, 10 + hy, 3, 2, skD);
-    r(7, 2 + hy, 7, 8, sk); r(8, 10 + hy, 5, 0, sk); r(13, 3 + hy, 1, 6, skD); r(7, 3 + hy, 1, 5, skL); r(8, 9 + hy, 5, 1, skD);
-    p(8, 5 + hy, skD); p(8, 6 + hy, skD);                       // ухо
-    const blink = frame === 'idle1' && (look.blink);
-    if (!blink) { p(11, 5 + hy, OUT); p(13, 5 + hy, OUT); } else { p(11, 6 + hy, skD); p(13, 6 + hy, skD); }
-    p(14, 6 + hy, sk); p(12, 8 + hy, '#8a4a3e');
-    if (look.old) { p(12, 4 + hy, skD); p(10, 8 + hy, skD); }
-    // волосы
+    // дальние рука и нога — темнее, за корпусом
+    if (frame !== 'knock') arm(ph < 0 ? 0 : ph + Math.PI, false);
+    leg(ph < 0 ? Math.PI : ph + Math.PI, false);
+    // корпус в профиль: грудь спереди (справа), спина слева
+    const ty = 12 + bob + breath, th = longTop ? 21 : 13 - breath, tw = fem ? 6 : 7, tx = fem ? 6 : 5;
+    r(tx, ty, tw, th, top[1]); r(tx, ty, 1, th, top[2]); r(tx + tw - 1, ty + 1, 1, th - 2, top[0]);
+    r(tx + 1, ty - 1, tw - 2, 1, top[1]);                                          // плечо
+    if (fem && !longTop) { r(tx + tw, ty + 3, 1, 3, top[1]); r(tx - 1 + 1, ty + 9, 1, 3, top[2]); }   // силуэт: грудь, талия
+    if (!longTop && !skirt) { r(tx, 24 + bob, tw, 1, '#2a2422'); p(tx + tw - 2, 24 + bob, '#9a8a6a'); }   // ремень
+    if (look.top === 'hoodie') { r(tx - 1, ty - 1, 3, 4, top[2]); r(tx + tw - 2, ty + 6, 2, 3, top[2]); p(tx + tw - 1, ty + 1, '#f4f3ee'); }
+    if (look.top === 'shirt') { r(tx + tw - 2, ty - 1, 2, 2, '#f4f3ee'); for (let y = ty + 3; y < ty + th - 1; y += 3) p(tx + tw - 1, y, top[3]); }
+    if (look.top === 'jacket') { r(tx + tw - 2, ty, 2, 8, '#e9eef5'); r(tx + tw - 1, ty + 1, 1, 7, '#2b2a33'); r(tx + tw - 3, ty, 1, 9, top[2]); }   // рубашка и галстук
+    if (look.top === 'leather') { r(tx + tw - 2, ty, 2, 10, '#e6dcc4'); r(tx + tw - 3, ty, 1, 11, top[3]); p(tx + 1, ty + 2, top[0]); }
+    if (longTop) { r(tx + tw - 1, ty, 1, th, '#d9b43a'); r(tx, ty + th - 1, tw, 1, '#d9b43a'); r(tx, 23 + bob, tw, 1, '#8a6a1e'); }
+    leg(ph < 0 ? Math.PI : ph, true);
+    // юбка — поверх бёдер, расширяется книзу и чуть качается на шаге
+    if (skirt) { const sw = moving ? Math.round(Math.sin(ph)) : 0, kc = tones(look.skirtCol || '#5a4a6e');
+      for (let i = 0; i < 8; i++) { const ww = tw + Math.floor(i / 2), x0 = tx - Math.floor(i / 4) + (i > 4 ? sw : 0); r(x0, 23 + bob + i, ww, 1, i === 7 ? kc[2] : kc[1]); p(x0, 23 + bob + i, kc[2]); if (i % 3 === 1) p(x0 + 2, 23 + bob + i, kc[0]); } }
+    // ближняя рука (стук — рука вперёд и вверх)
+    if (frame === 'knock') { seg(10, ty + 1, 80 * D, 5, 2, top[1], top[2]); seg(15, ty + 2, 160 * D, 4, 2, top[1], top[2]); r(15, ty - 3, 2, 2, sk); }
+    else arm(ph < 0 ? 0 : ph, true);
+    // шея и голова в профиль
+    const hy = bob + breath, hx = fem ? 8 : 7;
+    r(hx + 2, 10 + hy, 3, 2, skD);
+    r(hx, 2 + hy, 7, 8, sk); r(hx + 7, 4 + hy, 1, 4, sk); p(hx + 8, 6 + hy, sk);     // лоб, нос
+    r(hx, 3 + hy, 1, 6, skD); r(hx + 1, 9 + hy, 5, 1, skD); p(hx + 7, 8 + hy, skD);  // затылок, подбородок
+    p(hx + 3, 6 + hy, skD); p(hx + 3, 7 + hy, skD);                                    // ухо
+    const blink = frame === 'idle1' && look.blink;
+    if (!blink) { p(hx + 6, 5 + hy, OUT); if (fem) p(hx + 6, 4 + hy, OUT); } else p(hx + 6, 6 + hy, skD);
+    p(hx + 6, 8 + hy, fem ? '#b8545e' : '#8a4a3e');
+    if (look.old) { p(hx + 5, 4 + hy, skD); p(hx + 5, 8 + hy, skD); }
+    // волосы — в профиль
     const H1 = hair[1], H0 = hair[0], H2 = hair[2];
-    if (look.hair === 'short') { r(7, 1 + hy, 7, 2, H1); r(6, 2 + hy, 2, 5, H1); p(13, 2 + hy, H1); r(9, 1 + hy, 3, 1, H0); p(6, 6 + hy, H2); }
-    if (look.hair === 'long') { r(7, 1 + hy, 7, 2, H1); r(5, 2 + hy, 3, 13, H1); r(5, 12 + hy, 3, 3, H2); r(9, 1 + hy, 3, 1, H0); p(13, 3 + hy, H1); }
-    if (look.hair === 'bun') { r(7, 1 + hy, 7, 2, H1); r(6, 2 + hy, 2, 5, H1); r(4, 1 + hy, 4, 3, H1); p(5, 1 + hy, H0); }
-    if (look.hair === 'curly') { r(6, 0 + hy, 9, 3, H1); r(5, 2 + hy, 3, 7, H1); p(14, 3 + hy, H1); for (const [x, y] of [[7, 0], [10, 0], [13, 1], [5, 4], [6, 7]]) p(x, y + hy, H0); }
-    if (look.hair === 'bald') { r(7, 4 + hy, 1, 3, H2); p(9, 2 + hy, skL); }
-    if (look.beard) { r(10, 8 + hy, 4, 2, H1); p(13, 7 + hy, H1); p(9, 8 + hy, H1); }
-    if (look.glasses) { r(10, 5 + hy, 4, 1, OUT); p(9, 5 + hy, OUT); }
-    if (look.headphones) { r(7, 0 + hy, 7, 1, OUT); r(7, 4 + hy, 2, 3, '#b8443f'); }
-    if (look.hat === 'tyube') { r(7, 0 + hy, 7, 2, '#1b1a21'); p(8, 0 + hy, '#f4f3ee'); p(10, 1 + hy, '#f4f3ee'); p(12, 0 + hy, '#f4f3ee'); }
-    if (look.hat === 'cap') { const cc = look.capCol || '#b8443f'; r(7, 0 + hy, 7, 2, cc); r(13, 2 + hy, 3, 1, shade(cc, -30)); p(8, 0 + hy, shade(cc, 25)); }
-    if (look.hat === 'scarf') { const sc = tones(look.scarfCol || '#c8414a'); r(6, 0 + hy, 8, 3, sc[1]); r(5, 2 + hy, 3, 9, sc[1]); r(6, 9 + hy, 4, 3, sc[2]); p(8, 1 + hy, '#f4f3ee'); p(11, 1 + hy, '#f4f3ee'); p(6, 5 + hy, '#f4f3ee'); r(13, 2 + hy, 1, 1, sc[2]); }
+    if (look.hair === 'short') { r(hx, 1 + hy, 7, 2, H1); r(hx - 1, 2 + hy, 3, 5, H1); p(hx + 6, 3 + hy, H1); r(hx + 2, 1 + hy, 3, 1, H0); p(hx - 1, 6 + hy, H2); }
+    if (look.hair === 'long') { r(hx, 1 + hy, 7, 2, H1); r(hx - 2, 2 + hy, 4, 13, H1); r(hx - 2, 12 + hy, 3, 3, H2); r(hx + 2, 1 + hy, 3, 1, H0); p(hx + 6, 3 + hy, H1); p(hx - 2, 4 + hy, H0); }
+    if (look.hair === 'bun') { r(hx, 1 + hy, 7, 2, H1); r(hx - 1, 2 + hy, 3, 5, H1); r(hx - 3, 0 + hy, 4, 4, H1); p(hx - 2, 0 + hy, H0); p(hx + 6, 3 + hy, H1); }
+    if (look.hair === 'curly') { r(hx - 1, 0 + hy, 9, 3, H1); r(hx - 2, 2 + hy, 4, 8, H1); p(hx + 7, 2 + hy, H1); for (const [x, y] of [[0, 0], [3, 0], [6, 1], [-2, 4], [-1, 7], [-2, 9]]) p(hx + x, y + hy, H0); }
+    if (look.hair === 'bald') { r(hx - 1, 4 + hy, 2, 3, H2); p(hx + 3, 2 + hy, skL); }
+    if (look.beard) { r(hx + 4, 8 + hy, 4, 2, H1); p(hx + 3, 7 + hy, H1); }
+    if (look.glasses) { r(hx + 5, 5 + hy, 3, 1, OUT); p(hx + 4, 5 + hy, OUT); }
+    if (look.headphones) { r(hx, 0 + hy, 7, 1, OUT); r(hx + 2, 4 + hy, 2, 4, '#b8443f'); }
+    if (look.hat === 'tyube') { r(hx, 0 + hy, 7, 2, '#1b1a21'); p(hx + 1, 0 + hy, '#f4f3ee'); p(hx + 3, 1 + hy, '#f4f3ee'); p(hx + 5, 0 + hy, '#f4f3ee'); }
+    if (look.hat === 'cap') { const cc = look.capCol || '#b8443f'; r(hx, 0 + hy, 7, 2, cc); r(hx + 6, 2 + hy, 3, 1, shade(cc, -30)); p(hx + 1, 0 + hy, shade(cc, 25)); }
+    if (look.hat === 'scarf') { const sc = tones(look.scarfCol || '#c8414a'); r(hx - 1, 0 + hy, 8, 3, sc[1]); r(hx - 2, 2 + hy, 4, 9, sc[1]); r(hx + 1, 9 + hy, 4, 3, sc[2]); p(hx + 3, 1 + hy, sc[0]); p(hx + 6, 2 + hy, sc[2]); }
   });
   PERSON_CACHE.set(key, c); return c;
 }

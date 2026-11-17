@@ -4,7 +4,7 @@
 
 /* ---------- Mock API: тот же набор запросов, что будет у настоящего сервера ---------- */
 let USER = null, SAVE = null;
-const DEFAULT_LOOK = { skin: '#e3ad86', hair: 'short', hairCol: '#2b2420', top: 'hoodie', topCol: '#2f8577', hat: null };
+const DEFAULT_LOOK = { body: 'm', bottom: 'pants', skin: '#e3ad86', hair: 'short', hairCol: '#2b2420', top: 'hoodie', topCol: '#2f8577', hat: null };
 function persist() { API.save(SAVE).catch(() => toast('E-KNOT', L(UI.netSaveFail), 2400)); }
 const NEW_SAVE = () => ({ created: false, coins: 0, tours: {}, trust: {} });
 // индикатор связи с сервером: крутится в углу, пока идёт запрос дольше 0,3 с
@@ -165,6 +165,8 @@ function setLang(l) { LANG = l; saveStr('d67_lang', l); document.getElementById(
    СЦЕНА: создание персонажа
    ============================================================ */
 const OPT = {
+  body: ['m', 'f'],
+  bottom: ['pants', 'skirt'],
   skin: ['#f1c7a3', '#e3ad86', '#c98e66', '#9a6748'],
   hair: ['short', 'long', 'bun', 'curly', 'bald'],
   hairCol: ['#2b2420', '#4a2e22', '#a5503c', '#d9b43a', '#8f949c'],
@@ -172,7 +174,7 @@ const OPT = {
   topCol: ['#2f8577', '#3f6f8c', '#b8443f', '#c79a3b', '#5d6b5a', '#7d4f8a'],
   hat: [null, 'tyube', 'cap'],
 };
-const OPT_ROWS = ['skin', 'hair', 'hairCol', 'top', 'topCol', 'hat'];
+const OPT_ROWS = ['body', 'skin', 'hair', 'hairCol', 'top', 'topCol', 'bottom', 'hat'];
 scenes.creator = {
   enter() {
     this.look = Object.assign({}, DEFAULT_LOOK, SAVE.look || {}); this.row = 0; this.t = 0;
@@ -192,7 +194,10 @@ scenes.creator = {
     if (this.row < OPT_ROWS.length) { if (hit('left')) this.change(OPT_ROWS[this.row], -1); if (hit('right')) this.change(OPT_ROWS[this.row], 1); }
     if (hit('act') && (this.row === OPT_ROWS.length || isTouch || document.activeElement === document.getElementById('nameInput'))) this.done();
   },
-  change(k, d) { const a = OPT[k], i = a.indexOf(this.look[k] ?? null); this.look[k] = a[(i + d + a.length) % a.length]; sfx.select(); },
+  change(k, d) { const a = OPT[k], i = a.indexOf(this.look[k] ?? null); this.look[k] = a[(i + d + a.length) % a.length]; sfx.select();
+    // смена пола подбирает подходящие по умолчанию причёску и низ — дальше можно поменять
+    if (k === 'body') { const f = this.look.body === 'f'; this.look.bottom = f ? 'skirt' : 'pants';
+      if (f && this.look.hair === 'short') this.look.hair = 'long'; if (!f && (this.look.hair === 'long' || this.look.hair === 'bun')) this.look.hair = 'short'; } },
   done() {
     const name = (document.getElementById('nameInput').value || '').trim().slice(0, 12) || (LANG === 'kz' ? 'Төраға' : 'Председатель');
     SAVE.name = name; SAVE.look = this.look; SAVE.created = true; persist(); this.leave();
@@ -209,14 +214,14 @@ scenes.creator = {
     text(L(UI.hello).trim(), 74, 172, { col: INK }); text((document.getElementById('nameInput').value || '…').slice(0, 12), 74, 186, { col: INK_TEAL });
     text(L(UI.name), 200, 22, { col: '#f2c94c' });
     OPT_ROWS.forEach((k, i) => {
-      const y = 62 + i * 19, sel = this.row === i;
-      if (sel) rect(194, y - 3, 200, 17, 'rgba(242,201,76,.15)');
+      const y = 50 + i * 16, sel = this.row === i;
+      if (sel) rect(194, y - 3, 200, 15, 'rgba(242,201,76,.15)');
       text(L(UI[k]), 200, y + 2, { col: sel ? '#f2c94c' : '#f4f3ee' });
       if (button('◂', 0, y - 2, 'dark', { left: 300, w: 16 })) { this.row = i; this.change(k, -1); }
       if (button('▸', 0, y - 2, 'dark', { left: 372, w: 16 })) { this.row = i; this.change(k, 1); }
       const v = this.look[k] ?? null;
       if (k === 'skin' || k === 'hairCol' || k === 'topCol') { rect(322, y, 44, 12, OUT); rect(323, y + 1, 42, 10, v); }
-      else { const names = { short: 'Қысқа|Короткие', long: 'Ұзын|Длинные', bun: 'Түйін|Пучок', bald: 'Жоқ|Нет', curly: 'Бұйра|Кудри', leather: 'Күртеше|Куртка', hoodie: 'Худи|Худи', shirt: 'Көйлек|Рубашка', jacket: 'Пиджак|Пиджак', chapan: 'Шапан|Чапан', tyube: 'Тақия|Тюбетейка', cap: 'Кепка|Кепка', null: '—|—' };
+      else { const names = { short: 'Қысқа|Короткие', long: 'Ұзын|Длинные', bun: 'Түйін|Пучок', bald: 'Жоқ|Нет', curly: 'Бұйра|Кудри', leather: 'Күртеше|Куртка', hoodie: 'Худи|Худи', shirt: 'Көйлек|Рубашка', jacket: 'Пиджак|Пиджак', chapan: 'Шапан|Чапан', tyube: 'Тақия|Тюбетейка', cap: 'Кепка|Кепка', null: '—|—', m: 'Ер|Парень', f: 'Қыз|Девушка', pants: 'Шалбар|Брюки', skirt: 'Юбка|Юбка' };
         const s = (names[v] || '—|—').split('|')[LANG === 'kz' ? 0 : 1]; text(s, 344, y + 2, { align: 'center', col: '#9fd9c2', size: s.length > 6 ? 6 : 8 }); }
     });
     if (button(L(UI.ready), 296, 190, 'primary', { selected: this.row === OPT_ROWS.length })) this.done();
@@ -252,7 +257,7 @@ scenes.prologue = {
   },
   draw(dt) {
     drawStreet(dt, this.t);
-    const fr = this.moving ? 'walk' + (Math.floor(this.t / 130) % 4) : 'idle' + (Math.floor(this.t / 500) % 2);
+    const fr = this.moving ? 'walk' + (Math.floor(this.t / 95) % 8) : 'idle' + (Math.floor(this.t / 500) % 2);
     sprite(personSprite(SAVE.look, fr), Math.round(this.hx) - 9, STREET_GROUND - PH);
     dlgDraw();
   },
@@ -710,7 +715,7 @@ scenes.tour = {
     if (!tk.done || (tk.leaving && tk.leaving < 1400)) {
       if (tk.leaving) tk.leaving += dt;
       const x = tk.x + (tk.leaving ? tk.leaving * .05 : 0);
-      if (!tk.leaving || tk.leaving < 1400) sprite(personSprite(tk.look, tk.leaving ? ['walk0', 'walk1', 'walk2', 'walk3'][Math.floor(tk.leaving / 120) % 4] : ['idle0', 'idle1'][Math.floor(t / 600) % 2]), x - 9, this.base(tk.floor) - PH - cy, !tk.leaving && h.x < x);
+      if (!tk.leaving || tk.leaving < 1400) sprite(personSprite(tk.look, tk.leaving ? 'walk' + (Math.floor(tk.leaving / 95) % 8) : ['idle0', 'idle1'][Math.floor(t / 600) % 2]), x - 9, this.base(tk.floor) - PH - cy, !tk.leaving && h.x < x);
     }
     // помощница
     if (this.helper.state === 'shown') {
@@ -722,7 +727,7 @@ scenes.tour = {
     let fr = 'idle' + (Math.floor(t / 500) % 2);
     if (h.knockT > 0) { h.knockT -= dt; fr = Math.floor(h.knockT / 120) % 2 ? 'knock' : 'idle0'; }
     else if (h.climb) fr = 'climb' + (Math.floor(h.walkT / 260) % 4);
-    else if (h.moving) fr = 'walk' + (Math.floor(h.walkT / 130) % 4);
+    else if (h.moving) fr = 'walk' + (Math.floor(h.walkT / 95) % 8);
     if (!h.ride) sprite(personSprite(Object.assign({ blink: Math.floor(t / 2600) % 3 === 0 }, SAVE.look), fr), h.x - 9, h.y - PH - cy, h.dir < 0);
     else { const yb = Math.round(h.y - cy); rect(LIFT_X - 12, yb - 46, 24, 46, 'rgba(255,236,170,.22)'); }
     // подсказка над дверью

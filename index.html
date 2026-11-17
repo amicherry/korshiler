@@ -362,6 +362,8 @@ const UI = {
   back:       { kz: 'АРТҚА', ru: 'НАЗАД' },
   creator:    { kz: 'КЕЙІПКЕР', ru: 'ПЕРСОНАЖ' },
   name:       { kz: 'АТЫҢ', ru: 'ИМЯ' },
+  body:       { kz: 'ЖЫНЫС', ru: 'ПОЛ' },
+  bottom:     { kz: 'ТӨМЕНІ', ru: 'НИЗ' },
   skin:       { kz: 'ТЕРІ', ru: 'КОЖА' },
   hair:       { kz: 'ШАШ', ru: 'ПРИЧЁСКА' },
   hairCol:    { kz: 'ШАШ ТҮСІ', ru: 'ЦВЕТ ВОЛОС' },
@@ -509,7 +511,7 @@ const UI = {
 const ARCH = {
   apa: { mood: 45, deaf: .1, voice: 380, onlineOk: false, listen: 26,
     likes: { explain: 8, facts: -2, benefit: 4, neighbors: 14, online: -6 },
-    look: { skin: '#d9a77c', hair: 'scarf', hairCol: '#9c9a96', top: 'shirt', topCol: '#7d4f8a', hat: 'scarf', scarfCol: '#c8414a', old: true },
+    look: { skin: '#d9a77c', hair: 'scarf', hairCol: '#9c9a96', top: 'shirt', topCol: '#7d4f8a', hat: 'scarf', scarfCol: '#c8414a', old: true, body: 'f', bottom: 'skirt', skirtCol: '#4a3a52' },
     lines: {
       greet: { kz: 'Ой, балам, кімсің? Тағы бір жиналыс па?', ru: 'Ой, балам, ты кто? Опять какое-то собрание?' },
       again: { kz: 'Қайта келдің бе? Шай ішесің бе?', ru: 'Опять пришёл? Чаю будешь?' },
@@ -993,9 +995,11 @@ function shade(hex, amt) {
 
 
 /* ============================================================
-   ЛЮДИ: 18×42, пропорции ближе к реальным (по референсу автора),
-   каждая вещь в три тона: свет слева сверху, тень справа.
-   frame: idle0 idle1 walk0..3 knock climb0..3
+   ЛЮДИ: 18×42, вид сбоку (смотрят вправо), как в референсе автора.
+   Походка — 8 кадров: ноги «шарнирные» (бедро + голень), руки
+   качаются навстречу ногам, корпус чуть проседает на шаге.
+   frame: idle0 idle1 walk0..7 climb0..3 knock
+   body: 'm' | 'f' (если не задано — по причёске/платку)
    ============================================================ */
 const tones = c => [shade(c, 24), c, shade(c, -28), shade(c, -50)];
 const PERSON_CACHE = new Map();
@@ -1003,58 +1007,86 @@ function personSprite(look, frame) {
   const key = JSON.stringify(look) + '|' + frame;
   if (PERSON_CACHE.has(key)) return PERSON_CACHE.get(key);
   const c = makeCanvas(18, 42, ({ r, p }) => {
+    const fem = look.body ? look.body === 'f' : (look.hair === 'long' || look.hair === 'bun' || look.hat === 'scarf');
     const [skL, sk, skD] = tones(look.skin), hair = tones(look.hairCol), top = tones(look.topCol);
-    const pants = tones(look.pants || (look.top === 'jacket' ? '#3a3d48' : '#3d5277')), shoe = '#241f1d';
-    const walkI = frame.startsWith('walk') ? +frame[4] : frame.startsWith('climb') ? +frame[5] : -1;
-    const stride = walkI < 0 ? 0 : [1, 3, 1, -3][walkI] * (frame.startsWith('climb') ? .7 : 1);
-    const bob = walkI === 1 || walkI === 3 ? 1 : 0, breath = frame === 'idle1' ? 1 : 0, Y = bob;
-    const leg = (x0, dx, col, colD, lift) => {
-      for (let y = 25; y <= 39; y++) { const x = Math.round(x0 + dx * (y - 25) / 14); r(x, y - (y > 33 ? lift : 0), 3, 1, col); p(x + 2, y - (y > 33 ? lift : 0), colD); }
-      const fx = Math.round(x0 + dx); r(fx, 40 - lift, 5, 1, shoe); r(fx, 41 - lift, 5, 1, '#151211');
+    const pants = tones(look.pants || (look.top === 'jacket' ? '#3a3d48' : '#3d5277')), shoe = '#241f1d', shoeL = '#3a322d';
+    const skirt = look.bottom === 'skirt';
+    // фаза шага: walkN — 8 кадров, climbN — 4 кадра
+    let ph = -1, climb = false;
+    if (frame.startsWith('walk')) ph = (+frame.slice(4) % 8) / 8 * Math.PI * 2;
+    if (frame.startsWith('climb')) { ph = (+frame.slice(5) % 4) / 4 * Math.PI * 2; climb = true; }
+    const moving = ph >= 0, breath = frame === 'idle1' ? 1 : 0;
+    const bob = moving && Math.abs(Math.sin(ph)) > .7 ? 1 : 0;           // на широком шаге корпус ниже
+    const hipX = 9, hipY = 24 + bob, D = Math.PI / 180;
+    // конечность: отрезок толщиной w пикселей, тень на заднем крае
+    const seg = (x0, y0, ang, len, w, col, colD) => {
+      for (let i = 0; i <= len; i++) { const x = x0 + Math.sin(ang) * i, y = y0 + Math.cos(ang) * i;
+        r(Math.round(x - w / 2), Math.round(y), w, 1, col); p(Math.round(x - w / 2), Math.round(y), colD); }
+      return [x0 + Math.sin(ang) * len, y0 + Math.cos(ang) * len];
+    };
+    const leg = (phase, near) => {
+      const a = (moving ? 24 * Math.sin(phase) : 0) * D, bend = (moving ? 38 * Math.max(0, Math.cos(phase)) + 6 * Math.max(0, -Math.sin(phase)) : 0) * D;
+      const lift = climb ? 3 * Math.max(0, Math.sin(phase)) : 0;
+      // в юбке ноги в тёмных колготках и тоньше
+      const col = skirt ? (near ? '#3b3742' : '#2a2730') : near ? pants[1] : pants[2], colD = skirt ? '#1d1b22' : near ? pants[2] : pants[3];
+      const [kx, ky] = seg(hipX + (near ? 0 : -1), hipY, a, 8, skirt ? 2 : 3, col, colD);
+      const [fx, fy] = seg(kx, ky - lift, a - bend, 8, skirt ? 2 : 3, col, colD);
+      const X = Math.round(fx), Y = Math.min(41, Math.round(fy));
+      r(X - 1, Y - 1, 5, 2, near ? shoe : '#1a1615'); p(X + 3, Y - 1, near ? shoeL : shoe);
+    };
+    const arm = (phase, near) => {
+      const a = (moving ? -22 * Math.sin(phase) : 0) * D, elbow = (moving ? 12 + 14 * Math.max(0, -Math.sin(phase)) : 6) * D;
+      const col = near ? top[1] : top[2], colD = near ? top[2] : top[3];
+      const sy = 13 + bob + breath;
+      const [ex, ey] = seg(9 + (near ? 1 : -1), sy, a, 6, 2, col, colD);
+      const [hx, hy] = seg(ex, ey, a + elbow, 5, 2, col, colD);
+      r(Math.round(hx - 1), Math.round(hy), 2, 2, near ? sk : skD);
     };
     const longTop = look.top === 'chapan';
-    // дальняя нога и рука (темнее)
-    leg(7, -stride, pants[2], pants[3], frame.startsWith('climb') && walkI % 2 ? 2 : 0);
-    const arm = (x0, y0, dx, dy, col, colD) => { for (let i = 0; i < 11; i++) { const x = Math.round(x0 + dx * i / 10), y = y0 + Math.round(dy * i / 10) + i; r(x, y, 2, 1, col); p(x + 1, y, colD); }
-      r(Math.round(x0 + dx) , y0 + 11 + dy, 2, 2, skD); };
-    arm(4, 13 + breath, stride * .6, 0, top[2], top[3]);
-    // ближняя нога
-    leg(10, stride, pants[1], pants[2], frame.startsWith('climb') && walkI % 2 === 0 && walkI >= 0 ? 2 : 0);
-    // корпус
-    const ty = 12 + breath, th = longTop ? 22 : 13 - breath;
-    r(5, ty, 9, th, top[1]); r(4, ty + 1, 11, 3, top[1]);
-    r(5, ty + 1, 1, th - 1, top[0]); r(13, ty + 1, 1, th - 1, top[2]); r(14, ty + 1, 1, 3, top[2]);
-    if (!longTop) { r(5, 24, 9, 1, '#2a2422'); p(9, 24, '#9a8a6a'); }
-    if (look.top === 'hoodie') { r(6, ty - 1, 6, 2, top[2]); r(7, ty + 7, 5, 3, top[2]); p(9, ty + 2, '#f4f3ee'); p(10, ty + 3, '#f4f3ee'); }
-    if (look.top === 'shirt') { r(8, ty, 3, 2, '#f4f3ee'); for (let y = ty + 3; y < 24; y += 3) p(10, y, top[3]); }
-    if (look.top === 'jacket') { r(8, ty, 4, 10, '#e9eef5'); r(9, ty + 1, 2, 7, '#b8443f'); p(8, ty + 1, top[3]); p(11, ty + 1, top[3]); r(7, ty, 1, 9, top[2]); r(12, ty, 1, 9, top[2]); }
-    if (look.top === 'leather') { r(8, ty, 4, 11, '#e6dcc4'); r(7, ty, 1, 11, top[3]); r(12, ty, 1, 11, top[3]); p(6, ty + 2, top[0]); }
-    if (longTop) { r(5, ty, 1, th, '#d9b43a'); r(13, ty, 1, th, '#d9b43a'); r(5, ty + th - 1, 9, 1, '#d9b43a'); r(5, 23, 9, 1, '#8a6a1e'); }
-    // ближняя рука
-    if (frame === 'knock') { for (let i = 0; i < 5; i++) r(12 + i, ty + 2 - Math.floor(i / 2), 2, 2, top[1]); r(16, ty - 2, 2, 2, sk); }
-    else arm(12, 13 + breath, -stride * .6, 0, top[1], top[2]);
-    // шея и голова
-    const hy = breath + 0;
-    r(8, 10 + hy, 3, 2, skD);
-    r(7, 2 + hy, 7, 8, sk); r(8, 10 + hy, 5, 0, sk); r(13, 3 + hy, 1, 6, skD); r(7, 3 + hy, 1, 5, skL); r(8, 9 + hy, 5, 1, skD);
-    p(8, 5 + hy, skD); p(8, 6 + hy, skD);                       // ухо
-    const blink = frame === 'idle1' && (look.blink);
-    if (!blink) { p(11, 5 + hy, OUT); p(13, 5 + hy, OUT); } else { p(11, 6 + hy, skD); p(13, 6 + hy, skD); }
-    p(14, 6 + hy, sk); p(12, 8 + hy, '#8a4a3e');
-    if (look.old) { p(12, 4 + hy, skD); p(10, 8 + hy, skD); }
-    // волосы
+    // дальние рука и нога — темнее, за корпусом
+    if (frame !== 'knock') arm(ph < 0 ? 0 : ph + Math.PI, false);
+    leg(ph < 0 ? Math.PI : ph + Math.PI, false);
+    // корпус в профиль: грудь спереди (справа), спина слева
+    const ty = 12 + bob + breath, th = longTop ? 21 : 13 - breath, tw = fem ? 6 : 7, tx = fem ? 6 : 5;
+    r(tx, ty, tw, th, top[1]); r(tx, ty, 1, th, top[2]); r(tx + tw - 1, ty + 1, 1, th - 2, top[0]);
+    r(tx + 1, ty - 1, tw - 2, 1, top[1]);                                          // плечо
+    if (fem && !longTop) { r(tx + tw, ty + 3, 1, 3, top[1]); r(tx - 1 + 1, ty + 9, 1, 3, top[2]); }   // силуэт: грудь, талия
+    if (!longTop && !skirt) { r(tx, 24 + bob, tw, 1, '#2a2422'); p(tx + tw - 2, 24 + bob, '#9a8a6a'); }   // ремень
+    if (look.top === 'hoodie') { r(tx - 1, ty - 1, 3, 4, top[2]); r(tx + tw - 2, ty + 6, 2, 3, top[2]); p(tx + tw - 1, ty + 1, '#f4f3ee'); }
+    if (look.top === 'shirt') { r(tx + tw - 2, ty - 1, 2, 2, '#f4f3ee'); for (let y = ty + 3; y < ty + th - 1; y += 3) p(tx + tw - 1, y, top[3]); }
+    if (look.top === 'jacket') { r(tx + tw - 2, ty, 2, 8, '#e9eef5'); r(tx + tw - 1, ty + 1, 1, 7, '#2b2a33'); r(tx + tw - 3, ty, 1, 9, top[2]); }   // рубашка и галстук
+    if (look.top === 'leather') { r(tx + tw - 2, ty, 2, 10, '#e6dcc4'); r(tx + tw - 3, ty, 1, 11, top[3]); p(tx + 1, ty + 2, top[0]); }
+    if (longTop) { r(tx + tw - 1, ty, 1, th, '#d9b43a'); r(tx, ty + th - 1, tw, 1, '#d9b43a'); r(tx, 23 + bob, tw, 1, '#8a6a1e'); }
+    leg(ph < 0 ? Math.PI : ph, true);
+    // юбка — поверх бёдер, расширяется книзу и чуть качается на шаге
+    if (skirt) { const sw = moving ? Math.round(Math.sin(ph)) : 0, kc = tones(look.skirtCol || '#5a4a6e');
+      for (let i = 0; i < 8; i++) { const ww = tw + Math.floor(i / 2), x0 = tx - Math.floor(i / 4) + (i > 4 ? sw : 0); r(x0, 23 + bob + i, ww, 1, i === 7 ? kc[2] : kc[1]); p(x0, 23 + bob + i, kc[2]); if (i % 3 === 1) p(x0 + 2, 23 + bob + i, kc[0]); } }
+    // ближняя рука (стук — рука вперёд и вверх)
+    if (frame === 'knock') { seg(10, ty + 1, 80 * D, 5, 2, top[1], top[2]); seg(15, ty + 2, 160 * D, 4, 2, top[1], top[2]); r(15, ty - 3, 2, 2, sk); }
+    else arm(ph < 0 ? 0 : ph, true);
+    // шея и голова в профиль
+    const hy = bob + breath, hx = fem ? 8 : 7;
+    r(hx + 2, 10 + hy, 3, 2, skD);
+    r(hx, 2 + hy, 7, 8, sk); r(hx + 7, 4 + hy, 1, 4, sk); p(hx + 8, 6 + hy, sk);     // лоб, нос
+    r(hx, 3 + hy, 1, 6, skD); r(hx + 1, 9 + hy, 5, 1, skD); p(hx + 7, 8 + hy, skD);  // затылок, подбородок
+    p(hx + 3, 6 + hy, skD); p(hx + 3, 7 + hy, skD);                                    // ухо
+    const blink = frame === 'idle1' && look.blink;
+    if (!blink) { p(hx + 6, 5 + hy, OUT); if (fem) p(hx + 6, 4 + hy, OUT); } else p(hx + 6, 6 + hy, skD);
+    p(hx + 6, 8 + hy, fem ? '#b8545e' : '#8a4a3e');
+    if (look.old) { p(hx + 5, 4 + hy, skD); p(hx + 5, 8 + hy, skD); }
+    // волосы — в профиль
     const H1 = hair[1], H0 = hair[0], H2 = hair[2];
-    if (look.hair === 'short') { r(7, 1 + hy, 7, 2, H1); r(6, 2 + hy, 2, 5, H1); p(13, 2 + hy, H1); r(9, 1 + hy, 3, 1, H0); p(6, 6 + hy, H2); }
-    if (look.hair === 'long') { r(7, 1 + hy, 7, 2, H1); r(5, 2 + hy, 3, 13, H1); r(5, 12 + hy, 3, 3, H2); r(9, 1 + hy, 3, 1, H0); p(13, 3 + hy, H1); }
-    if (look.hair === 'bun') { r(7, 1 + hy, 7, 2, H1); r(6, 2 + hy, 2, 5, H1); r(4, 1 + hy, 4, 3, H1); p(5, 1 + hy, H0); }
-    if (look.hair === 'curly') { r(6, 0 + hy, 9, 3, H1); r(5, 2 + hy, 3, 7, H1); p(14, 3 + hy, H1); for (const [x, y] of [[7, 0], [10, 0], [13, 1], [5, 4], [6, 7]]) p(x, y + hy, H0); }
-    if (look.hair === 'bald') { r(7, 4 + hy, 1, 3, H2); p(9, 2 + hy, skL); }
-    if (look.beard) { r(10, 8 + hy, 4, 2, H1); p(13, 7 + hy, H1); p(9, 8 + hy, H1); }
-    if (look.glasses) { r(10, 5 + hy, 4, 1, OUT); p(9, 5 + hy, OUT); }
-    if (look.headphones) { r(7, 0 + hy, 7, 1, OUT); r(7, 4 + hy, 2, 3, '#b8443f'); }
-    if (look.hat === 'tyube') { r(7, 0 + hy, 7, 2, '#1b1a21'); p(8, 0 + hy, '#f4f3ee'); p(10, 1 + hy, '#f4f3ee'); p(12, 0 + hy, '#f4f3ee'); }
-    if (look.hat === 'cap') { const cc = look.capCol || '#b8443f'; r(7, 0 + hy, 7, 2, cc); r(13, 2 + hy, 3, 1, shade(cc, -30)); p(8, 0 + hy, shade(cc, 25)); }
-    if (look.hat === 'scarf') { const sc = tones(look.scarfCol || '#c8414a'); r(6, 0 + hy, 8, 3, sc[1]); r(5, 2 + hy, 3, 9, sc[1]); r(6, 9 + hy, 4, 3, sc[2]); p(8, 1 + hy, '#f4f3ee'); p(11, 1 + hy, '#f4f3ee'); p(6, 5 + hy, '#f4f3ee'); r(13, 2 + hy, 1, 1, sc[2]); }
+    if (look.hair === 'short') { r(hx, 1 + hy, 7, 2, H1); r(hx - 1, 2 + hy, 3, 5, H1); p(hx + 6, 3 + hy, H1); r(hx + 2, 1 + hy, 3, 1, H0); p(hx - 1, 6 + hy, H2); }
+    if (look.hair === 'long') { r(hx, 1 + hy, 7, 2, H1); r(hx - 2, 2 + hy, 4, 13, H1); r(hx - 2, 12 + hy, 3, 3, H2); r(hx + 2, 1 + hy, 3, 1, H0); p(hx + 6, 3 + hy, H1); p(hx - 2, 4 + hy, H0); }
+    if (look.hair === 'bun') { r(hx, 1 + hy, 7, 2, H1); r(hx - 1, 2 + hy, 3, 5, H1); r(hx - 3, 0 + hy, 4, 4, H1); p(hx - 2, 0 + hy, H0); p(hx + 6, 3 + hy, H1); }
+    if (look.hair === 'curly') { r(hx - 1, 0 + hy, 9, 3, H1); r(hx - 2, 2 + hy, 4, 8, H1); p(hx + 7, 2 + hy, H1); for (const [x, y] of [[0, 0], [3, 0], [6, 1], [-2, 4], [-1, 7], [-2, 9]]) p(hx + x, y + hy, H0); }
+    if (look.hair === 'bald') { r(hx - 1, 4 + hy, 2, 3, H2); p(hx + 3, 2 + hy, skL); }
+    if (look.beard) { r(hx + 4, 8 + hy, 4, 2, H1); p(hx + 3, 7 + hy, H1); }
+    if (look.glasses) { r(hx + 5, 5 + hy, 3, 1, OUT); p(hx + 4, 5 + hy, OUT); }
+    if (look.headphones) { r(hx, 0 + hy, 7, 1, OUT); r(hx + 2, 4 + hy, 2, 4, '#b8443f'); }
+    if (look.hat === 'tyube') { r(hx, 0 + hy, 7, 2, '#1b1a21'); p(hx + 1, 0 + hy, '#f4f3ee'); p(hx + 3, 1 + hy, '#f4f3ee'); p(hx + 5, 0 + hy, '#f4f3ee'); }
+    if (look.hat === 'cap') { const cc = look.capCol || '#b8443f'; r(hx, 0 + hy, 7, 2, cc); r(hx + 6, 2 + hy, 3, 1, shade(cc, -30)); p(hx + 1, 0 + hy, shade(cc, 25)); }
+    if (look.hat === 'scarf') { const sc = tones(look.scarfCol || '#c8414a'); r(hx - 1, 0 + hy, 8, 3, sc[1]); r(hx - 2, 2 + hy, 4, 9, sc[1]); r(hx + 1, 9 + hy, 4, 3, sc[2]); p(hx + 3, 1 + hy, sc[0]); p(hx + 6, 2 + hy, sc[2]); }
   });
   PERSON_CACHE.set(key, c); return c;
 }
@@ -1488,7 +1520,10 @@ function portrait(look, expr = 'neutral') {
     if (expr === 'sad') { line(14, 16, 18, 14, hc); line(22, 14, 26, 16, hc); }
     if (expr !== 'think' && expr !== 'angry' && expr !== 'sad') { line(14, 15, 17, 15, shade(hc, 10)); line(23, 15, 26, 15, shade(hc, 10)); }
     p(20, 21, skD); p(20, 22, skD);
-    const M = '#7a3b34';
+    const fem = look.body ? look.body === 'f' : (look.hair === 'long' || look.hair === 'bun' || look.hat === 'scarf');
+    const M = fem ? '#b8545e' : '#7a3b34';
+    if (fem && expr !== 'happy') { p(14, ey - 1, OUT); p(25, ey - 1, OUT); }            // ресницы
+    if (fem) { p(14, 22, shade(sk, -8) === sk ? '#e8a08a' : '#e8a08a'); p(26, 22, '#e8a08a'); }   // румянец
     if (expr === 'happy') { p(17, 24, M); r(18, 25, 4, 1, M); p(22, 24, M); }
     else if (expr === 'angry' || expr === 'sad') { r(18, 25, 4, 1, M); p(17, 26, M); p(22, 26, M); }
     else if (expr === 'think') { r(19, 25, 3, 1, M); }
@@ -1568,7 +1603,7 @@ const ICONS = {}; for (const k of ['yes', 'no', 'thinking', 'away', 'noanswer', 
 
 /* ---------- Mock API: тот же набор запросов, что будет у настоящего сервера ---------- */
 let USER = null, SAVE = null;
-const DEFAULT_LOOK = { skin: '#e3ad86', hair: 'short', hairCol: '#2b2420', top: 'hoodie', topCol: '#2f8577', hat: null };
+const DEFAULT_LOOK = { body: 'm', bottom: 'pants', skin: '#e3ad86', hair: 'short', hairCol: '#2b2420', top: 'hoodie', topCol: '#2f8577', hat: null };
 function persist() { API.save(SAVE).catch(() => toast('E-KNOT', L(UI.netSaveFail), 2400)); }
 const NEW_SAVE = () => ({ created: false, coins: 0, tours: {}, trust: {} });
 // индикатор связи с сервером: крутится в углу, пока идёт запрос дольше 0,3 с
@@ -1729,6 +1764,8 @@ function setLang(l) { LANG = l; saveStr('d67_lang', l); document.getElementById(
    СЦЕНА: создание персонажа
    ============================================================ */
 const OPT = {
+  body: ['m', 'f'],
+  bottom: ['pants', 'skirt'],
   skin: ['#f1c7a3', '#e3ad86', '#c98e66', '#9a6748'],
   hair: ['short', 'long', 'bun', 'curly', 'bald'],
   hairCol: ['#2b2420', '#4a2e22', '#a5503c', '#d9b43a', '#8f949c'],
@@ -1736,7 +1773,7 @@ const OPT = {
   topCol: ['#2f8577', '#3f6f8c', '#b8443f', '#c79a3b', '#5d6b5a', '#7d4f8a'],
   hat: [null, 'tyube', 'cap'],
 };
-const OPT_ROWS = ['skin', 'hair', 'hairCol', 'top', 'topCol', 'hat'];
+const OPT_ROWS = ['body', 'skin', 'hair', 'hairCol', 'top', 'topCol', 'bottom', 'hat'];
 scenes.creator = {
   enter() {
     this.look = Object.assign({}, DEFAULT_LOOK, SAVE.look || {}); this.row = 0; this.t = 0;
@@ -1756,7 +1793,10 @@ scenes.creator = {
     if (this.row < OPT_ROWS.length) { if (hit('left')) this.change(OPT_ROWS[this.row], -1); if (hit('right')) this.change(OPT_ROWS[this.row], 1); }
     if (hit('act') && (this.row === OPT_ROWS.length || isTouch || document.activeElement === document.getElementById('nameInput'))) this.done();
   },
-  change(k, d) { const a = OPT[k], i = a.indexOf(this.look[k] ?? null); this.look[k] = a[(i + d + a.length) % a.length]; sfx.select(); },
+  change(k, d) { const a = OPT[k], i = a.indexOf(this.look[k] ?? null); this.look[k] = a[(i + d + a.length) % a.length]; sfx.select();
+    // смена пола подбирает подходящие по умолчанию причёску и низ — дальше можно поменять
+    if (k === 'body') { const f = this.look.body === 'f'; this.look.bottom = f ? 'skirt' : 'pants';
+      if (f && this.look.hair === 'short') this.look.hair = 'long'; if (!f && (this.look.hair === 'long' || this.look.hair === 'bun')) this.look.hair = 'short'; } },
   done() {
     const name = (document.getElementById('nameInput').value || '').trim().slice(0, 12) || (LANG === 'kz' ? 'Төраға' : 'Председатель');
     SAVE.name = name; SAVE.look = this.look; SAVE.created = true; persist(); this.leave();
@@ -1773,14 +1813,14 @@ scenes.creator = {
     text(L(UI.hello).trim(), 74, 172, { col: INK }); text((document.getElementById('nameInput').value || '…').slice(0, 12), 74, 186, { col: INK_TEAL });
     text(L(UI.name), 200, 22, { col: '#f2c94c' });
     OPT_ROWS.forEach((k, i) => {
-      const y = 62 + i * 19, sel = this.row === i;
-      if (sel) rect(194, y - 3, 200, 17, 'rgba(242,201,76,.15)');
+      const y = 50 + i * 16, sel = this.row === i;
+      if (sel) rect(194, y - 3, 200, 15, 'rgba(242,201,76,.15)');
       text(L(UI[k]), 200, y + 2, { col: sel ? '#f2c94c' : '#f4f3ee' });
       if (button('◂', 0, y - 2, 'dark', { left: 300, w: 16 })) { this.row = i; this.change(k, -1); }
       if (button('▸', 0, y - 2, 'dark', { left: 372, w: 16 })) { this.row = i; this.change(k, 1); }
       const v = this.look[k] ?? null;
       if (k === 'skin' || k === 'hairCol' || k === 'topCol') { rect(322, y, 44, 12, OUT); rect(323, y + 1, 42, 10, v); }
-      else { const names = { short: 'Қысқа|Короткие', long: 'Ұзын|Длинные', bun: 'Түйін|Пучок', bald: 'Жоқ|Нет', curly: 'Бұйра|Кудри', leather: 'Күртеше|Куртка', hoodie: 'Худи|Худи', shirt: 'Көйлек|Рубашка', jacket: 'Пиджак|Пиджак', chapan: 'Шапан|Чапан', tyube: 'Тақия|Тюбетейка', cap: 'Кепка|Кепка', null: '—|—' };
+      else { const names = { short: 'Қысқа|Короткие', long: 'Ұзын|Длинные', bun: 'Түйін|Пучок', bald: 'Жоқ|Нет', curly: 'Бұйра|Кудри', leather: 'Күртеше|Куртка', hoodie: 'Худи|Худи', shirt: 'Көйлек|Рубашка', jacket: 'Пиджак|Пиджак', chapan: 'Шапан|Чапан', tyube: 'Тақия|Тюбетейка', cap: 'Кепка|Кепка', null: '—|—', m: 'Ер|Парень', f: 'Қыз|Девушка', pants: 'Шалбар|Брюки', skirt: 'Юбка|Юбка' };
         const s = (names[v] || '—|—').split('|')[LANG === 'kz' ? 0 : 1]; text(s, 344, y + 2, { align: 'center', col: '#9fd9c2', size: s.length > 6 ? 6 : 8 }); }
     });
     if (button(L(UI.ready), 296, 190, 'primary', { selected: this.row === OPT_ROWS.length })) this.done();
@@ -1816,7 +1856,7 @@ scenes.prologue = {
   },
   draw(dt) {
     drawStreet(dt, this.t);
-    const fr = this.moving ? 'walk' + (Math.floor(this.t / 130) % 4) : 'idle' + (Math.floor(this.t / 500) % 2);
+    const fr = this.moving ? 'walk' + (Math.floor(this.t / 95) % 8) : 'idle' + (Math.floor(this.t / 500) % 2);
     sprite(personSprite(SAVE.look, fr), Math.round(this.hx) - 9, STREET_GROUND - PH);
     dlgDraw();
   },
@@ -2274,7 +2314,7 @@ scenes.tour = {
     if (!tk.done || (tk.leaving && tk.leaving < 1400)) {
       if (tk.leaving) tk.leaving += dt;
       const x = tk.x + (tk.leaving ? tk.leaving * .05 : 0);
-      if (!tk.leaving || tk.leaving < 1400) sprite(personSprite(tk.look, tk.leaving ? ['walk0', 'walk1', 'walk2', 'walk3'][Math.floor(tk.leaving / 120) % 4] : ['idle0', 'idle1'][Math.floor(t / 600) % 2]), x - 9, this.base(tk.floor) - PH - cy, !tk.leaving && h.x < x);
+      if (!tk.leaving || tk.leaving < 1400) sprite(personSprite(tk.look, tk.leaving ? 'walk' + (Math.floor(tk.leaving / 95) % 8) : ['idle0', 'idle1'][Math.floor(t / 600) % 2]), x - 9, this.base(tk.floor) - PH - cy, !tk.leaving && h.x < x);
     }
     // помощница
     if (this.helper.state === 'shown') {
@@ -2286,7 +2326,7 @@ scenes.tour = {
     let fr = 'idle' + (Math.floor(t / 500) % 2);
     if (h.knockT > 0) { h.knockT -= dt; fr = Math.floor(h.knockT / 120) % 2 ? 'knock' : 'idle0'; }
     else if (h.climb) fr = 'climb' + (Math.floor(h.walkT / 260) % 4);
-    else if (h.moving) fr = 'walk' + (Math.floor(h.walkT / 130) % 4);
+    else if (h.moving) fr = 'walk' + (Math.floor(h.walkT / 95) % 8);
     if (!h.ride) sprite(personSprite(Object.assign({ blink: Math.floor(t / 2600) % 3 === 0 }, SAVE.look), fr), h.x - 9, h.y - PH - cy, h.dir < 0);
     else { const yb = Math.round(h.y - cy); rect(LIFT_X - 12, yb - 46, 24, 46, 'rgba(255,236,170,.22)'); }
     // подсказка над дверью
@@ -2480,41 +2520,78 @@ const HM = { x0: 120, x1: 280, top: 46, fh: 15, floors: 9, ground: 186 };
 HM.bottom = HM.top + HM.fh * HM.floors;   // 181
 const HSPOT = {   // где на карте каждая вещь (для подсветки и нажатия)
   light: [200, 112, 20, 120], door: [200, 172, 22, 16], roof: [150, 50, 60, 16], basement: [150, 185, 50, 8],
-  playground: [346, 206, 80, 30], lift: [200, 34, 30, 14], antenna: [268, 30, 22, 24], sign: [200, 16, 140, 14],
+  playground: [346, 206, 80, 30], lift: [144, 40, 30, 14], antenna: [268, 30, 22, 24], sign: [200, 28, 130, 14],
   bench: [240, 196, 30, 12], flowers: [252, 186, 50, 6], trees: [52, 170, 90, 50], lamps: [104, 172, 16, 40], parking: [48, 212, 80, 18],
 };
 
 const HOUSE_ART = { built: false };
+// палитра по референсам: сиреневые сумерки, облака, луна, тёплые и розовые окна
+const HP = { sky0: '#1c1734', sky1: '#3b2f5c', sky2: '#7a5f8e', sky3: '#c98f8f', cloud: '#5e4f86', cloudL: '#8676ad', cloudD: '#43386a',
+  far: '#352b52', wall: '#6d6488', wallL: '#857ca0', wallD: '#544b70', stain: '#5b5378', ground: '#3b3049', groundL: '#55466a', slab: '#8f86a8' };
+const WIN_COLS = ['#f2b84a', '#f5c96a', '#e8913a', '#ec9d8f', '#9a6ad0', '#f2b84a'];
 function buildHouseArt() {
   const R = rng(5);
-  HOUSE_ART.bg = makeCanvas(W, H, ({ r, p }) => {
-    for (let y = 0; y < H; y++) { const k = y / H; r(0, y, W, 1, `rgb(${22 + k * 40 | 0},${32 + k * 40 | 0},${62 + k * 40 | 0})`); }
-    for (let y = 130; y < 190; y++) r(0, y, W, 1, `rgba(220,130,90,${((y - 130) / 60 * .25).toFixed(3)})`);
-    for (let i = 0; i < 50; i++) p(R() * W, R() * 100, R() < .2 ? '#f4f3ee' : '#9fb0cc');
-    // дальние дома
-    let x = -4; while (x < W) { const w = 14 + R() * 26, h = 20 + R() * 50; r(x, 186 - h, w, h, '#26304a'); for (let yy = 190 - h; yy < 182; yy += 5) for (let xx = x + 2; xx < x + w - 2; xx += 4) if (R() < .12) r(xx, yy, 2, 2, '#c9a65e'); x += w + 2; }
-    // земля: тротуар и двор
-    r(0, HM.ground, W, H - HM.ground, '#3a4258'); r(0, HM.ground, W, 6, '#565f78'); r(0, HM.ground, W, 1, '#7a84a0');
-    for (let i = 0; i < 120; i++) p(R() * W, HM.ground + 7 + R() * 30, pick(R, ['#323a50', '#444d66']));
-    // дом: фасад, швы панелей, балконные плиты
-    const { x0, x1, top, fh, floors } = HM;
-    r(x0, top, x1 - x0, HM.bottom - top + 5, '#5d6884'); r(x0, top, 2, HM.bottom - top + 5, '#7682a0'); r(x1 - 2, top, 2, HM.bottom - top + 5, '#4a5470');
-    r(176, top, 48, HM.bottom - top + 5, '#56607c');                              // лестничная клетка
-    for (let f = 0; f <= floors; f++) { const y = top + f * fh; r(x0, y, x1 - x0, 1, '#4c5570'); }
-    for (const sx of [148, 176, 224, 252]) r(sx, top, 1, HM.bottom - top, '#4c5570');
-    r(x0 - 2, top - 4, x1 - x0 + 4, 4, '#3b4460');                                  // парапет
-    r(x0, HM.bottom, x1 - x0, 5, '#3a4152');                                       // цоколь
-    // козырёк подъезда
-    r(184, 166, 32, 3, '#7a84a0'); r(184, 169, 32, 1, '#2c3346');
+  HOUSE_ART.bg = makeCanvas(W, H, ({ r, p, g }) => {
+    // небо: от тёмно-синего к сиреневому и розовому у горизонта
+    const stops = [[0, HP.sky0], [.45, HP.sky1], [.75, HP.sky2], [.9, HP.sky3]];
+    for (let y = 0; y < H; y++) { const k = y / 190; let i = 0; while (i < stops.length - 2 && k > stops[i + 1][0]) i++;
+      const [k0, c0] = stops[i], [k1, c1] = stops[i + 1], t = Math.max(0, Math.min(1, (k - k0) / (k1 - k0)));
+      const mix = (a, b) => Math.round(parseInt(a, 16) + (parseInt(b, 16) - parseInt(a, 16)) * t);
+      r(0, y, W, 1, `rgb(${mix(c0.slice(1, 3), c1.slice(1, 3))},${mix(c0.slice(3, 5), c1.slice(3, 5))},${mix(c0.slice(5, 7), c1.slice(5, 7))})`); }
+    for (let i = 0; i < 70; i++) { const x = R() * W, y = R() * 90; p(x, y, R() < .25 ? '#f4f3ee' : '#a99fc8'); if (R() < .08) { p(x - 1, y, '#a99fc8'); p(x + 1, y, '#a99fc8'); p(x, y - 1, '#a99fc8'); p(x, y + 1, '#a99fc8'); } }
+    // луна с кратерами
+    { const mx = 352, my = 30, mr = 13; for (let y = -mr; y <= mr; y++) for (let x = -mr; x <= mr; x++) { const d = x * x + y * y; if (d > mr * mr) continue;
+      p(mx + x, my + y, d > (mr - 1.5) ** 2 ? '#b9b0a0' : (x + y > 8 ? '#cfc6b4' : '#e6dfcf')); }
+      for (const [cx, cy, cr] of [[-4, -3, 3], [4, 4, 2], [-2, 6, 2], [5, -5, 1.5]]) for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) if (x * x + y * y <= cr * cr) p(mx + cx + x, my + cy + y, '#bdb3a2'); }
+    // облака: пухлые слои с подсветкой сверху и тенью снизу
+    const cloud = (cx, cy, n, sc) => { const blobs = []; for (let i = 0; i < n; i++) blobs.push([cx + (i - n / 2) * 9 * sc + (R() - .5) * 6, cy - Math.sin(i / (n - 1) * Math.PI) * 7 * sc, (6 + R() * 5) * sc]);
+      for (const [bx, by, br] of blobs) { g.fillStyle = HP.cloudD; g.beginPath(); g.arc(Math.round(bx), Math.round(by + 2), br, 0, 7); g.fill(); }
+      for (const [bx, by, br] of blobs) { g.fillStyle = HP.cloud; g.beginPath(); g.arc(Math.round(bx), Math.round(by), br, 0, 7); g.fill(); }
+      for (const [bx, by, br] of blobs) { g.fillStyle = HP.cloudL; g.beginPath(); g.arc(Math.round(bx - br * .3), Math.round(by - br * .35), br * .55, 0, 7); g.fill(); }
+      r(cx - n * 5 * sc, cy + 4 * sc, n * 10 * sc, 3, HP.cloudD); };
+    cloud(60, 52, 7, 1); cloud(250, 40, 6, .8); cloud(330, 70, 5, .9); cloud(150, 82, 5, .7);
+    // дальние дома: сиреневые силуэты с тёплыми окнами
+    let x = -4; while (x < W) { const w = 16 + R() * 26, h = 30 + R() * 55; r(x, 186 - h, w, h, HP.far); r(x, 186 - h, w, 1, '#463a66');
+      for (let yy = 190 - h; yy < 182; yy += 6) for (let xx = x + 2; xx < x + w - 3; xx += 5) if (R() < .18) r(xx, yy, 3, 3, pick(R, ['#e8a24a', '#d98a6a', '#c9a65e'])); x += w + 3; }
+    // земля двора
+    r(0, HM.ground, W, H - HM.ground, HP.ground); r(0, HM.ground, W, 6, HP.groundL); r(0, HM.ground, W, 1, '#8a78a0');
+    for (let i = 0; i < 140; i++) p(R() * W, HM.ground + 7 + R() * 32, pick(R, ['#332a42', '#46395a', '#4e4064']));
+    // дом: бетон с потёками, швы панелей
+    const { x0, x1, top, fh, floors } = HM, hb = HM.bottom - top + 5;
+    r(x0, top, x1 - x0, hb, HP.wall); r(x0, top, 2, hb, HP.wallL); r(x1 - 2, top, 2, hb, HP.wallD);
+    r(176, top, 48, hb, '#665d82');                                               // лестничная клетка
+    for (let f = 0; f <= floors; f++) r(x0, top + f * fh, x1 - x0, 1, HP.wallD);
+    for (const sx of [148, 176, 224, 252]) r(sx, top, 1, HM.bottom - top, HP.wallD);
+    for (let i = 0; i < 46; i++) { const sx = x0 + R() * (x1 - x0), sy = top + R() * (hb - 10); r(sx, sy, 1, 4 + R() * 12, HP.stain); if (R() < .3) r(sx - 1, sy, 3, 1, HP.stain); }
+    // закатный свет на правом торце (как на референсе)
+    for (let y = top; y < HM.bottom; y++) { r(x1 - 14, y, 12, 1, 'rgba(240,140,70,.18)'); r(x1 - 6, y, 4, 1, 'rgba(250,160,80,.22)'); }
+    r(x0 - 2, top - 4, x1 - x0 + 4, 4, '#4e4569'); r(x0 - 2, top - 4, x1 - x0 + 4, 1, '#7a6f98');      // парапет
+    r(x0, HM.bottom, x1 - x0, 5, '#463d5e');                                                        // цоколь
+    r(184, 166, 32, 3, HP.slab); r(184, 169, 32, 1, '#2c2540');                                     // козырёк
   });
-  // окна квартир: свет то загорается, то гаснет
+  // окна: у некоторых балкон (плита + решётка), у некоторых застеклённая лоджия
   HOUSE_ART.win = [];
-  for (let f = 0; f < HM.floors; f++) for (const wx of [126, 142, 158, 230, 246, 262]) HOUSE_ART.win.push({ x: wx, y: HM.top + f * HM.fh + 4, on: R() < .4, warm: pick(R, ['#f2c66a', '#f7e3a1', '#e8a85a']) });
-  // тарелки жильцов на балконах (пока нет общей антенны)
+  for (let f = 0; f < HM.floors; f++) for (const wx of [126, 142, 158, 230, 246, 262]) {
+    const y = HM.top + f * HM.fh + 4, kind = R() < .3 ? 'balcony' : R() < .25 ? 'loggia' : 'plain';
+    HOUSE_ART.win.push({ x: wx, y, kind, on: R() < .42, warm: pick(R, WIN_COLS), curtain: R() < .4 });
+  }
   HOUSE_ART.dishes = Array.from({ length: 7 }, () => ({ x: pick(R, [126, 142, 158, 230, 246, 262]) + 8, y: HM.top + Math.floor(R() * 9) * HM.fh + 2 }));
+  // осенние кусты на переднем плане
+  HOUSE_ART.fg = makeCanvas(W, H, ({ g }) => { const R2 = rng(9);
+    for (const [bx, n] of [[-6, 5], [372, 4]]) for (let i = 0; i < n; i++) { const cx = bx + i * 9 + R2() * 4, cy = 214 + R2() * 6, rr = 7 + R2() * 4;
+      g.fillStyle = '#7a3b2a'; g.beginPath(); g.arc(cx, cy + 2, rr, 0, 7); g.fill(); g.fillStyle = '#c4622f'; g.beginPath(); g.arc(cx, cy, rr, 0, 7); g.fill();
+      g.fillStyle = '#e8913a'; g.beginPath(); g.arc(cx - rr * .3, cy - rr * .35, rr * .5, 0, 7); g.fill(); } });
   HOUSE_ART.built = true;
 }
-
+// окно дома: рама, свет, занавеска; балкон или лоджия
+function drawHouseWindow(w) {
+  const lit = w.on ? w.warm : '#2a2440';
+  if (w.kind === 'loggia') { rect(w.x - 2, w.y - 1, 14, 11, '#4a3f62'); rect(w.x - 1, w.y, 12, 9, lit); for (const fx of [w.x + 3, w.x + 7]) rect(fx, w.y, 1, 9, '#5e4a3a'); rect(w.x - 1, w.y + 5, 12, 1, '#5e4a3a'); rect(w.x - 2, w.y + 9, 14, 2, '#7a6f98'); return; }
+  rect(w.x - 1, w.y - 1, 12, 10, '#4a3f62'); rect(w.x, w.y, 10, 8, lit); rect(w.x + 5, w.y, 1, 8, '#4a3f62');
+  if (w.on && w.curtain) rect(w.x, w.y, 3, 8, shade(w.warm, -35));
+  if (w.on) { ctx.fillStyle = 'rgba(255,200,120,.08)'; ctx.fillRect(w.x - 3, w.y - 2, 16, 13); }
+  if (w.kind === 'balcony') { rect(w.x - 2, w.y + 8, 14, 2, HP.slab); for (let i = 0; i < 7; i++) rect(w.x - 2 + i * 2, w.y + 5, 1, 3, '#3a3050'); rect(w.x - 2, w.y + 5, 14, 1, '#3a3050'); }
+}
 // одна вещь в состоянии k: 0 — сломано/нет, 1 — отремонтировано. Между ними — анимация установки
 function drawHouseItem(id, k, t) {
   const A = (a, f) => { if (a <= 0) return; ctx.save(); ctx.globalAlpha = Math.min(1, a); f(); ctx.restore(); };
@@ -2549,9 +2626,9 @@ function drawHouseItem(id, k, t) {
       });
       break; }
     case 'lift': {    // машинное помещение лифта на крыше: после ремонта горит окно и огонёк
-      rect(186, 34, 28, 12, '#3b4460'); rect(186, 34, 28, 1, '#55607c');
-      rect(196, 37, 8, 5, k > .5 ? '#f4e6a8' : '#1f2538'); if (k > .5 && Math.sin(t / 250) > 0) rect(212, 35, 1, 1, '#7fe08a');
-      A(1 - k, () => { rect(190, 38, 3, 3, '#b8443f'); });
+      rect(130, 34, 28, 10, '#4e4569'); rect(130, 34, 28, 1, '#7a6f98');
+      rect(140, 36, 8, 5, k > .5 ? '#f4e6a8' : '#2a2440'); if (k > .5 && Math.sin(t / 250) > 0) rect(156, 35, 1, 1, '#7fe08a');
+      A(1 - k, () => { rect(134, 37, 3, 3, '#b8443f'); });
       break; }
     case 'antenna': {   // общая антенна: опускается сверху на тросе; тарелки с балконов исчезают
       A(1 - k, () => { for (const d of HOUSE_ART.dishes) { rect(d.x, d.y, 3, 4, '#c9cdd6'); rect(d.x - 1, d.y + 1, 1, 2, '#8792ad'); } });
@@ -2562,17 +2639,17 @@ function drawHouseItem(id, k, t) {
       break; }
     case 'sign': {    // вывеска на крыше: до — почти вся тёмная, после — буквы загораются по очереди
       const s = signText(), x0 = 200 - Math.round(textW(s, 6) / 2);
-      rect(x0 - 4, 10, textW(s, 6) + 8, 11, '#140b0d'); for (const px of [x0 + 10, 200, x0 + textW(s, 6) - 10]) rect(px, 21, 1, 21, '#1a1e2a');
+      rect(x0 - 4, 22, textW(s, 6) + 8, 11, '#140b0d'); for (const px of [x0 + 10, 200, x0 + textW(s, 6) - 10]) rect(px, 33, 1, 9, '#2a2440');
       let acc = 0; [...s].forEach((ch, i) => {
         const on = k >= (i + 1) / s.length || (k === 0 && i % 4 === 1 && Math.sin(t / 130 + i) > -.3);
-        text(ch, x0 + acc, 12, { size: 6, col: on ? '#ff6a45' : '#3c1714' }); acc += textW(ch, 6); });
-      if (k >= 1) A(.25 + .05 * Math.sin(t / 140), () => { ctx.save(); ctx.globalCompositeOperation = 'lighter'; rect(x0 - 6, 8, textW(s, 6) + 12, 15, '#ff4a30'); ctx.restore(); });
+        text(ch, x0 + acc, 24, { size: 6, col: on ? '#ff6a45' : '#3c1714' }); acc += textW(ch, 6); });
+      if (k >= 1) A(.25 + .05 * Math.sin(t / 140), () => { ctx.save(); ctx.globalCompositeOperation = 'lighter'; rect(x0 - 6, 20, textW(s, 6) + 12, 15, '#ff4a30'); ctx.restore(); });
       break; }
     case 'bench': A(k, () => { for (const bx of [228, 252]) { rect(bx, 193, 14, 2, '#8a5a3a'); rect(bx, 190, 14, 1, '#8a5a3a'); rect(bx + 1, 195, 1, 3, '#2a2a2a'); rect(bx + 12, 195, 1, 3, '#2a2a2a'); } }); break;
     case 'flowers': A(k, () => { for (const fx of [126, 150, 228, 254]) { rect(fx, 186, 20, 3, '#4a3a2a'); for (let i = 0; i < 6; i++) rect(fx + 1 + i * 3, 184 + (i % 2), 2, 2, ['#e05a7a', '#f2c94c', '#f4f3ee'][i % 3]); } }); break;
     case 'trees': A(k, () => { for (const [tx, s] of [[22, 1], [58, 1.2], [92, .9]]) { const h = Math.round(22 * s * Math.min(1, k * 1.2));
-      rect(tx, 200 - h, 2, h, '#5a3e2e'); ctx.fillStyle = '#3f7a52'; ctx.beginPath(); ctx.arc(tx + 1, 200 - h, 9 * s * Math.min(1, k * 1.2), 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#5a9a66'; ctx.beginPath(); ctx.arc(tx - 2, 198 - h, 4 * s * Math.min(1, k * 1.2), 0, Math.PI * 2); ctx.fill(); } }); break;
+      rect(tx, 200 - h, 2, h, '#4a3028'); ctx.fillStyle = '#b8562e'; ctx.beginPath(); ctx.arc(tx + 1, 200 - h, 9 * s * Math.min(1, k * 1.2), 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e8913a'; ctx.beginPath(); ctx.arc(tx - 2, 198 - h, 4 * s * Math.min(1, k * 1.2), 0, Math.PI * 2); ctx.fill(); } }); break;
     case 'lamps': A(k, () => { for (const lx of [104, 296]) { rect(lx, 160, 1, 32, '#1a1e28'); rect(lx - 3, 159, 7, 2, '#2a2f3c'); rect(lx - 2, 161, 5, 1, '#fff1b8');
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .18; ctx.fillStyle = '#ffd890'; ctx.beginPath(); ctx.moveTo(lx - 2, 162); ctx.lineTo(lx + 3, 162); ctx.lineTo(lx + 14, 192); ctx.lineTo(lx - 13, 192); ctx.fill(); ctx.restore(); } }); break;
     case 'parking': A(k, () => { rect(8, 204, 84, 18, '#2a3142'); for (let i = 0; i <= 4; i++) rect(8 + i * 21, 204, 1, 18, '#cfd6e4');
@@ -2584,29 +2661,55 @@ function drawHouseMap(t, anim) {
   if (!HOUSE_ART.built) buildHouseArt();
   sprite(HOUSE_ART.bg, 0, 0);
   if (Math.random() < 1 / 40) { const w = pick(Math.random, HOUSE_ART.win); w.on = !w.on; }
-  for (const w of HOUSE_ART.win) rect(w.x, w.y, 10, 8, w.on ? w.warm : '#1f2538');
+  for (const w of HOUSE_ART.win) drawHouseWindow(w);
   const ids = [...PROBLEMS.map(p => p.id), ...DECOR.map(d => d.id)];
   for (const id of ids) {
     let k = has(id) ? 1 : 0;
-    if (anim && anim.id === id) k = Math.max(0, Math.min(1, (anim.t - 1300) / 1300));
+    if (anim && anim.id === id) k = Math.max(0, Math.min(1, (anim.t - 1300) / 900));
     drawHouseItem(id, k, t);
   }
-  // идёт ремонт: леса, рабочие, искры
-  if (anim && anim.t < 2700) {
-    const [cx, cy, w, h] = HSPOT[anim.id], a = Math.min(1, anim.t / 200) * (anim.t > 2300 ? (2700 - anim.t) / 400 : 1);
-    ctx.save(); ctx.globalAlpha = a;
-    rect(cx - w / 2 - 3, cy - h / 2 - 3, 1, h + 6, '#c9a95a'); rect(cx + w / 2 + 2, cy - h / 2 - 3, 1, h + 6, '#c9a95a');
-    for (let yy = cy - h / 2 - 3; yy < cy + h / 2 + 3; yy += 6) rect(cx - w / 2 - 3, yy, w + 6, 1, 'rgba(201,169,90,.7)');
-    for (let i = 0; i < 2; i++) { const wx = cx - w / 2 + ((anim.t / 12 + i * w / 2) % w), wy = cy + h / 2 - 1;
-      rect(wx, wy - 7, 3, 4, '#f2a33a'); rect(wx, wy - 3, 3, 3, '#2c3e50'); rect(wx + 1, wy - 9, 2, 2, '#e3ad86'); rect(wx, wy - 10, 3, 1, '#f2c94c'); }
-    for (let i = 0; i < 6; i++) { const ang = anim.t / 120 + i, d = (anim.t / 7 + i * 13) % 14; rect(cx + Math.cos(ang) * d, cy + Math.sin(ang) * d * .6, 1, 1, i % 2 ? '#fff1b8' : '#f2c94c'); }
-    ctx.restore();
+  // идёт ремонт: над местом крутятся две шестерёнки, потом облачко пыли — и вещь готова
+  if (anim && anim.t < 2900) {
+    const [cx, cy] = HSPOT[anim.id], t0 = anim.t;
+    const pop = Math.min(1, t0 / 220), out = t0 > 2300 ? Math.max(0, 1 - (t0 - 2300) / 300) : 1, s = pop * out;
+    if (s > 0) {
+      const big = gearSprite(26, Math.floor(t0 / 45)), small = gearSprite(15, 16 - Math.floor(t0 / 30) % 16);
+      ctx.save(); ctx.globalAlpha = s;
+      ctx.drawImage(big, Math.round(cx - 13 - 6), Math.round(cy - 13 - 8 - (1 - pop) * 6));
+      ctx.drawImage(small, Math.round(cx + 5), Math.round(cy - 7 - 15));
+      ctx.restore();
+      if (t0 > 600 && t0 < 1300 && Math.floor(t0 / 90) % 2) for (let i = 0; i < 3; i++) rect(cx - 2 + Math.cos(t0 / 50 + i * 2) * 12, cy - 8 + Math.sin(t0 / 50 + i * 2) * 8, 1, 1, '#fff1b8');
+    }
+    // пыль при «готово»
+    if (t0 > 1300 && t0 < 2300) { const k = (t0 - 1300) / 1000;
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, d = 4 + k * 18; ctx.globalAlpha = 1 - k; rect(Math.round(cx + Math.cos(a) * d), Math.round(cy + Math.sin(a) * d * .6), 2, 2, i % 2 ? '#e8dcc8' : '#b9aec8'); }
+      ctx.globalAlpha = 1; }
   }
+  if (HOUSE_ART.fg) sprite(HOUSE_ART.fg, 0, 0);
+}
+
+const GEAR_CACHE = new Map();
+function gearSprite(size, step) {
+  const key = size + ':' + (step % 16); if (GEAR_CACHE.has(key)) return GEAR_CACHE.get(key);
+  const c = makeCanvas(size, size, ({ p }) => {
+    const R0 = size / 2, rot = (step % 16) / 16 * (Math.PI * 2 / 8), teeth = 8, rOut = R0 - .5, rBody = R0 * .78, rHole = R0 * .38;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const dx = x + .5 - R0, dy = y + .5 - R0, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx) - rot;
+      const tooth = ((a / (Math.PI * 2) * teeth) % 1 + 1) % 1 < .45;
+      const edge = tooth ? rOut : rBody;
+      if (d > edge || d < rHole) continue;
+      const rim = d > edge - 1.2 || d < rHole + 1.2, light = (-dx - dy) / (d || 1);
+      p(x, y, rim ? '#2b2733' : light > .45 ? '#e2dcd2' : light > -.2 ? '#b3aaa0' : '#857c74');
+    }
+  });
+  GEAR_CACHE.set(key, c); return c;
 }
 
 /* ---------- сцена «Мой ЖК» ---------- */
 scenes.house = {
-  enter(d) { this.t = 0; this.sel = null; this.anim = null; this.busy = false; setTouch({}); this.refresh(); if (d && d.focus) this.sel = d.focus; },
+  enter(d) { this.t = 0; this.sel = null; this.anim = null; this.busy = false; setTouch({}); this.refresh(); if (d && d.focus) this.sel = d.focus;
+    // подсказка — один раз, пока ничего не отремонтировано
+    if (!HOUSE_STATE.fixed.length && !this.hinted) { this.hinted = true; setTimeout(() => toast('E-KNOT', L(UI.hHint), 4200), 500); } },
   refresh() { API.house().then(h => { HOUSE_STATE = h; SAVE.coins = h.coins; }).catch(() => {}); },
   // что можно сделать с вещью сейчас
   status(id) {
@@ -2654,14 +2757,14 @@ scenes.house = {
     text(`★${HOUSE_STATE.score}`, 128, 5, { col: '#9fd9c2' });
     if (button(L(UI.meetings), 0, 1, 'primary', { left: 176 })) irisTo(W / 2, 120, () => go('levels'));
     if (button(L(UI.menu), 0, 1, 'dark', { left: 344 })) irisTo(W / 2, 120, () => go('title'));
-    if (HOUSE_STATE.claimable && button(`${L(UI.bonusDay)} +${HOUSE_STATE.bonus}`, 0, 22, 'alt', { left: 6 }))
+    if (HOUSE_STATE.claimable && button(`${L(UI.bonusDay)} +${HOUSE_STATE.bonus}`, 0, 34, 'alt', { left: 6 }))
       API.claim().then(r => { HOUSE_STATE = r.house; toast('E-KNOT', L(r.reward.status === 'sent' ? UI.rRewardSent : UI.rRewardGuest).replace('{n}', r.reward.points), 3200); }).catch(() => {});
     // выбор вещи на карте
     if (!this.anim && !this.busy) {
       for (const id of ids) { const [cx, cy, w, h] = HSPOT[id]; if (clickIn(cx - w / 2 - 4, cy - h / 2 - 4, w + 8, h + 8) && this.status(id).kind !== 'done') { this.sel = this.sel === id ? null : id; sfx.select(); } }
     }
     if (this.sel && !this.anim) this.drawPanel(this.sel);
-    else if (!this.anim) { rect(0, H - 13, W, 13, 'rgba(10,12,20,.75)'); text(L(UI.hHint), W / 2, H - 9, { align: 'center', col: '#cfd6e4', size: 6 }); }
+
   },
   drawPanel(id) {
     const p = PROBLEMS.find(x => x.id === id), d = DECOR.find(x => x.id === id), st = this.status(id);

@@ -16,41 +16,78 @@ const HM = { x0: 120, x1: 280, top: 46, fh: 15, floors: 9, ground: 186 };
 HM.bottom = HM.top + HM.fh * HM.floors;   // 181
 const HSPOT = {   // где на карте каждая вещь (для подсветки и нажатия)
   light: [200, 112, 20, 120], door: [200, 172, 22, 16], roof: [150, 50, 60, 16], basement: [150, 185, 50, 8],
-  playground: [346, 206, 80, 30], lift: [200, 34, 30, 14], antenna: [268, 30, 22, 24], sign: [200, 16, 140, 14],
+  playground: [346, 206, 80, 30], lift: [144, 40, 30, 14], antenna: [268, 30, 22, 24], sign: [200, 28, 130, 14],
   bench: [240, 196, 30, 12], flowers: [252, 186, 50, 6], trees: [52, 170, 90, 50], lamps: [104, 172, 16, 40], parking: [48, 212, 80, 18],
 };
 
 const HOUSE_ART = { built: false };
+// палитра по референсам: сиреневые сумерки, облака, луна, тёплые и розовые окна
+const HP = { sky0: '#1c1734', sky1: '#3b2f5c', sky2: '#7a5f8e', sky3: '#c98f8f', cloud: '#5e4f86', cloudL: '#8676ad', cloudD: '#43386a',
+  far: '#352b52', wall: '#6d6488', wallL: '#857ca0', wallD: '#544b70', stain: '#5b5378', ground: '#3b3049', groundL: '#55466a', slab: '#8f86a8' };
+const WIN_COLS = ['#f2b84a', '#f5c96a', '#e8913a', '#ec9d8f', '#9a6ad0', '#f2b84a'];
 function buildHouseArt() {
   const R = rng(5);
-  HOUSE_ART.bg = makeCanvas(W, H, ({ r, p }) => {
-    for (let y = 0; y < H; y++) { const k = y / H; r(0, y, W, 1, `rgb(${22 + k * 40 | 0},${32 + k * 40 | 0},${62 + k * 40 | 0})`); }
-    for (let y = 130; y < 190; y++) r(0, y, W, 1, `rgba(220,130,90,${((y - 130) / 60 * .25).toFixed(3)})`);
-    for (let i = 0; i < 50; i++) p(R() * W, R() * 100, R() < .2 ? '#f4f3ee' : '#9fb0cc');
-    // дальние дома
-    let x = -4; while (x < W) { const w = 14 + R() * 26, h = 20 + R() * 50; r(x, 186 - h, w, h, '#26304a'); for (let yy = 190 - h; yy < 182; yy += 5) for (let xx = x + 2; xx < x + w - 2; xx += 4) if (R() < .12) r(xx, yy, 2, 2, '#c9a65e'); x += w + 2; }
-    // земля: тротуар и двор
-    r(0, HM.ground, W, H - HM.ground, '#3a4258'); r(0, HM.ground, W, 6, '#565f78'); r(0, HM.ground, W, 1, '#7a84a0');
-    for (let i = 0; i < 120; i++) p(R() * W, HM.ground + 7 + R() * 30, pick(R, ['#323a50', '#444d66']));
-    // дом: фасад, швы панелей, балконные плиты
-    const { x0, x1, top, fh, floors } = HM;
-    r(x0, top, x1 - x0, HM.bottom - top + 5, '#5d6884'); r(x0, top, 2, HM.bottom - top + 5, '#7682a0'); r(x1 - 2, top, 2, HM.bottom - top + 5, '#4a5470');
-    r(176, top, 48, HM.bottom - top + 5, '#56607c');                              // лестничная клетка
-    for (let f = 0; f <= floors; f++) { const y = top + f * fh; r(x0, y, x1 - x0, 1, '#4c5570'); }
-    for (const sx of [148, 176, 224, 252]) r(sx, top, 1, HM.bottom - top, '#4c5570');
-    r(x0 - 2, top - 4, x1 - x0 + 4, 4, '#3b4460');                                  // парапет
-    r(x0, HM.bottom, x1 - x0, 5, '#3a4152');                                       // цоколь
-    // козырёк подъезда
-    r(184, 166, 32, 3, '#7a84a0'); r(184, 169, 32, 1, '#2c3346');
+  HOUSE_ART.bg = makeCanvas(W, H, ({ r, p, g }) => {
+    // небо: от тёмно-синего к сиреневому и розовому у горизонта
+    const stops = [[0, HP.sky0], [.45, HP.sky1], [.75, HP.sky2], [.9, HP.sky3]];
+    for (let y = 0; y < H; y++) { const k = y / 190; let i = 0; while (i < stops.length - 2 && k > stops[i + 1][0]) i++;
+      const [k0, c0] = stops[i], [k1, c1] = stops[i + 1], t = Math.max(0, Math.min(1, (k - k0) / (k1 - k0)));
+      const mix = (a, b) => Math.round(parseInt(a, 16) + (parseInt(b, 16) - parseInt(a, 16)) * t);
+      r(0, y, W, 1, `rgb(${mix(c0.slice(1, 3), c1.slice(1, 3))},${mix(c0.slice(3, 5), c1.slice(3, 5))},${mix(c0.slice(5, 7), c1.slice(5, 7))})`); }
+    for (let i = 0; i < 70; i++) { const x = R() * W, y = R() * 90; p(x, y, R() < .25 ? '#f4f3ee' : '#a99fc8'); if (R() < .08) { p(x - 1, y, '#a99fc8'); p(x + 1, y, '#a99fc8'); p(x, y - 1, '#a99fc8'); p(x, y + 1, '#a99fc8'); } }
+    // луна с кратерами
+    { const mx = 352, my = 30, mr = 13; for (let y = -mr; y <= mr; y++) for (let x = -mr; x <= mr; x++) { const d = x * x + y * y; if (d > mr * mr) continue;
+      p(mx + x, my + y, d > (mr - 1.5) ** 2 ? '#b9b0a0' : (x + y > 8 ? '#cfc6b4' : '#e6dfcf')); }
+      for (const [cx, cy, cr] of [[-4, -3, 3], [4, 4, 2], [-2, 6, 2], [5, -5, 1.5]]) for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) if (x * x + y * y <= cr * cr) p(mx + cx + x, my + cy + y, '#bdb3a2'); }
+    // облака: пухлые слои с подсветкой сверху и тенью снизу
+    const cloud = (cx, cy, n, sc) => { const blobs = []; for (let i = 0; i < n; i++) blobs.push([cx + (i - n / 2) * 9 * sc + (R() - .5) * 6, cy - Math.sin(i / (n - 1) * Math.PI) * 7 * sc, (6 + R() * 5) * sc]);
+      for (const [bx, by, br] of blobs) { g.fillStyle = HP.cloudD; g.beginPath(); g.arc(Math.round(bx), Math.round(by + 2), br, 0, 7); g.fill(); }
+      for (const [bx, by, br] of blobs) { g.fillStyle = HP.cloud; g.beginPath(); g.arc(Math.round(bx), Math.round(by), br, 0, 7); g.fill(); }
+      for (const [bx, by, br] of blobs) { g.fillStyle = HP.cloudL; g.beginPath(); g.arc(Math.round(bx - br * .3), Math.round(by - br * .35), br * .55, 0, 7); g.fill(); }
+      r(cx - n * 5 * sc, cy + 4 * sc, n * 10 * sc, 3, HP.cloudD); };
+    cloud(60, 52, 7, 1); cloud(250, 40, 6, .8); cloud(330, 70, 5, .9); cloud(150, 82, 5, .7);
+    // дальние дома: сиреневые силуэты с тёплыми окнами
+    let x = -4; while (x < W) { const w = 16 + R() * 26, h = 30 + R() * 55; r(x, 186 - h, w, h, HP.far); r(x, 186 - h, w, 1, '#463a66');
+      for (let yy = 190 - h; yy < 182; yy += 6) for (let xx = x + 2; xx < x + w - 3; xx += 5) if (R() < .18) r(xx, yy, 3, 3, pick(R, ['#e8a24a', '#d98a6a', '#c9a65e'])); x += w + 3; }
+    // земля двора
+    r(0, HM.ground, W, H - HM.ground, HP.ground); r(0, HM.ground, W, 6, HP.groundL); r(0, HM.ground, W, 1, '#8a78a0');
+    for (let i = 0; i < 140; i++) p(R() * W, HM.ground + 7 + R() * 32, pick(R, ['#332a42', '#46395a', '#4e4064']));
+    // дом: бетон с потёками, швы панелей
+    const { x0, x1, top, fh, floors } = HM, hb = HM.bottom - top + 5;
+    r(x0, top, x1 - x0, hb, HP.wall); r(x0, top, 2, hb, HP.wallL); r(x1 - 2, top, 2, hb, HP.wallD);
+    r(176, top, 48, hb, '#665d82');                                               // лестничная клетка
+    for (let f = 0; f <= floors; f++) r(x0, top + f * fh, x1 - x0, 1, HP.wallD);
+    for (const sx of [148, 176, 224, 252]) r(sx, top, 1, HM.bottom - top, HP.wallD);
+    for (let i = 0; i < 46; i++) { const sx = x0 + R() * (x1 - x0), sy = top + R() * (hb - 10); r(sx, sy, 1, 4 + R() * 12, HP.stain); if (R() < .3) r(sx - 1, sy, 3, 1, HP.stain); }
+    // закатный свет на правом торце (как на референсе)
+    for (let y = top; y < HM.bottom; y++) { r(x1 - 14, y, 12, 1, 'rgba(240,140,70,.18)'); r(x1 - 6, y, 4, 1, 'rgba(250,160,80,.22)'); }
+    r(x0 - 2, top - 4, x1 - x0 + 4, 4, '#4e4569'); r(x0 - 2, top - 4, x1 - x0 + 4, 1, '#7a6f98');      // парапет
+    r(x0, HM.bottom, x1 - x0, 5, '#463d5e');                                                        // цоколь
+    r(184, 166, 32, 3, HP.slab); r(184, 169, 32, 1, '#2c2540');                                     // козырёк
   });
-  // окна квартир: свет то загорается, то гаснет
+  // окна: у некоторых балкон (плита + решётка), у некоторых застеклённая лоджия
   HOUSE_ART.win = [];
-  for (let f = 0; f < HM.floors; f++) for (const wx of [126, 142, 158, 230, 246, 262]) HOUSE_ART.win.push({ x: wx, y: HM.top + f * HM.fh + 4, on: R() < .4, warm: pick(R, ['#f2c66a', '#f7e3a1', '#e8a85a']) });
-  // тарелки жильцов на балконах (пока нет общей антенны)
+  for (let f = 0; f < HM.floors; f++) for (const wx of [126, 142, 158, 230, 246, 262]) {
+    const y = HM.top + f * HM.fh + 4, kind = R() < .3 ? 'balcony' : R() < .25 ? 'loggia' : 'plain';
+    HOUSE_ART.win.push({ x: wx, y, kind, on: R() < .42, warm: pick(R, WIN_COLS), curtain: R() < .4 });
+  }
   HOUSE_ART.dishes = Array.from({ length: 7 }, () => ({ x: pick(R, [126, 142, 158, 230, 246, 262]) + 8, y: HM.top + Math.floor(R() * 9) * HM.fh + 2 }));
+  // осенние кусты на переднем плане
+  HOUSE_ART.fg = makeCanvas(W, H, ({ g }) => { const R2 = rng(9);
+    for (const [bx, n] of [[-6, 5], [372, 4]]) for (let i = 0; i < n; i++) { const cx = bx + i * 9 + R2() * 4, cy = 214 + R2() * 6, rr = 7 + R2() * 4;
+      g.fillStyle = '#7a3b2a'; g.beginPath(); g.arc(cx, cy + 2, rr, 0, 7); g.fill(); g.fillStyle = '#c4622f'; g.beginPath(); g.arc(cx, cy, rr, 0, 7); g.fill();
+      g.fillStyle = '#e8913a'; g.beginPath(); g.arc(cx - rr * .3, cy - rr * .35, rr * .5, 0, 7); g.fill(); } });
   HOUSE_ART.built = true;
 }
-
+// окно дома: рама, свет, занавеска; балкон или лоджия
+function drawHouseWindow(w) {
+  const lit = w.on ? w.warm : '#2a2440';
+  if (w.kind === 'loggia') { rect(w.x - 2, w.y - 1, 14, 11, '#4a3f62'); rect(w.x - 1, w.y, 12, 9, lit); for (const fx of [w.x + 3, w.x + 7]) rect(fx, w.y, 1, 9, '#5e4a3a'); rect(w.x - 1, w.y + 5, 12, 1, '#5e4a3a'); rect(w.x - 2, w.y + 9, 14, 2, '#7a6f98'); return; }
+  rect(w.x - 1, w.y - 1, 12, 10, '#4a3f62'); rect(w.x, w.y, 10, 8, lit); rect(w.x + 5, w.y, 1, 8, '#4a3f62');
+  if (w.on && w.curtain) rect(w.x, w.y, 3, 8, shade(w.warm, -35));
+  if (w.on) { ctx.fillStyle = 'rgba(255,200,120,.08)'; ctx.fillRect(w.x - 3, w.y - 2, 16, 13); }
+  if (w.kind === 'balcony') { rect(w.x - 2, w.y + 8, 14, 2, HP.slab); for (let i = 0; i < 7; i++) rect(w.x - 2 + i * 2, w.y + 5, 1, 3, '#3a3050'); rect(w.x - 2, w.y + 5, 14, 1, '#3a3050'); }
+}
 // одна вещь в состоянии k: 0 — сломано/нет, 1 — отремонтировано. Между ними — анимация установки
 function drawHouseItem(id, k, t) {
   const A = (a, f) => { if (a <= 0) return; ctx.save(); ctx.globalAlpha = Math.min(1, a); f(); ctx.restore(); };
@@ -85,9 +122,9 @@ function drawHouseItem(id, k, t) {
       });
       break; }
     case 'lift': {    // машинное помещение лифта на крыше: после ремонта горит окно и огонёк
-      rect(186, 34, 28, 12, '#3b4460'); rect(186, 34, 28, 1, '#55607c');
-      rect(196, 37, 8, 5, k > .5 ? '#f4e6a8' : '#1f2538'); if (k > .5 && Math.sin(t / 250) > 0) rect(212, 35, 1, 1, '#7fe08a');
-      A(1 - k, () => { rect(190, 38, 3, 3, '#b8443f'); });
+      rect(130, 34, 28, 10, '#4e4569'); rect(130, 34, 28, 1, '#7a6f98');
+      rect(140, 36, 8, 5, k > .5 ? '#f4e6a8' : '#2a2440'); if (k > .5 && Math.sin(t / 250) > 0) rect(156, 35, 1, 1, '#7fe08a');
+      A(1 - k, () => { rect(134, 37, 3, 3, '#b8443f'); });
       break; }
     case 'antenna': {   // общая антенна: опускается сверху на тросе; тарелки с балконов исчезают
       A(1 - k, () => { for (const d of HOUSE_ART.dishes) { rect(d.x, d.y, 3, 4, '#c9cdd6'); rect(d.x - 1, d.y + 1, 1, 2, '#8792ad'); } });
@@ -98,17 +135,17 @@ function drawHouseItem(id, k, t) {
       break; }
     case 'sign': {    // вывеска на крыше: до — почти вся тёмная, после — буквы загораются по очереди
       const s = signText(), x0 = 200 - Math.round(textW(s, 6) / 2);
-      rect(x0 - 4, 10, textW(s, 6) + 8, 11, '#140b0d'); for (const px of [x0 + 10, 200, x0 + textW(s, 6) - 10]) rect(px, 21, 1, 21, '#1a1e2a');
+      rect(x0 - 4, 22, textW(s, 6) + 8, 11, '#140b0d'); for (const px of [x0 + 10, 200, x0 + textW(s, 6) - 10]) rect(px, 33, 1, 9, '#2a2440');
       let acc = 0; [...s].forEach((ch, i) => {
         const on = k >= (i + 1) / s.length || (k === 0 && i % 4 === 1 && Math.sin(t / 130 + i) > -.3);
-        text(ch, x0 + acc, 12, { size: 6, col: on ? '#ff6a45' : '#3c1714' }); acc += textW(ch, 6); });
-      if (k >= 1) A(.25 + .05 * Math.sin(t / 140), () => { ctx.save(); ctx.globalCompositeOperation = 'lighter'; rect(x0 - 6, 8, textW(s, 6) + 12, 15, '#ff4a30'); ctx.restore(); });
+        text(ch, x0 + acc, 24, { size: 6, col: on ? '#ff6a45' : '#3c1714' }); acc += textW(ch, 6); });
+      if (k >= 1) A(.25 + .05 * Math.sin(t / 140), () => { ctx.save(); ctx.globalCompositeOperation = 'lighter'; rect(x0 - 6, 20, textW(s, 6) + 12, 15, '#ff4a30'); ctx.restore(); });
       break; }
     case 'bench': A(k, () => { for (const bx of [228, 252]) { rect(bx, 193, 14, 2, '#8a5a3a'); rect(bx, 190, 14, 1, '#8a5a3a'); rect(bx + 1, 195, 1, 3, '#2a2a2a'); rect(bx + 12, 195, 1, 3, '#2a2a2a'); } }); break;
     case 'flowers': A(k, () => { for (const fx of [126, 150, 228, 254]) { rect(fx, 186, 20, 3, '#4a3a2a'); for (let i = 0; i < 6; i++) rect(fx + 1 + i * 3, 184 + (i % 2), 2, 2, ['#e05a7a', '#f2c94c', '#f4f3ee'][i % 3]); } }); break;
     case 'trees': A(k, () => { for (const [tx, s] of [[22, 1], [58, 1.2], [92, .9]]) { const h = Math.round(22 * s * Math.min(1, k * 1.2));
-      rect(tx, 200 - h, 2, h, '#5a3e2e'); ctx.fillStyle = '#3f7a52'; ctx.beginPath(); ctx.arc(tx + 1, 200 - h, 9 * s * Math.min(1, k * 1.2), 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#5a9a66'; ctx.beginPath(); ctx.arc(tx - 2, 198 - h, 4 * s * Math.min(1, k * 1.2), 0, Math.PI * 2); ctx.fill(); } }); break;
+      rect(tx, 200 - h, 2, h, '#4a3028'); ctx.fillStyle = '#b8562e'; ctx.beginPath(); ctx.arc(tx + 1, 200 - h, 9 * s * Math.min(1, k * 1.2), 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e8913a'; ctx.beginPath(); ctx.arc(tx - 2, 198 - h, 4 * s * Math.min(1, k * 1.2), 0, Math.PI * 2); ctx.fill(); } }); break;
     case 'lamps': A(k, () => { for (const lx of [104, 296]) { rect(lx, 160, 1, 32, '#1a1e28'); rect(lx - 3, 159, 7, 2, '#2a2f3c'); rect(lx - 2, 161, 5, 1, '#fff1b8');
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .18; ctx.fillStyle = '#ffd890'; ctx.beginPath(); ctx.moveTo(lx - 2, 162); ctx.lineTo(lx + 3, 162); ctx.lineTo(lx + 14, 192); ctx.lineTo(lx - 13, 192); ctx.fill(); ctx.restore(); } }); break;
     case 'parking': A(k, () => { rect(8, 204, 84, 18, '#2a3142'); for (let i = 0; i <= 4; i++) rect(8 + i * 21, 204, 1, 18, '#cfd6e4');
@@ -120,29 +157,55 @@ function drawHouseMap(t, anim) {
   if (!HOUSE_ART.built) buildHouseArt();
   sprite(HOUSE_ART.bg, 0, 0);
   if (Math.random() < 1 / 40) { const w = pick(Math.random, HOUSE_ART.win); w.on = !w.on; }
-  for (const w of HOUSE_ART.win) rect(w.x, w.y, 10, 8, w.on ? w.warm : '#1f2538');
+  for (const w of HOUSE_ART.win) drawHouseWindow(w);
   const ids = [...PROBLEMS.map(p => p.id), ...DECOR.map(d => d.id)];
   for (const id of ids) {
     let k = has(id) ? 1 : 0;
-    if (anim && anim.id === id) k = Math.max(0, Math.min(1, (anim.t - 1300) / 1300));
+    if (anim && anim.id === id) k = Math.max(0, Math.min(1, (anim.t - 1300) / 900));
     drawHouseItem(id, k, t);
   }
-  // идёт ремонт: леса, рабочие, искры
-  if (anim && anim.t < 2700) {
-    const [cx, cy, w, h] = HSPOT[anim.id], a = Math.min(1, anim.t / 200) * (anim.t > 2300 ? (2700 - anim.t) / 400 : 1);
-    ctx.save(); ctx.globalAlpha = a;
-    rect(cx - w / 2 - 3, cy - h / 2 - 3, 1, h + 6, '#c9a95a'); rect(cx + w / 2 + 2, cy - h / 2 - 3, 1, h + 6, '#c9a95a');
-    for (let yy = cy - h / 2 - 3; yy < cy + h / 2 + 3; yy += 6) rect(cx - w / 2 - 3, yy, w + 6, 1, 'rgba(201,169,90,.7)');
-    for (let i = 0; i < 2; i++) { const wx = cx - w / 2 + ((anim.t / 12 + i * w / 2) % w), wy = cy + h / 2 - 1;
-      rect(wx, wy - 7, 3, 4, '#f2a33a'); rect(wx, wy - 3, 3, 3, '#2c3e50'); rect(wx + 1, wy - 9, 2, 2, '#e3ad86'); rect(wx, wy - 10, 3, 1, '#f2c94c'); }
-    for (let i = 0; i < 6; i++) { const ang = anim.t / 120 + i, d = (anim.t / 7 + i * 13) % 14; rect(cx + Math.cos(ang) * d, cy + Math.sin(ang) * d * .6, 1, 1, i % 2 ? '#fff1b8' : '#f2c94c'); }
-    ctx.restore();
+  // идёт ремонт: над местом крутятся две шестерёнки, потом облачко пыли — и вещь готова
+  if (anim && anim.t < 2900) {
+    const [cx, cy] = HSPOT[anim.id], t0 = anim.t;
+    const pop = Math.min(1, t0 / 220), out = t0 > 2300 ? Math.max(0, 1 - (t0 - 2300) / 300) : 1, s = pop * out;
+    if (s > 0) {
+      const big = gearSprite(26, Math.floor(t0 / 45)), small = gearSprite(15, 16 - Math.floor(t0 / 30) % 16);
+      ctx.save(); ctx.globalAlpha = s;
+      ctx.drawImage(big, Math.round(cx - 13 - 6), Math.round(cy - 13 - 8 - (1 - pop) * 6));
+      ctx.drawImage(small, Math.round(cx + 5), Math.round(cy - 7 - 15));
+      ctx.restore();
+      if (t0 > 600 && t0 < 1300 && Math.floor(t0 / 90) % 2) for (let i = 0; i < 3; i++) rect(cx - 2 + Math.cos(t0 / 50 + i * 2) * 12, cy - 8 + Math.sin(t0 / 50 + i * 2) * 8, 1, 1, '#fff1b8');
+    }
+    // пыль при «готово»
+    if (t0 > 1300 && t0 < 2300) { const k = (t0 - 1300) / 1000;
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, d = 4 + k * 18; ctx.globalAlpha = 1 - k; rect(Math.round(cx + Math.cos(a) * d), Math.round(cy + Math.sin(a) * d * .6), 2, 2, i % 2 ? '#e8dcc8' : '#b9aec8'); }
+      ctx.globalAlpha = 1; }
   }
+  if (HOUSE_ART.fg) sprite(HOUSE_ART.fg, 0, 0);
+}
+
+const GEAR_CACHE = new Map();
+function gearSprite(size, step) {
+  const key = size + ':' + (step % 16); if (GEAR_CACHE.has(key)) return GEAR_CACHE.get(key);
+  const c = makeCanvas(size, size, ({ p }) => {
+    const R0 = size / 2, rot = (step % 16) / 16 * (Math.PI * 2 / 8), teeth = 8, rOut = R0 - .5, rBody = R0 * .78, rHole = R0 * .38;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const dx = x + .5 - R0, dy = y + .5 - R0, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx) - rot;
+      const tooth = ((a / (Math.PI * 2) * teeth) % 1 + 1) % 1 < .45;
+      const edge = tooth ? rOut : rBody;
+      if (d > edge || d < rHole) continue;
+      const rim = d > edge - 1.2 || d < rHole + 1.2, light = (-dx - dy) / (d || 1);
+      p(x, y, rim ? '#2b2733' : light > .45 ? '#e2dcd2' : light > -.2 ? '#b3aaa0' : '#857c74');
+    }
+  });
+  GEAR_CACHE.set(key, c); return c;
 }
 
 /* ---------- сцена «Мой ЖК» ---------- */
 scenes.house = {
-  enter(d) { this.t = 0; this.sel = null; this.anim = null; this.busy = false; setTouch({}); this.refresh(); if (d && d.focus) this.sel = d.focus; },
+  enter(d) { this.t = 0; this.sel = null; this.anim = null; this.busy = false; setTouch({}); this.refresh(); if (d && d.focus) this.sel = d.focus;
+    // подсказка — один раз, пока ничего не отремонтировано
+    if (!HOUSE_STATE.fixed.length && !this.hinted) { this.hinted = true; setTimeout(() => toast('E-KNOT', L(UI.hHint), 4200), 500); } },
   refresh() { API.house().then(h => { HOUSE_STATE = h; SAVE.coins = h.coins; }).catch(() => {}); },
   // что можно сделать с вещью сейчас
   status(id) {
@@ -190,14 +253,14 @@ scenes.house = {
     text(`★${HOUSE_STATE.score}`, 128, 5, { col: '#9fd9c2' });
     if (button(L(UI.meetings), 0, 1, 'primary', { left: 176 })) irisTo(W / 2, 120, () => go('levels'));
     if (button(L(UI.menu), 0, 1, 'dark', { left: 344 })) irisTo(W / 2, 120, () => go('title'));
-    if (HOUSE_STATE.claimable && button(`${L(UI.bonusDay)} +${HOUSE_STATE.bonus}`, 0, 22, 'alt', { left: 6 }))
+    if (HOUSE_STATE.claimable && button(`${L(UI.bonusDay)} +${HOUSE_STATE.bonus}`, 0, 34, 'alt', { left: 6 }))
       API.claim().then(r => { HOUSE_STATE = r.house; toast('E-KNOT', L(r.reward.status === 'sent' ? UI.rRewardSent : UI.rRewardGuest).replace('{n}', r.reward.points), 3200); }).catch(() => {});
     // выбор вещи на карте
     if (!this.anim && !this.busy) {
       for (const id of ids) { const [cx, cy, w, h] = HSPOT[id]; if (clickIn(cx - w / 2 - 4, cy - h / 2 - 4, w + 8, h + 8) && this.status(id).kind !== 'done') { this.sel = this.sel === id ? null : id; sfx.select(); } }
     }
     if (this.sel && !this.anim) this.drawPanel(this.sel);
-    else if (!this.anim) { rect(0, H - 13, W, 13, 'rgba(10,12,20,.75)'); text(L(UI.hHint), W / 2, H - 9, { align: 'center', col: '#cfd6e4', size: 6 }); }
+
   },
   drawPanel(id) {
     const p = PROBLEMS.find(x => x.id === id), d = DECOR.find(x => x.id === id), st = this.status(id);
