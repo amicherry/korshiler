@@ -70,7 +70,7 @@ function dlgDraw() {
   else { const parts = DLG.name.split(' '); parts.slice(0, 2).forEach((s, i) => text(s.slice(0, 9), x + 29, y + 55 + i * 9, { align: 'center', col: '#f2c94c', size: 6 })); }
   // текст
   if (!DLG.choices) wrapText(DLG.text.slice(0, Math.floor(DLG.shown)), DLG_TW).slice(0, DLG_LINES).forEach((l, i) => text(l, x + 58, y + 9 + i * 12));
-  if (!DLG.choices && DLG.shown >= DLG.text.length && DLG.resolve) { if (Math.floor(performance.now() / 300) % 2) rect(x + w - 14, y + h - 12, 6, 4, '#f2c94c'); }
+  if (!DLG.choices && DLG.shown >= DLG.text.length && DLG.resolve && !isTouch) { if (Math.floor(performance.now() / 300) % 2) rect(x + w - 14, y + h - 12, 6, 4, '#f2c94c'); }
   if (DLG.choices) {
     // варианты — крупные кнопки в две колонки, нажимаются пальцем
     const rowsN = Math.ceil(DLG.choices.length / 2), y0 = y + Math.round((h - rowsN * CH.rowH) / 2) + 1;
@@ -331,8 +331,9 @@ scenes.tour = {
     this.run = null; API.tourStart(tour.id).then(r => this.run = r).catch(() => {});
     this.plan = null;
     // повестка собрания: какая жалоба и сколько подписей нужно
-    setTimeout(() => { toast(L(UI.meetingT).replace('{n}', tour.n), L(UI.meetingB).replace('{p}', L(this.problem.name)).replace('{g}', tour.goal), 4200);
-      if (tour.n === 1) setTimeout(() => !this.over && toast('E-KNOT', L(UI.tutTap)), 4600); }, 500);
+    const runId = this.runId = (this.runId || 0) + 1, here = () => scene === scenes.tour && this.runId === runId && !this.over;
+    setTimeout(() => { if (!here()) return; toast(L(UI.meetingT).replace('{n}', tour.n), L(UI.meetingB).replace('{p}', L(this.problem.name)).replace('{g}', tour.goal), 4200);
+      if (tour.n === 1) setTimeout(() => here() && toast('E-KNOT', L(UI.tutTap)), 4600); }, 500);
   },
   focus() { return { x: this.hero.x, y: this.hero.y - this.camY - 14 }; },
   signatures() { return Object.values(this.res).filter(r => r.status === 'yes').length; },

@@ -106,10 +106,8 @@ function buildHouseArt() {
   }
   HOUSE_ART.dishes = Array.from({ length: 7 }, () => ({ x: pick(R, [126, 142, 158, 230, 246, 262]) + 8, y: HM.top + Math.floor(R() * 9) * HM.fh + 2 }));
   // осенние кусты на переднем плане
-  HOUSE_ART.fg = makeCanvas(W, H, ({ g }) => { const R2 = rng(9);
-    for (const [bx, n] of [[-8, 2]]) for (let i = 0; i < n; i++) { const cx = bx + i * 9 + R2() * 4, cy = 214 + R2() * 6, rr = 7 + R2() * 4;
-      g.fillStyle = '#7a3b2a'; g.beginPath(); g.arc(cx, cy + 2, rr, 0, 7); g.fill(); g.fillStyle = '#c4622f'; g.beginPath(); g.arc(cx, cy, rr, 0, 7); g.fill();
-      g.fillStyle = '#e8913a'; g.beginPath(); g.arc(cx - rr * .3, cy - rr * .35, rr * .5, 0, 7); g.fill(); } });
+  HOUSE_ART.fg = makeCanvas(W, H, ({ r }) => { const R2 = rng(9);
+    pxCrown(r, R2, 14, 214, 10, 7); pxCrown(r, R2, 26, 217, 8, 5); });
   HOUSE_ART.built = true;
 }
 // окно дома: рама, свет, занавеска; балкон или лоджия
@@ -226,8 +224,8 @@ function drawHouseItem(id, k, t) {
     case 'flowers': A(k, () => { for (const fx of [126, 150, 228, 254]) { rect(fx, 186, 20, 3, '#4a3a2a'); for (let i = 0; i < 6; i++) rect(fx + 1 + i * 3, 184 + (i % 2), 2, 2, ['#e05a7a', '#f2c94c', '#f4f3ee'][i % 3]); } }); break;
     case 'trees': A(k, () => { for (const [tx, s] of [[44, 1.1], [70, .9]]) { const h = Math.round(22 * s * Math.min(1, k * 1.2));
       ctx.fillStyle = 'rgba(10,6,20,.35)'; ctx.fillRect(tx - 9, 200, 20, 2);                                  // тень
-      rect(tx, 200 - h, 2, h, '#4a3028'); ctx.fillStyle = '#b8562e'; ctx.beginPath(); ctx.arc(tx + 1, 200 - h, 9 * s * Math.min(1, k * 1.2), 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#e8913a'; ctx.beginPath(); ctx.arc(tx - 2, 198 - h, 4 * s * Math.min(1, k * 1.2), 0, Math.PI * 2); ctx.fill(); } }); break;
+      rect(tx, 200 - h, 2, h, '#4a3028'); const g2 = Math.min(1, k * 1.2), rx = Math.max(2, Math.round(9 * s * g2)), ry = Math.max(2, Math.round(10 * s * g2));
+      pxCrown(rect, rng(tx), tx + 1, 200 - h - ry * .4, rx, ry); } }); break;
     case 'lamps': A(k, () => { for (const lx of [84, 396]) { rect(lx, 160, 1, 32, '#1a1e28'); rect(lx - 3, 159, 7, 2, '#2a2f3c'); rect(lx - 2, 161, 5, 1, '#fff1b8');
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .18; ctx.fillStyle = '#ffd890'; ctx.beginPath(); ctx.moveTo(lx - 2, 162); ctx.lineTo(lx + 3, 162); ctx.lineTo(lx + 14, 192); ctx.lineTo(lx - 13, 192); ctx.fill(); ctx.restore(); } }); break;
     case 'parking': A(k, () => { rect(6, 204, 88, 18, '#2c2640'); for (let i = 0; i <= 3; i++) rect(8 + i * 28, 204, 1, 18, '#cfd6e4');

@@ -247,7 +247,7 @@ function drawIris(dt) {
 /* ---------- сцены и главный цикл ---------- */
 const scenes = {}; let scene = null;
 function go(name, data, from) {
-  scene = scenes[name]; clicks = []; for (const k in pressed) pressed[k] = false;
+  scene = scenes[name]; clicks = []; toasts.length = 0; for (const k in pressed) pressed[k] = false;
   scene.enter && scene.enter(data || {});
   const p = from || (scene.focus ? scene.focus() : { x: W / 2, y: H / 2 });
   irisFrom(p.x, p.y);
