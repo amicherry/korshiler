@@ -788,6 +788,9 @@ scenes.tour = {
     // подписи
     const n = this.votes();
     text(`${L(T.remote ? UI.votes : UI.signs)} ${n}/${T.goal}`, 132, 5, { col: n >= T.goal ? '#4caf6e' : '#f2c94c' });
+    // обещали подписать онлайн в E-KNOT — придут к концу собрания, показываем отдельно, чтобы итог не был сюрпризом
+    const pend = Object.values(this.res).filter(r => r.status === 'online').length;
+    if (pend) text(L(UI.hudOnline).replace('{n}', pend), 132, 15, { col: '#7fc4a8', size: 6 });
     if (button(L(UI.ballot), 0, 1, 'dark', { left: 244 }) && !this.busy && !DLG.open) this.ballot = !this.ballot;
     if (button(`${L(UI.raccoon)}×${this.raccoon}`, 0, 1, this.raccoon ? 'alt' : 'off', { left: 330 })) this.useRaccoon();
     text(`${this.hero.floor}${L(UI.floor)}`, 8, 22, { col: '#f4f3ee', shadow: '#0b0c10', size: 6 });
@@ -842,16 +845,23 @@ scenes.result = {
     const t2 = d.tourId === 't2';
     text(L(UI.protocol).replace('1', d.tourId ? d.tourId.slice(1) : '1'), W / 2, 18, { align: 'center', col: INK_MUTED });
     text(d.success ? (d.tourId === 'L1' ? L(UI.win) : L(UI.winMeeting)) : L(UI.lose), W / 2, 32, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
-    const rows = [[L(UI.rSigned), `${d.signatures}/${d.goal || TOURS.L1.goal}`], ['  ' + L(UI.rOnline), String(d.online)], [L(UI.rAgainst), String(d.against)], [L(UI.rThinking), String(d.thinking)]];
-    if (!d.offline) rows.push([L(UI.rScore), String(d.score) + (d.newBest ? ' ★' : '')], [L(UI.rRank), this.rank ? '#' + this.rank.rank : '…'], [L(UI.rBudget), '+₸' + d.coins]);
-    rows.forEach(([a, b], i) => { text(a, 74, 48 + i * 13, { col: INK }); text(b, 326, 48 + i * 13, { col: i === 4 && d.newBest ? INK_GOLD : INK, align: 'right' }); rect(74, 57 + i * 13, 252, 1, '#e2d9c2'); });
+    // у дверей + онлайн = всего: те же числа, что игрок видел на экране собрания
+    const online = d.online || 0, door = Math.max(0, d.signatures - online - (d.remote || 0));
+    const rows = [[L(UI.rDoor), String(door)]];
+    if (online) rows.push([L(UI.rOnline), '+' + online]);
+    if (d.remote) rows.push([L(UI.remote), '+' + d.remote]);
+    rows.push([L(UI.rTotal), `${d.signatures}/${d.goal || TOURS.L1.goal}`, d.signatures >= (d.goal || 0) ? INK_TEAL : INK_RED], [L(UI.rAgainst), String(d.against)], [L(UI.rThinking), String(d.thinking)]);
+    if (!d.offline) rows.push([L(UI.rScore), String(d.score) + (d.newBest ? ' ★' : ''), d.newBest ? INK_GOLD : INK], [L(UI.rRank), this.rank ? '#' + this.rank.rank : '…'], [L(UI.rBudget), '+₸' + d.coins]);
+    const rh = rows.length > 8 ? 10 : 11;
+    rows.forEach(([a, b, c], i) => { text(a, 74, 46 + i * rh, { col: INK }); text(b, 326, 46 + i * rh, { col: c || INK, align: 'right' }); rect(74, 55 + i * rh, 252, 1, '#e2d9c2'); });
     // бонус в приложение
     let note, col = INK_MUTED;
     if (d.offline) note = L(UI.rOffline);
+    else if (d.suspicious) { note = L(UI.rSuspicious); col = INK_RED; }
     else if (d.reward && d.reward.status === 'sent') { note = L(UI.rRewardSent).replace('{n}', d.reward.points); col = INK_TEAL; }
     else if (d.reward && d.reward.status === 'needs_login') { note = L(UI.rRewardGuest).replace('{n}', d.reward.points); col = INK_GOLD; }
     else note = d.success ? (d.first && d.problem ? L(UI.rFirstWin).replace('{p}', L(d.problem.name)) : L(UI.rReplay)) : L(UI.rRetry);
-    wrapText(note, 200).slice(0, 3).forEach((l, i) => text(l, 172, 140 + i * 10, { align: 'center', col, size: 6 }));
+    wrapText(note, 200).slice(0, 3).forEach((l, i) => text(l, 172, 46 + rows.length * rh + 4 + i * 9, { align: 'center', col, size: 6 }));
     if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(296, 154); ctx.rotate(-.25); ctx.scale(s, s); ctx.globalAlpha = k;
       ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text(d.tourId === 'L1' ? 'ОСИ' : 'ИӘ', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
     const bw = 84;

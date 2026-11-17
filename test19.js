@@ -9,4 +9,9 @@ const {chromium}=require('playwright'); const fs=require('fs');
  console.log('toasts after quick exit:', await pg.evaluate(()=>toasts.length));
  await pg.evaluate(()=>go('tour',{tour:'L1'})); await pg.waitForTimeout(900);
  console.log('toasts in level:', await pg.evaluate(()=>toasts.length));
+ // 6 у дверей + 4 онлайн: итог должен показать 6, +4 и 10/6
+ const res = await pg.evaluate(async()=>{ const run=await API.tourStart('L1'); MockServer.debugDB().runs[run.runId].startedAt-=180000;
+   const ev=[]; for(let a=1;a<=6;a++) ev.push({t:'yes',apt:a}); for(let a=7;a<=10;a++) ev.push({t:'yes',apt:a,via:'online'});
+   const r=await API.tourFinish(run, ev); go('result',{...r,tourId:'L1',goal:6,problem:PROBLEMS[0],against:0,thinking:0}); return [r.signatures,r.online]; });
+ console.log('signatures/online', res); await pg.waitForTimeout(900); await pg.screenshot({path:'shots/r_6_4.png'});
  console.log(errs); await b.close(); })();

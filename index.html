@@ -478,7 +478,11 @@ const UI = {
   lose:       { kz: 'ҚОЛТАҢБА ЖЕТПЕДІ', ru: 'ПОДПИСЕЙ НЕ ХВАТИЛО' },
   protocol:   { kz: 'ХАТТАМА №1', ru: 'ПРОТОКОЛ №1' },
   rSigned:    { kz: 'Қол қойғандар', ru: 'Подписали' },
-  rOnline:    { kz: 'оның ішінде E-KNOT арқылы', ru: 'из них через E-KNOT' },
+  rOnline:    { kz: 'Онлайн, E-KNOT арқылы', ru: 'Онлайн через E-KNOT' },
+  rSuspicious: { kz: 'Тым жылдам — сервер дауыстарды есептемеді. Әр көршімен шынымен сөйлесіңіз.', ru: 'Слишком быстро — сервер не засчитал голоса. Поговори с соседями по-настоящему.' },
+  rDoor:      { kz: 'Есік алдында қол қойды', ru: 'Подписали у дверей' },
+  rTotal:     { kz: 'Барлық дауыс', ru: 'Всего голосов' },
+  hudOnline:  { kz: '+{n} онлайн күтілуде', ru: '+{n} ждём онлайн' },
   rAgainst:   { kz: 'Қарсы', ru: 'Против' },
   rThinking:  { kz: 'Ойланып жүр', ru: 'Думают' },
   rCoins:     { kz: 'Тиын', ru: 'Монеты' },
@@ -853,7 +857,7 @@ const MockServer = (() => {
       const yes = new Map();
       for (const e of body.events || []) if (e.t === 'yes' && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt) yes.set(e.apt, e.via || 'door');
       const suspicious = seconds < 15 && yes.size > 3;                       // 10 подписей за 15 секунд не бывает
-      const own = suspicious ? 0 : yes.size, online = [...yes.values()].filter(v => v === 'online').length;
+      const own = suspicious ? 0 : yes.size, online = suspicious ? 0 : [...yes.values()].filter(v => v === 'online').length;
       const remote = 0, signatures = own;
       const success = signatures >= tour.goal;
       const score = signatures * 100 + online * 20 + (success ? 300 + Math.max(0, Math.round(600 - seconds) * 2) : 0);
@@ -1366,7 +1370,7 @@ function buildNight() {
   });
 
   // ---- дома: дальние панельки в дымке, соседний дом слева, наш дом справа ----
-  NIGHT.mid = makeCanvas(W, H, ({ r, p }) => {
+  NIGHT.mid = makeCanvas(W, H, ({ r, p, line, g }) => {
     // дальний ряд девятиэтажек
     for (const [x, w, top] of [[118, 44, 150], [168, 30, 160], [200, 40, 146], [-10, 30, 156]]) {
       r(x, top, w, 210 - top, '#3a3158'); r(x, top, w, 2, '#4a4068');
@@ -1383,43 +1387,47 @@ function buildNight() {
         if (c % 4 === 1) { r(x - 2, y + 7, 12, 4, '#4a4170'); r(x - 2, y + 7, 12, 1, '#5d5384'); }        // лоджии
         win(x, y + 1, 8, 7, { off: '#2a2442' }); } }
     r(30, lt - 10, 1, 7, '#1c1626'); r(27, lt - 8, 7, 1, '#1c1626');
-    // ===== наш дом: торец слева в тени, фасад прямо =====
-    const fx = 236, fr = 394, top = 76, fh = 16;
-    r(222, top + 6, 14, H - top, '#4a4366'); r(222, top + 6, 14, 1, '#5d5580');
-    for (let y = top + 10; y < H; y += fh) r(222, y + 10, 14, 1, '#3e3858');
-    for (let f = 0; f < 9; f++) win(226, top + 12 + f * fh, 4, 6, { on: R() < .12, off: '#262036' });
-    r(fx, top, fr - fx, H - top, '#6d6488');
-    for (let i = 0; i < 260; i++) p(fx + R() * (fr - fx), top + R() * (H - top), R() < .5 ? '#746b90' : '#655c80');
-    for (let i = 0; i < 40; i++) { const x = fx + R() * (fr - fx), y = top + R() * 100; r(x, y, 1, 3 + R() * 12, '#5f5780'); }
-    for (let y = top; y < H; y++) r(fx, y, 30, 1, `rgba(20,14,36,${(.22 * (1 - (y - top) / 160)).toFixed(3)})`);
-    r(fx, top - 4, fr - fx, 4, '#9a91b4'); r(fx, top - 4, fr - fx, 1, '#b8b0cc'); r(fx, top, fr - fx, 1, '#4e4569');   // парапет
-    r(fx, top, 1, H - top, '#857ca0');
-    const stairX = 306;
-    for (let f = 0; f < 9; f++) { const y = top + 4 + f * fh;
-      r(fx, y + fh - 4, fr - fx, 2, '#8f86a8'); r(fx, y + fh - 2, fr - fx, 1, '#4a4268');     // плиты
-      win(stairX + 3, y + 3, 6, 7, { on: R() < .7, warm: '#c4d6b4', off: '#232a3c' });
-      for (const x of [242, 258, 274, 290, 324, 340, 356, 372]) {
-        const bal = (x === 258 || x === 340) && f < 8;
-        if (bal) { r(x - 2, y + 8, 14, 4, '#7d7498'); r(x - 2, y + 8, 14, 1, '#a59cbc'); }
-        win(x, y + 1, 9, 9, { front: true });
-        if (bal && R() < .35) { r(x, y + 9, 2, 2, pick(R, ['#b8443f', '#e8e4f0', '#4c9a84'])); r(x + 4, y + 9, 2, 2, pick(R, ['#e8e4f0', '#3f6f8c'])); }
-        if (!bal && R() < .1) { r(x + 10, y + 4, 4, 4, '#cfcbd8'); r(x + 10, y + 4, 4, 1, '#e8e4f0'); }
+    // ===== главная высотка =====
+    const { TL, TR, BL, BR, STL, SBL, rows, cols } = BLD;
+    fillPoly(g, [STL, TL, BL, SBL], '#4a4366');                         // торец
+    fillPoly(g, [TL, TR, BR, BL], '#6d6488');                            // фасад
+    // фасад темнеет кверху (дальше от фонарей двора)
+    g.save(); g.beginPath(); g.moveTo(TL[0], TL[1]); g.lineTo(TR[0], TR[1]); g.lineTo(BR[0], BR[1]); g.lineTo(BL[0], BL[1]); g.closePath(); g.clip();
+    for (let y = TL[1] - 2; y < 170; y += 2) { const k = 1 - (y - TL[1]) / (170 - TL[1]); g.fillStyle = `rgba(14,18,32,${(Math.max(0, k) * .4).toFixed(3)})`; g.fillRect(0, y, W, 2); }
+    g.restore();
+    // вертикальные швы панелей и колонна лестничной клетки
+    for (let c = 2; c < cols; c += 2) { const a = FF(c / cols, 0), b = FF(c / cols, 1); line(a[0], a[1], b[0], b[1], '#5b5378'); }
+    const sc0 = 7 / cols, sc1 = 8 / cols;
+    fillPoly(g, [FF(sc0, 0), FF(sc1, 0), FF(sc1, 1), FF(sc0, 1)], '#625a80');
+    // этажи: плиты балконов (светлые полосы) и окна
+    for (let row = 0; row < rows; row++) {
+      const vb = (row + .86) / rows, a = FF(0, vb), b = FF(1, vb);
+      line(a[0], a[1], b[0], b[1], '#8f86a8'); line(a[0], a[1] + 1, b[0], b[1] + 1, '#4a4268');
+      const sa = SF(0, vb), sb = SF(1, vb); line(sa[0], sa[1], sb[0], sb[1], '#5a527a');
+      for (let c = 0; c < cols; c++) {
+        if (c === 7) { const p0 = FF((c + .3) / cols, (row + .4) / rows), p1 = FF((c + .7) / cols, (row + .62) / rows);
+          win(p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1], { on: R() < .7, warm: '#c4d6b4', off: '#232a3c' }); continue; }
+        const ctr = FF((c + .5) / cols, (row + .2) / rows), bot = FF((c + .5) / cols, (row + .7) / rows), cw = FF((c + 1) / cols, (row + .5) / rows)[0] - FF(c / cols, (row + .5) / rows)[0];
+        const ww = Math.round(cw * .66), hh = Math.max(3, Math.round(bot[1] - ctr[1]));
+        win(Math.round(ctr[0] - ww / 2), Math.round(ctr[1]), ww, hh, { front: true });
       }
+      for (let c = 0; c < 3; c++) { const p0 = SF((c + .3) / 3, (row + .26) / rows), p1 = SF((c + .62) / 3, (row + .66) / rows);
+        win(p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1], { on: R() < .14, off: '#262036' }); }
     }
-    r(stairX, top, 1, H - top, '#5b5378'); r(stairX + 12, top, 1, H - top, '#5b5378');
-    // надстройки на крыше
-    r(250, top - 10, 18, 6, '#4e4569'); r(250, top - 10, 18, 1, '#7a6f98'); r(360, top - 8, 10, 4, '#4e4569');
+    // угол дома — светлое ребро; парапет и надстройки на крыше
+    line(TL[0], TL[1], BL[0], BL[1], '#857ca0');
+    fillPoly(g, [[STL[0] - 1, STL[1] - 3], [TL[0], TL[1] - 3], [TL[0], TL[1]], [STL[0] - 1, STL[1]]], '#3a3356');
+    fillPoly(g, [[TL[0], TL[1] - 3], [TR[0] + 1, TR[1] - 3], [TR[0] + 1, TR[1]], [TL[0], TL[1]]], '#4e4569');
+    line(TL[0], TL[1] - 3, TR[0] + 1, TR[1] - 3, '#7a6f98');
+    // стойки вывески
+    for (const u of [.2, .5, .8]) { const q = FF(u, 0); r(q[0], q[1] - 9, 1, 7, '#1a1e2a'); }
   });
 
   // ---- передний план: столб с проводами (видно, куда идут), кроны деревьев, земля ----
   NIGHT.fg = makeCanvas(W, H, ({ r, p }) => {
-    const px = 196;
-    r(px, 112, 3, H - 112, '#1a1428'); r(px - 9, 116, 21, 2, '#1a1428'); r(px - 6, 122, 15, 2, '#1a1428');
-    for (const ix of [px - 8, px - 1, px + 9]) r(ix, 114, 2, 2, '#4a4458');
     const wire = (x0, y0, x1, y1, sag) => { for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) { const k = (x - x0) / (x1 - x0); p(x, Math.round(y0 + (y1 - y0) * k + Math.sin(k * Math.PI) * sag), '#1c1626'); } };
-    wire(px + 9, 115, 222, 128, 4); r(220, 126, 3, 3, '#2a2238');               // в торец нашего дома
-    wire(px - 8, 115, 120, 120, 6); r(117, 118, 3, 3, '#2a2238');               // в соседний дом
-    wire(px + 9, 123, 222, 140, 3); r(220, 138, 3, 3, '#2a2238');
+    r(116, 94, 2, 6, '#1c1626'); r(114, 94, 6, 1, '#1c1626');                      // стойка на крыше соседнего дома
+    wire(117, 95, 154, 128, 5); wire(117, 97, 153, 136, 4); r(152, 126, 3, 3, '#2a2238'); r(151, 134, 3, 3, '#2a2238');   // кронштейны на торце
     // кроны деревьев: пиксельные шапки с подсветкой сверху
     const crown = (cx, cy, w, h, d, l) => { for (let x = -w; x <= w; x += 2) { const hh = Math.round(h * Math.sqrt(Math.max(0, 1 - (x / w) ** 2)) * (.75 + .25 * Math.sin(x * 1.7 + cx)) / 2) * 2;
       r(cx + x, cy - hh, 2, hh + 40, d); if (Math.sin(x * .9 + cx) > .2) r(cx + x, cy - hh, 2, 2, l); } };
@@ -1431,17 +1439,27 @@ function buildNight() {
   NIGHT.stars = Array.from({ length: 50 }, () => ({ x: R() * W, y: R() * 50, ph: R() * 6, big: R() < .1 }));
   NIGHT.snow = Array.from({ length: 18 }, () => ({ x: R() * W, y: R() * H, v: .008 + R() * .012, dx: (R() - .3) * .015, big: R() < .3, c: pick(R, ['#c4622f', '#e8913a', '#b8562e']) }));
 
-  // ---- вывеска на крыше нашего дома ----
+  // ---- вывеска: доска, буквы и свечение (с наклоном крыши) ----
   const s = signText(); font(8);
   const tw = Math.ceil(textW(s, 8)), sw = tw + 10, sh = 13;
-  const on = makeCanvas(sw, sh, ({ r, g }) => { r(0, 0, sw, sh, '#120a0c'); r(0, 0, sw, 1, '#2a1416'); g.font = '8px ' + FONT; g.textBaseline = 'top'; g.fillStyle = '#ff6a45'; g.fillText(s, 5, 3);
-    g.fillStyle = 'rgba(255,214,190,.55)'; g.globalCompositeOperation = 'source-atop'; g.fillRect(0, 5, sw, 2); g.globalCompositeOperation = 'source-over'; r(0, 0, sw, 1, '#2a1416'); });
-  const off = makeCanvas(sw, sh, ({ r, g }) => { r(0, 0, sw, sh, '#120a0c'); r(0, 0, sw, 1, '#2a1416'); g.font = '8px ' + FONT; g.textBaseline = 'top'; g.fillStyle = '#3c1714'; g.fillText(s, 5, 3); });
-  const glow = makeCanvas(on.width + 24, on.height + 24, ({ g }) => { g.shadowColor = 'rgba(255,72,40,1)'; g.shadowBlur = 7; g.drawImage(on, 12, 12); g.drawImage(on, 12, 12); });
+  const mid = FF(.5, 0), a0 = FF(0, 0), b0 = FF(1, 0), slope = (b0[1] - a0[1]) / (b0[0] - a0[0]);
+  const a = [mid[0] - sw / 2, mid[1] - sw / 2 * slope];
+  const board = makeCanvas(sw, sh, ({ r }) => { r(0, 0, sw, sh, '#120a0c'); r(0, 0, sw, 1, '#2a1416'); r(0, sh - 1, sw, 1, '#07040a'); });
+  const letters0 = on => makeCanvas(sw, sh, ({ g }) => {
+    g.font = '8px ' + FONT; g.textBaseline = 'top'; g.fillStyle = on ? '#ff6a45' : '#3c1714'; g.fillText(s, 5, 3);
+    if (on) { g.fillStyle = 'rgba(255,214,190,.55)'; g.globalCompositeOperation = 'source-atop'; g.fillRect(0, 5, sw, 2); g.globalCompositeOperation = 'source-over'; }
+  });
   const lw0 = []; { let acc = 5; for (const ch of s) { const w = textW(ch, 8); lw0.push([Math.round(acc), Math.round(w)]); acc += w; } }
+  // доска наклонена по столбцам, а каждая буква сдвинута целиком — так текст остаётся чётким
+  const shear = on => { const src = letters0(on); return makeCanvas(sw, sh + Math.ceil(sw * Math.abs(slope)) + 1, ({ g }) => {
+    for (let x = 0; x < sw; x++) g.drawImage(board, x, 0, 1, sh, x, Math.round(x * slope), 1, sh);
+    for (const [lx, lw] of lw0) { const dy = Math.round((lx + lw / 2) * slope); g.drawImage(src, lx, 0, lw, sh, lx, dy, lw, sh); }
+  }); };
+  const on = shear(true), off = shear(false);
+  const glow = makeCanvas(on.width + 24, on.height + 24, ({ g }) => { g.shadowColor = 'rgba(255,72,40,1)'; g.shadowBlur = 7; g.drawImage(on, 12, 12); g.drawImage(on, 12, 12); });
+  // где какая буква (для мерцания)
   const letters = lw0.filter((_, i) => s[i] !== ' ');
-  const sx = Math.round(310 - sw / 2), sy = 52;
-  NIGHT.sign = { on, off, glow, x: sx, y: sy, letters, flick: -1, until: 0, legs: [sx + 8, sx + (sw >> 1), sx + sw - 9] };
+  NIGHT.sign = { on, off, glow, x: Math.round(a[0]), y: Math.round(a[1]) - 22, letters, flick: -1, until: 0 };
   NIGHT.lang = LANG;
 }
 
@@ -1470,14 +1488,13 @@ function drawNight(dt) {
   // вывеска: горит целиком, изредка одна буква подмигивает
   if (t > S.until) { S.flick = Math.random() < .5 ? Math.floor(Math.random() * S.letters.length) : -1; S.until = t + (S.flick >= 0 ? 160 + Math.random() * 380 : 900 + Math.random() * 2400); }
   const signOk = typeof HOUSE_STATE !== 'undefined' && HOUSE_STATE.fixed.includes('sign');
-  for (const lx of S.legs) rect(lx, S.y + 13, 1, 72 - S.y - 13, '#1a1e2a');
   if (signOk) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .55 + .08 * Math.sin(t / 140); ctx.drawImage(S.glow, S.x - 12, S.y - 12); ctx.restore(); ctx.drawImage(S.on, S.x, S.y); }
   else { ctx.drawImage(S.off, S.x, S.y);   // вывеска сломана: светятся лишь некоторые буквы — её чинят в последнем собрании
     S.letters.forEach(([lx, lw], i) => { if (i % 3 === 1 && Math.sin(t / 170 + i * 2) > -.4) ctx.drawImage(S.on, lx, 0, lw, S.on.height, S.x + lx, S.y, lw, S.on.height); }); }
   if (S.flick >= 0 && Math.floor(t / 60) % 3) { const [lx, lw] = S.letters[S.flick]; ctx.drawImage(S.off, lx, 0, lw, S.off.height, S.x + lx, S.y, lw, S.off.height); }
   // после 2-го тура на крыше стоит антенна (награда видна прямо в меню)
   if (typeof HOUSE_STATE !== 'undefined' && HOUSE_STATE.fixed.includes('antenna')) {
-    const x = 391, y = 70;
+    const q = FF(.95, 0), x = Math.round(q[0]), y = Math.round(q[1]) - 3;
     rect(x, y - 12, 1, 12, '#8792ad'); rect(x - 3, y - 4, 7, 1, '#5d6884');
     rect(x - 5, y - 17, 3, 7, '#cfd6e4'); rect(x - 4, y - 18, 4, 1, '#cfd6e4'); rect(x - 2, y - 15, 3, 1, '#8792ad');
     if (Math.sin(t / 300) > 0) rect(x, y - 13, 1, 1, '#ff4a3a');
@@ -2503,6 +2520,9 @@ scenes.tour = {
     // подписи
     const n = this.votes();
     text(`${L(T.remote ? UI.votes : UI.signs)} ${n}/${T.goal}`, 132, 5, { col: n >= T.goal ? '#4caf6e' : '#f2c94c' });
+    // обещали подписать онлайн в E-KNOT — придут к концу собрания, показываем отдельно, чтобы итог не был сюрпризом
+    const pend = Object.values(this.res).filter(r => r.status === 'online').length;
+    if (pend) text(L(UI.hudOnline).replace('{n}', pend), 132, 15, { col: '#7fc4a8', size: 6 });
     if (button(L(UI.ballot), 0, 1, 'dark', { left: 244 }) && !this.busy && !DLG.open) this.ballot = !this.ballot;
     if (button(`${L(UI.raccoon)}×${this.raccoon}`, 0, 1, this.raccoon ? 'alt' : 'off', { left: 330 })) this.useRaccoon();
     text(`${this.hero.floor}${L(UI.floor)}`, 8, 22, { col: '#f4f3ee', shadow: '#0b0c10', size: 6 });
@@ -2557,16 +2577,23 @@ scenes.result = {
     const t2 = d.tourId === 't2';
     text(L(UI.protocol).replace('1', d.tourId ? d.tourId.slice(1) : '1'), W / 2, 18, { align: 'center', col: INK_MUTED });
     text(d.success ? (d.tourId === 'L1' ? L(UI.win) : L(UI.winMeeting)) : L(UI.lose), W / 2, 32, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
-    const rows = [[L(UI.rSigned), `${d.signatures}/${d.goal || TOURS.L1.goal}`], ['  ' + L(UI.rOnline), String(d.online)], [L(UI.rAgainst), String(d.against)], [L(UI.rThinking), String(d.thinking)]];
-    if (!d.offline) rows.push([L(UI.rScore), String(d.score) + (d.newBest ? ' ★' : '')], [L(UI.rRank), this.rank ? '#' + this.rank.rank : '…'], [L(UI.rBudget), '+₸' + d.coins]);
-    rows.forEach(([a, b], i) => { text(a, 74, 48 + i * 13, { col: INK }); text(b, 326, 48 + i * 13, { col: i === 4 && d.newBest ? INK_GOLD : INK, align: 'right' }); rect(74, 57 + i * 13, 252, 1, '#e2d9c2'); });
+    // у дверей + онлайн = всего: те же числа, что игрок видел на экране собрания
+    const online = d.online || 0, door = Math.max(0, d.signatures - online - (d.remote || 0));
+    const rows = [[L(UI.rDoor), String(door)]];
+    if (online) rows.push([L(UI.rOnline), '+' + online]);
+    if (d.remote) rows.push([L(UI.remote), '+' + d.remote]);
+    rows.push([L(UI.rTotal), `${d.signatures}/${d.goal || TOURS.L1.goal}`, d.signatures >= (d.goal || 0) ? INK_TEAL : INK_RED], [L(UI.rAgainst), String(d.against)], [L(UI.rThinking), String(d.thinking)]);
+    if (!d.offline) rows.push([L(UI.rScore), String(d.score) + (d.newBest ? ' ★' : ''), d.newBest ? INK_GOLD : INK], [L(UI.rRank), this.rank ? '#' + this.rank.rank : '…'], [L(UI.rBudget), '+₸' + d.coins]);
+    const rh = rows.length > 8 ? 10 : 11;
+    rows.forEach(([a, b, c], i) => { text(a, 74, 46 + i * rh, { col: INK }); text(b, 326, 46 + i * rh, { col: c || INK, align: 'right' }); rect(74, 55 + i * rh, 252, 1, '#e2d9c2'); });
     // бонус в приложение
     let note, col = INK_MUTED;
     if (d.offline) note = L(UI.rOffline);
+    else if (d.suspicious) { note = L(UI.rSuspicious); col = INK_RED; }
     else if (d.reward && d.reward.status === 'sent') { note = L(UI.rRewardSent).replace('{n}', d.reward.points); col = INK_TEAL; }
     else if (d.reward && d.reward.status === 'needs_login') { note = L(UI.rRewardGuest).replace('{n}', d.reward.points); col = INK_GOLD; }
     else note = d.success ? (d.first && d.problem ? L(UI.rFirstWin).replace('{p}', L(d.problem.name)) : L(UI.rReplay)) : L(UI.rRetry);
-    wrapText(note, 200).slice(0, 3).forEach((l, i) => text(l, 172, 140 + i * 10, { align: 'center', col, size: 6 }));
+    wrapText(note, 200).slice(0, 3).forEach((l, i) => text(l, 172, 46 + rows.length * rh + 4 + i * 9, { align: 'center', col, size: 6 }));
     if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(296, 154); ctx.rotate(-.25); ctx.scale(s, s); ctx.globalAlpha = k;
       ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text(d.tourId === 'L1' ? 'ОСИ' : 'ИӘ', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
     const bw = 84;

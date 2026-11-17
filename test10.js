@@ -19,8 +19,8 @@ const {chromium}=require('playwright'); const fs=require('fs');
  await pg.evaluate(async(id)=>{ /* состарим */ }, res);
  const fin=await pg.evaluate(async()=>{ const run=await API.tourStart('L1'); await wait(10); 
    // через внутренности заглушки нельзя — поэтому подождём «по-честному» 16 сек? вместо этого 3 подписи (не подозрительно)
-   return await API.tourFinish(run,[{t:'yes',apt:1},{t:'yes',apt:2},{t:'yes',apt:2},{t:'yes',apt:99},{t:'yes',apt:13}]); });
- console.log('fin (ожидаем 2 подписи: дубль, 99 и своя 13 не считаются)', fin.signatures, 'score', fin.score);
+   return await API.tourFinish(run,[{t:'yes',apt:1},{t:'yes',apt:2},{t:'yes',apt:2},{t:'yes',apt:99},{t:'yes',apt:34}]); });
+ console.log('fin (ожидаем 2 подписи: дубль, 99 и своя 34 не считаются)', fin.signatures, 'score', fin.score);
  const again=await pg.evaluate(async()=>{ const run=await API.tourStart('L1'); const a=await API.tourFinish(run,[{t:'yes',apt:1}]); const b2=await API.tourFinish(run,[{t:'yes',apt:1},{t:'yes',apt:2}]); return [a.signatures,b2.signatures]; });
  console.log('повторная отправка той же попытки', again);
  // показать результат с бонусом

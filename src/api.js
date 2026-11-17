@@ -89,7 +89,7 @@ const MockServer = (() => {
       const yes = new Map();
       for (const e of body.events || []) if (e.t === 'yes' && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt) yes.set(e.apt, e.via || 'door');
       const suspicious = seconds < 15 && yes.size > 3;                       // 10 подписей за 15 секунд не бывает
-      const own = suspicious ? 0 : yes.size, online = [...yes.values()].filter(v => v === 'online').length;
+      const own = suspicious ? 0 : yes.size, online = suspicious ? 0 : [...yes.values()].filter(v => v === 'online').length;
       const remote = 0, signatures = own;
       const success = signatures >= tour.goal;
       const score = signatures * 100 + online * 20 + (success ? 300 + Math.max(0, Math.round(600 - seconds) * 2) : 0);
