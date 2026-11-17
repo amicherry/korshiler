@@ -169,6 +169,13 @@ function drawNight(dt) {
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .55 + .08 * Math.sin(t / 140); ctx.drawImage(S.glow, S.x - 12, S.y - 12); ctx.restore();
   ctx.drawImage(S.on, S.x, S.y);
   if (S.flick >= 0 && Math.floor(t / 60) % 3) { const [lx, lw] = S.letters[S.flick]; ctx.drawImage(S.off, lx, 0, lw, S.off.height, S.x + lx, S.y, lw, S.off.height); }
+  // после 2-го тура на крыше стоит антенна (награда видна прямо в меню)
+  if (typeof SAVE !== 'undefined' && SAVE && SAVE.tours && SAVE.tours.t2 && SAVE.tours.t2.done) {
+    const q = FF(.95, 0), x = Math.round(q[0]), y = Math.round(q[1]) - 3;
+    rect(x, y - 12, 1, 12, '#8792ad'); rect(x - 3, y - 4, 7, 1, '#5d6884');
+    rect(x - 5, y - 17, 3, 7, '#cfd6e4'); rect(x - 4, y - 18, 4, 1, '#cfd6e4'); rect(x - 2, y - 15, 3, 1, '#8792ad');
+    if (Math.sin(t / 300) > 0) rect(x, y - 13, 1, 1, '#ff4a3a');
+  }
   sprite(NIGHT.fg, 0, 0);
   for (const w of NIGHT.windows) if (w.fg) drawWin(w);
   for (const s of NIGHT.snow) { s.y += s.v * dt; s.x += s.dx * dt; if (s.y > H) { s.y = -2; s.x = Math.random() * W; } rect(s.x, s.y, s.big ? 2 : 1, s.big ? 2 : 1, 'rgba(230,236,245,.7)'); }

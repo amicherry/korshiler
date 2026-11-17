@@ -77,7 +77,11 @@ const MockServer = (() => {
       const yes = new Map();
       for (const e of body.events || []) if (e.t === 'yes' && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt) yes.set(e.apt, e.via || 'door');
       const suspicious = seconds < 15 && yes.size > 3;                       // 10 подписей за 15 секунд не бывает
-      const signatures = suspicious ? 0 : yes.size, online = [...yes.values()].filter(v => v === 'online').length;
+      const own = suspicious ? 0 : yes.size, online = [...yes.values()].filter(v => v === 'online').length;
+      // тур 2: онлайн-голоса других подъездов по формуле от «да» в своём подъезде и рассылок енота
+      const broadcasts = Math.min(tour.raccoon || 0, (body.events || []).filter(e => e.t === 'broadcast').length);
+      const remote = tour.remote && !suspicious ? Math.min(tour.remote.max, Math.floor(own * tour.remote.perYes + broadcasts * tour.remote.perBroadcast)) : 0;
+      const signatures = own + remote;
       const success = signatures >= tour.goal;
       const score = signatures * 100 + online * 20 + (success ? 300 + Math.max(0, Math.round(600 - seconds) * 2) : 0);
       const coins = signatures * 5 + (success ? 25 : 0);
@@ -92,7 +96,7 @@ const MockServer = (() => {
         if (!u.guest) { db.rewards[u.userId].push(reward); prof.rewardsTotal = (prof.rewardsTotal || 0) + reward.points; }
       }
       run.finished = true;
-      run.result = { signatures, online, success, score, best, newBest: score > prevBest, coins, totalCoins: prof.coins, reward, suspicious };
+      run.result = { signatures, own, remote, online, success, score, best, newBest: score > prevBest, coins, totalCoins: prof.coins, reward, suspicious };
       commit();
       return run.result;
     },

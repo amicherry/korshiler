@@ -120,7 +120,7 @@ scenes.title = {
   },
   start() {
     // пролог показываем один раз; «Продолжить» ведёт сразу в подъезд
-    irisTo(60, 140, () => go(!(SAVE && SAVE.created) ? 'creator' : (SAVE.seenIntro || SAVE.tours.t1) ? 'tour' : 'prologue', { tour: 't1' }));
+    irisTo(60, 140, () => go(!(SAVE && SAVE.created) ? 'creator' : SAVE.tours.t1 && SAVE.tours.t1.done ? 'tours' : (SAVE.seenIntro || SAVE.tours.t1) ? 'tour' : 'prologue', { tour: 't1' }));
   },
   draw(dt) {
     drawNight(dt);
@@ -305,14 +305,14 @@ scenes.tour = {
     const tour = this.tour = TOURS[data.tour || 't1'];
     this.res = makeResidents(tour, hashStr(USER.userId + tour.id) + (SAVE.tours[tour.id]?.tries || 0));
     const R = rng(hashStr(USER.userId) + 9);
-    this.doorLook = {}; for (let apt = 1; apt <= 20; apt++) this.doorLook[apt] = pick(R, DOOR_STYLES);
+    this.doorLook = {}; for (let apt = 1; apt <= tour.floors * tour.perFloor; apt++) this.doorLook[apt] = pick(R, DOOR_STYLES);
     this.doorLook[tour.heroApt] = { col: '#2f6f62', kind: 'metal' };
     this.bg = drawStairwell(tour.floors, apt => this.doorLook[apt]);
     this.WH = this.bg.height;
     const hf = Math.ceil(tour.heroApt / tour.perFloor);
     this.hero = { x: DOOR_X[(tour.heroApt - 1) % tour.perFloor] + 20, floor: hf, y: floorBase(hf, tour.floors), dir: -1, walkT: 0, moving: false, climb: null, knockT: 0 };
     this.minute = tour.start; this.end = tour.start + tour.duration;
-    this.events = []; this.raccoon = tour.raccoon; this.busy = false; this.ballot = false; this.goalShown = false; this.over = false;
+    this.events = []; this.raccoon = tour.raccoon; this.broadcasts = 0; this.remoteShown = 0; this.busy = false; this.ballot = false; this.goalShown = false; this.over = false;
     this.camY = clamp(this.hero.y - 165, 0, this.WH - H);
     this.talker = { floor: tour.talkerFloor, x: 112, done: false, look: { skin: '#d6a07a', hair: 'short', hairCol: '#3a2a20', top: 'hoodie', topCol: '#3b3f55', pants: '#2b2a33', hat: 'cap', capCol: '#3f6f8c', beard: true } };
     this.helper = { state: 'hidden', floor: 2, x: 104, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
@@ -320,10 +320,21 @@ scenes.tour = {
     this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
     this.run = null; API.tourStart(tour.id).then(r => this.run = r).catch(() => {});
     this.plan = null;
-    setTimeout(() => { toast('E-KNOT', L(UI.tutTap)); setTimeout(() => !this.over && toast('E-KNOT', L(UI.tut1)), 4500); }, 600);
+    if (tour.remote) this.intro2();
+    else setTimeout(() => { toast('E-KNOT', L(UI.tutTap)); setTimeout(() => !this.over && toast('E-KNOT', L(UI.tut1)), 4500); }, 600);
   },
   focus() { return { x: this.hero.x, y: this.hero.y - this.camY - 14 }; },
   signatures() { return Object.values(this.res).filter(r => r.status === 'yes').length; },
+  // тур 2: онлайн-голоса двух других подъездов — та же формула, что на сервере
+  remoteTarget() { const R = this.tour.remote; return R ? Math.min(R.max, Math.floor(this.signatures() * R.perYes + this.broadcasts * R.perBroadcast)) : 0; },
+  votes() { return this.signatures() + Math.floor(this.remoteShown); },
+  goalMet() { return this.votes() >= this.tour.goal; },
+  async intro2() {
+    this.busy = true; await wait(500);
+    dlgOpen('E-KNOT', () => EKNOT_PORT, 900);
+    await say(L(UI.t2intro1)); await say(L(UI.t2intro2)); await say(L(UI.t2intro3));
+    dlgClose(); this.busy = false;
+  },
   addTime(m) { this.minute += m; },
   base(f) { return floorBase(f, this.tour.floors); },
   nearDoor() { const h = this.hero; if (h.climb) return null; for (let d = 0; d < 4; d++) if (Math.abs(h.x - DOOR_X[d]) < 12) return (h.floor - 1) * 4 + d + 1; return null; },
@@ -339,6 +350,10 @@ scenes.tour = {
     const h = this.hero, T = this.tour;
     // время идёт, пока игрок ходит (в диалоге и в бюллетене — пауза)
     if (!this.busy && !this.ballot && !trans.phase) this.minute += dt / 1000 / T.secPerMin;
+    if (T.remote) { const tg = this.remoteTarget(), before = Math.floor(this.remoteShown);
+      if (this.remoteShown < tg) this.remoteShown = Math.min(tg, this.remoteShown + dt / 450);
+      const now = Math.floor(this.remoteShown); if (now > before && now % 5 === 0) pop(this.hero.x, this.hero.y - 62, '+5 E-KNOT', '#7fc4a8');
+      this.checkGoal(); }
     if (this.minute >= this.end && !this.busy) { this.finish(true); return; }
     // помощница возвращается с результатом
     if (this.helper.state === 'busy' && this.minute >= this.helper.doneAt) this.helperDone();
@@ -528,7 +543,7 @@ scenes.tour = {
     sfx.stamp(); this.events.push({ t: 'yes', apt: r.apt, via });
     pop(DOOR_X[r.d], this.base(r.floor) - 70, '+1 ✓', '#4caf6e');
     this.stampT = 900;
-    if (!this.goalShown && this.signatures() >= this.tour.goal) { this.goalShown = true; setTimeout(() => toast('E-KNOT', L(UI.goalDone), 4200), 400); }
+    this.checkGoal(400);
   },
   async endVisit(r) { dlgClose(); sfx.door(); await tweenDoor(r, 0); this.busy = false; },
 
@@ -563,7 +578,11 @@ scenes.tour = {
       r.mood += 22; if (r.mood >= 60) { r.status = 'yes'; this.events.push({ t: 'yes', apt: r.apt, via: 'helper' }); n++; } else r.status = 'thinking';
     }
     toast(L(UI.helperName), L(UI.helperDone).replace('{f}', f).replace('{n}', n));
-    if (!this.goalShown && this.signatures() >= this.tour.goal) { this.goalShown = true; setTimeout(() => toast('E-KNOT', L(UI.goalDone), 4200), 4000); }
+    this.checkGoal(4000);
+  },
+  checkGoal(delay = 0) {
+    if (this.goalShown || !this.goalMet()) return; this.goalShown = true;
+    setTimeout(() => toast('E-KNOT', L(this.tour.remote ? UI.goalDone2 : UI.goalDone), 4200), delay);
   },
   /* ---- енот: рассылка в E-KNOT ---- */
   useRaccoon() {
@@ -579,7 +598,9 @@ scenes.tour = {
       if (R() >= chance) continue;
       r.status = 'online'; this.events.push({ t: 'online', apt: r.apt, via: 'raccoon' }); n++;
     }
+    this.events.push({ t: 'broadcast' }); this.broadcasts++;
     setTimeout(() => toast(L(UI.raccoonT), L(UI.raccoonB) + ' (+' + n + ')'), 900);
+    if (this.tour.remote) setTimeout(() => toast('E-KNOT', L(UI.remoteToast).replace('{n}', this.tour.remote.perBroadcast)), 3600);
   },
   /* ---- конец тура ---- */
   async finish(timeUp) {
@@ -593,13 +614,13 @@ scenes.tour = {
     try { result = await API.tourFinish(this.run, this.events); }
     catch (e) {
       // сервер не ответил — показываем итог, посчитанный в игре, но без рейтинга и бонусов
-      const yes = new Set(this.events.filter(e => e.t === 'yes').map(e => e.apt)), n = yes.size, ok = n >= this.tour.goal;
-      result = { signatures: n, online: this.events.filter(e => e.t === 'yes' && e.via === 'online').length, success: ok, coins: 0, score: null, offline: true };
+      const yes = new Set(this.events.filter(e => e.t === 'yes').map(e => e.apt)), own = yes.size, remote = this.remoteTarget(), n = own + remote, ok = n >= this.tour.goal;
+      result = { signatures: n, own, remote, online: this.events.filter(e => e.t === 'yes' && e.via === 'online').length, success: ok, coins: 0, score: null, offline: true };
     }
     const T = this.tour.id, prev = SAVE.tours[T] || { tries: 0, best: 0, done: false };
     SAVE.tours[T] = { tries: prev.tries + 1, best: Math.max(prev.best, result.signatures), done: prev.done || result.success };
     if (result.totalCoins != null) SAVE.coins = result.totalCoins; persist();
-    const stats = { ...result, against: Object.values(this.res).filter(r => r.status === 'no').length, thinking: Object.values(this.res).filter(r => r.status === 'thinking').length };
+    const stats = { ...result, tourId: this.tour.id, goal: this.tour.goal, against: Object.values(this.res).filter(r => r.status === 'no').length, thinking: Object.values(this.res).filter(r => r.status === 'thinking').length };
     setTimeout(() => irisTo(this.hero.x, this.hero.y - this.camY - 14, () => go('result', stats)), timeUp ? 1200 : 200);
   },
 
@@ -696,35 +717,42 @@ scenes.tour = {
     text(`${hh}:${String(mm).padStart(2, '0')}`, 19, 5, { col: left < 8 ? '#e98f6f' : '#f4f3ee' });
     rect(64, 6, 60, 6, '#2b2a33'); rect(64, 6, Math.round(60 * clamp(left / T.duration, 0, 1)), 6, left < 8 ? '#e98f6f' : '#7fc4a8');
     // подписи
-    const n = this.signatures();
-    text(`${L(UI.signs)} ${n}/${T.goal}`, 132, 5, { col: n >= T.goal ? '#4caf6e' : '#f2c94c' });
+    const n = this.votes();
+    text(`${L(T.remote ? UI.votes : UI.signs)} ${n}/${T.goal}`, 132, 5, { col: n >= T.goal ? '#4caf6e' : '#f2c94c' });
     if (button(L(UI.ballot), 0, 1, 'dark', { left: 244 }) && !this.busy && !DLG.open) this.ballot = !this.ballot;
     if (button(`${L(UI.raccoon)}×${this.raccoon}`, 0, 1, this.raccoon ? 'alt' : 'off', { left: 330 })) this.useRaccoon();
     text(`${this.hero.floor}${L(UI.floor)}`, 8, 22, { col: '#f4f3ee', shadow: '#0b0c10', size: 6 });
-    if (n >= T.goal && !this.busy && !DLG.open) { if (button(L(UI.finish), W / 2, 22, 'primary')) this.finish(false); }
+    if (this.goalMet() && !this.busy && !DLG.open) { if (button(L(UI.finish), W / 2, 22, 'primary')) this.finish(false); }
   },
   drawBallot() {
     const T = this.tour;
     rect(0, 0, W, H, 'rgba(11,12,16,.55)');
     paper(40, 22, 320, 192, 8);
     text(L(UI.ballotTitle), W / 2, 30, { align: 'center', col: INK_RED });
+    const rowH = T.floors > 5 ? 13 : 24, ch = rowH - 2;
     for (let f = T.floors; f >= 1; f--) {
-      const y = 46 + (T.floors - f) * 24;
-      text(`${f}`, 54, y + 6, { col: INK_MUTED });
+      const y = 42 + (T.floors - f) * rowH;
+      text(`${f}`, 54, y + Math.round(ch / 2) - 3, { col: INK_MUTED, size: 6 });
       for (let d = 0; d < 4; d++) {
         const apt = (f - 1) * 4 + d + 1, x = 68 + d * 70, r = this.res[apt];
-        rect(x, y, 64, 20, '#e2d9c2'); rect(x, y + 19, 64, 1, '#cfc3a5');
-        text(String(apt), x + 3, y + 7, { col: INK, size: 6 });
+        rect(x, y, 64, ch, '#e2d9c2'); rect(x, y + ch - 1, 64, 1, '#cfc3a5');
+        const ty = y + Math.round(ch / 2) - 3;
+        text(String(apt), x + 3, ty, { col: INK, size: 6 });
         const st = apt === T.heroApt ? 'me' : r.status;
-        if (ICONS[st]) sprite(ICONS[st], x + 17, y + 5);
+        if (ICONS[st]) sprite(ICONS[st], x + 17, y + Math.round((ch - 9) / 2));
         const nm = apt === T.heroApt ? L(UI.st.me) : (r.status === 'unknown' ? '' : r.name.split(' ')[0]);
-        text(nm.length > 6 ? nm.slice(0, 5) + '.' : nm, x + 28, y + 7, { col: INK_MUTED, size: 6 });
+        text(nm.length > 6 ? nm.slice(0, 5) + '.' : nm, x + 28, ty, { col: INK_MUTED, size: 6 });
       }
+    }
+    if (T.remote) {   // полоска онлайн-голосов двух других подъездов
+      const y = 42 + T.floors * rowH + 2, k = Math.floor(this.remoteShown) / T.remote.max;
+      text(L(UI.remote), 68, y, { col: INK, size: 6 }); text(`${Math.floor(this.remoteShown)}/${T.remote.max}`, 332, y, { col: INK_TEAL, size: 6, align: 'right' });
+      rect(68, y + 8, 264, 4, '#e2d9c2'); rect(68, y + 8, Math.round(264 * k), 4, '#4c9a84');
     }
     const cnt = s => Object.values(this.res).filter(r => r.status === s).length;
     const leg = [['yes', cnt('yes')], ['online', cnt('online')], ['thinking', cnt('thinking')], ['no', cnt('no')], ['away', cnt('away')], ['noanswer', cnt('noanswer')]];
-    leg.forEach(([k, v], i) => { const x = 62 + i * 46; sprite(ICONS[k], x, 170); text(String(v), x + 12, 171, { col: INK }); });
-    if (button(L(UI.close), W / 2, 188, 'alt')) this.ballot = false;
+    const ly = T.remote ? 174 : 170; leg.forEach(([k, v], i) => { const x = 62 + i * 46; sprite(ICONS[k], x, ly); text(String(v), x + 12, ly + 1, { col: INK }); });
+    if (button(L(UI.close), W / 2, T.remote ? 190 : 188, 'alt')) this.ballot = false;
   },
 };
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -741,9 +769,11 @@ scenes.result = {
     const d = this.d;
     drawNight(dt);
     paper(56, 10, 288, 210, 11);
-    text(L(UI.protocol), W / 2, 18, { align: 'center', col: INK_MUTED });
-    text(d.success ? L(UI.win) : L(UI.lose), W / 2, 32, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
-    const rows = [[L(UI.rSigned), `${d.signatures}/${TOURS.t1.goal}`], ['  ' + L(UI.rOnline), String(d.online)], [L(UI.rAgainst), String(d.against)], [L(UI.rThinking), String(d.thinking)]];
+    const t2 = d.tourId === 't2';
+    text(L(UI.protocol).replace('1', t2 ? '2' : '1'), W / 2, 18, { align: 'center', col: INK_MUTED });
+    text(d.success ? L(t2 ? UI.win2 : UI.win) : L(t2 ? UI.lose2 : UI.lose), W / 2, 32, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
+    const rows = t2 ? [[L(UI.votes), `${d.signatures}/${d.goal}`], ['  ' + L(UI.rOwn), String(d.own)], ['  ' + L(UI.rRemote), String(d.remote)], [L(UI.rAgainst), String(d.against)]]
+      : [[L(UI.rSigned), `${d.signatures}/${d.goal || TOURS.t1.goal}`], ['  ' + L(UI.rOnline), String(d.online)], [L(UI.rAgainst), String(d.against)], [L(UI.rThinking), String(d.thinking)]];
     if (!d.offline) rows.push([L(UI.rScore), String(d.score) + (d.newBest ? ' ★' : '')], [L(UI.rRank), this.rank ? '#' + this.rank.rank : '…'], [L(UI.rCoins), '+' + d.coins]);
     rows.forEach(([a, b], i) => { text(a, 74, 48 + i * 13, { col: INK }); text(b, 326, 48 + i * 13, { col: i === 4 && d.newBest ? INK_GOLD : INK, align: 'right' }); rect(74, 57 + i * 13, 252, 1, '#e2d9c2'); });
     // бонус в приложение
@@ -751,14 +781,46 @@ scenes.result = {
     if (d.offline) note = L(UI.rOffline);
     else if (d.reward && d.reward.status === 'sent') { note = L(UI.rRewardSent).replace('{n}', d.reward.points); col = INK_TEAL; }
     else if (d.reward && d.reward.status === 'needs_login') { note = L(UI.rRewardGuest).replace('{n}', d.reward.points); col = INK_GOLD; }
-    else note = d.success ? L(UI.rNext) : L(UI.rRetry);
+    else note = d.success ? L(t2 ? UI.rNext2 : UI.rNext) : L(UI.rRetry);
     wrapText(note, 200).slice(0, 3).forEach((l, i) => text(l, 172, 140 + i * 10, { align: 'center', col, size: 6 }));
     if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(296, 154); ctx.rotate(-.25); ctx.scale(s, s); ctx.globalAlpha = k;
-      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text('ОСИ', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
+      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text(t2 ? 'ИӘ 51%' : 'ОСИ', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
     const bw = 84;
     if (button(L(UI.menu), 108, 186, 'alt', { w: bw })) irisTo(108, 194, () => go('title'));
     if (button(L(UI.rating), 200, 186, 'alt', { w: bw })) irisTo(200, 194, () => go('leaderboard', { from: 'result' }));
-    if (button(L(UI.again), 292, 186, 'primary', { w: bw })) irisTo(292, 194, () => go('tour', { tour: 't1' }));
+    if (button(L(UI.again), 292, 186, 'primary', { w: bw })) irisTo(292, 194, () => go('tour', { tour: d.tourId || 't1' }));
+  },
+};
+
+/* ============================================================
+   СЦЕНА: выбор тура
+   ============================================================ */
+scenes.tours = {
+  enter() { this.sel = SAVE.tours.t1 && SAVE.tours.t1.done ? 1 : 0; setTouch({ act: L(UI.play2) }); },
+  list() { return ['t1', 't2'].map(id => ({ id, T: TOURS[id], open: !TOURS[id].unlock || (SAVE.tours[TOURS[id].unlock] || {}).done, st: SAVE.tours[id] || {} })); },
+  play(i) { const c = this.list()[i]; if (!c.open) { toast('E-KNOT', L(UI.locked), 2000); return; } irisTo(W / 2, 120, () => go('tour', { tour: c.id })); },
+  update() {
+    if (hit('left') || hit('up')) this.sel = 0; if (hit('right') || hit('down')) this.sel = 1;
+    if (hit('act')) this.play(this.sel); if (hit('back')) irisTo(W / 2, 120, () => go('title'));
+  },
+  draw(dt) {
+    drawNight(dt);
+    text(L(UI.tours), W / 2, 16, { align: 'center', col: '#f4f3ee', shadow: '#0b0c10' });
+    this.list().forEach((c, i) => {
+      const x = 40 + i * 168, y = 34, w = 152, h = 136, sel = i === this.sel;
+      frameBox(x, y, w, h, .92); if (sel) { rect(x, y, w, 1, '#f2c94c'); rect(x, y + h - 1, w, 1, '#f2c94c'); rect(x, y, 1, h, '#f2c94c'); rect(x + w - 1, y, 1, h, '#f2c94c'); }
+      if (clickIn(x, y, w, h - 24)) { if (this.sel === i) this.play(i); else this.sel = i; }
+      // маленькая картинка дома: этажи и окна
+      const fl = c.T.floors, st = Math.min(7, Math.floor(46 / fl)), bh = fl * st, bx = x + w / 2 - 24, by = y + 62 - bh;
+      rect(bx, by, 48, bh, '#4b5470'); for (let f = 0; f < fl; f++) for (let k = 0; k < 4; k++) rect(bx + 4 + k * 11, by + 1 + f * st, 6, st - 2, (f * 4 + k + i) % 3 ? '#232a3c' : '#f2c66a');
+      if (i === 1) { rect(bx + 34, by - 9, 1, 9, '#8792ad'); rect(bx + 30, by - 10, 9, 2, (SAVE.tours.t2 || {}).done ? '#cfd6e4' : '#55607c'); }
+      text(L(UI.tourName[c.id]), x + w / 2, y + 72, { align: 'center', col: c.open ? '#f4f3ee' : '#8792ad', size: 6 });
+      wrapText(L(UI.tourDesc[c.id]), w - 14, 6).slice(0, 2).forEach((l, j) => text(l, x + w / 2, y + 83 + j * 8, { align: 'center', col: '#9fd9c2', size: 6 }));
+      if (!c.open) text(L(UI.locked), x + w / 2, y + 102, { align: 'center', col: '#e88a7a', size: 6 });
+      else if (c.st.tries) text(`${L(UI.best)}: ${c.st.best}${c.st.done ? ' ✓' : ''}`, x + w / 2, y + 102, { align: 'center', col: c.st.done ? '#7fc4a8' : '#cfd6e4', size: 6 });
+      if (button(L(UI.play2), x + w / 2, y + h - 20, c.open ? (sel ? 'primary' : 'alt') : 'off', { w: 100 })) this.play(i);
+    });
+    if (button(L(UI.back), W / 2, 188, 'alt')) irisTo(W / 2, 120, () => go('title'));
   },
 };
 
