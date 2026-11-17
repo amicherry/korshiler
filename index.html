@@ -2802,6 +2802,8 @@ scenes.house = {
         if (best) { clicks.splice(clicks.indexOf(c), 1); this.sel = this.sel === best ? null : best; sfx.select(); } }
     }
     if (this.sel && !this.anim) this.drawPanel(this.sel);
+    // нажатие мимо кнопок закрывает карточку снизу
+    if (this.sel && clicks.some(c => c.y > 20)) { clicks.length = 0; this.sel = null; }
 
   },
   drawPanel(id) {
