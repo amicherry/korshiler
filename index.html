@@ -2278,7 +2278,10 @@ scenes.tour = {
   updateCam(dt) {
     const target = clamp(this.hero.y - (DLG.open ? DLG_BOX.y - 22 : 165), 0, this.WH - H);
     this.camY = lerp(this.camY, target, Math.min(1, dt / 160));
-    this.camX = lerp(this.camX, clamp(this.hero.x - W / 2, 0, SW - W), Math.min(1, dt / 200));
+    // по горизонтали камера стоит, пока герой в средней части экрана (лестница целиком в ней) — без качки на пролётах
+    const sx = this.hero.x - this.camX; let tx = this.camX;
+    if (sx < 120) tx = this.hero.x - 120; else if (sx > 280) tx = this.hero.x - 280;
+    this.camX = lerp(this.camX, clamp(tx, 0, SW - W), Math.min(1, dt / 200));
   },
   startClimb(d) {
     const h = this.hero, b = this.base(h.floor);
@@ -2806,12 +2809,12 @@ function tourInfo(i) {
 }
 
 // геометрия дома на карте
-const HM = { x0: 120, x1: 280, top: 41, fh: 11, floors: 13, ground: 186 };   // 13 этажей, как в подъезде
+const HM = { x0: 100, x1: 300, top: 41, fh: 11, floors: 13, ground: 186 };   // 13 этажей, как в подъезде
 HM.bottom = HM.top + HM.fh * HM.floors;   // 184
 const HSPOT = {   // где на карте каждая вещь (для подсветки и нажатия)
-  light: [200, 112, 20, 130], door: [200, 174, 22, 16], roof: [170, 41, 60, 12], basement: [112, 181, 20, 12],
+  light: [200, 112, 20, 130], door: [200, 174, 22, 16], roof: [170, 41, 60, 12], basement: [92, 181, 20, 12],
   playground: [348, 206, 90, 30], lift: [140, 37, 30, 12], antenna: [268, 26, 22, 24], sign: [200, 28, 130, 14],
-  bench: [246, 194, 40, 10], flowers: [252, 186, 50, 6], trees: [58, 180, 60, 40], lamps: [84, 176, 16, 40], parking: [48, 212, 80, 18],
+  bench: [246, 194, 40, 10], flowers: [252, 186, 50, 6], trees: [51, 180, 50, 40], lamps: [78, 176, 16, 40], parking: [48, 212, 80, 18],
 };
 
 const HOUSE_ART = { built: false };
@@ -2846,7 +2849,7 @@ function buildHouseArt() {
       r(x0, bot, x1 - x0, 6, '#3a3356');
       for (let y = top - 3; y < bot + 6; y++) r(x0, y, x1 - x0, 1, 'rgba(24,18,44,.28)');                     // дымка: соседи темнее нашего дома
     };
-    neighbour(-14, 104, 60, 9, 14); neighbour(298, 414, 54, 10, 13);
+    neighbour(-14, 84, 60, 9, 14); neighbour(316, 414, 54, 10, 13);
     // земля двора
     r(0, HM.ground, W, H - HM.ground, HP.ground); r(0, HM.ground, W, 6, HP.groundL); r(0, HM.ground, W, 1, '#8a78a0');
     for (let i = 0; i < 140; i++) p(R() * W, HM.ground + 7 + R() * 32, pick(R, ['#332a42', '#46395a', '#4e4064']));
@@ -2855,7 +2858,7 @@ function buildHouseArt() {
     r(x0, top, x1 - x0, hb, HP.wall); r(x0, top, 2, hb, HP.wallL); r(x1 - 2, top, 2, hb, HP.wallD);
     r(176, top, 48, hb, '#665d82');                                               // лестничная клетка
     for (let f = 0; f <= floors; f++) r(x0, top + f * fh, x1 - x0, 1, HP.wallD);
-    for (const sx of [148, 176, 224, 252]) r(sx, top, 1, HM.bottom - top, HP.wallD);
+    for (const sx of [138, 176, 224, 262]) r(sx, top, 1, HM.bottom - top, HP.wallD);
     for (let i = 0; i < 46; i++) { const sx = x0 + R() * (x1 - x0), sy = top + R() * (hb - 10); r(sx, sy, 1, 4 + R() * 12, HP.stain); if (R() < .3) r(sx - 1, sy, 3, 1, HP.stain); }
     // закатный свет на правом торце (как на референсе)
     for (let y = top; y < HM.bottom; y++) { r(x1 - 14, y, 12, 1, 'rgba(240,140,70,.18)'); r(x1 - 6, y, 4, 1, 'rgba(250,160,80,.22)'); }
@@ -2867,15 +2870,15 @@ function buildHouseArt() {
     for (const ax of [208, 236]) { r(ax, top - 18, 1, 14, '#5a5070'); r(ax - 4, top - 16, 9, 1, '#5a5070'); r(ax - 3, top - 13, 7, 1, '#5a5070'); }
     for (let k = 0; k <= 40; k++) p(236 + k, top - 4 + Math.round(Math.sin(k / 40 * Math.PI) * 3), '#2a2238');          // кабель по крыше
     // ===== водостоки по углам: воронка, хомуты, отлив внизу =====
-    for (const dx of [121, 277]) { r(dx - 1, top - 3, 4, 3, '#7a6f98'); r(dx, top, 2, HM.bottom - top + 3, '#8a80a8'); r(dx, top, 1, HM.bottom - top + 3, '#a198bd');
+    for (const dx of [101, 297]) { r(dx - 1, top - 3, 4, 3, '#7a6f98'); r(dx, top, 2, HM.bottom - top + 3, '#8a80a8'); r(dx, top, 1, HM.bottom - top + 3, '#a198bd');
       for (let yy = top + 6; yy < HM.bottom; yy += HM.fh * 2) r(dx - 1, yy, 4, 1, '#4e4569'); r(dx - 1, HM.bottom + 3, 5, 2, '#8a80a8'); }
     // ===== жёлтая газовая труба вдоль фасада, с опусками и кронштейнами =====
     { const gy = HM.bottom - HM.fh - 1;   // по шву между первым и вторым этажом, не через окна
-      r(122, gy, 154, 2, '#d9b43a'); r(122, gy, 154, 1, '#f2d26a'); for (let xx = 128; xx < 276; xx += 16) r(xx, gy + 2, 1, 1, '#6a5a2a');
-      r(124, gy, 2, 186 - gy, '#d9b43a'); r(123, 183, 4, 3, '#8a7a3a'); r(250, gy - 4, 2, 4, '#d9b43a'); r(249, gy - 5, 4, 2, '#8a7a3a'); }
+      r(102, gy, 196, 2, '#d9b43a'); r(102, gy, 196, 1, '#f2d26a'); for (let xx = 108; xx < 296; xx += 16) r(xx, gy + 2, 1, 1, '#6a5a2a');
+      r(104, gy, 2, 186 - gy, '#d9b43a'); r(103, 183, 4, 3, '#8a7a3a'); r(250, gy - 4, 2, 4, '#d9b43a'); r(249, gy - 5, 4, 2, '#8a7a3a'); }
     // ===== вход в подвал: пристройка с наклонной крышей, железная дверь и табличка =====
-    r(104, 177, 16, 9, '#5b5378'); r(103, 175, 18, 2, '#8f86a8'); for (let i = 0; i < 5; i++) r(103 + i * 4, 174 - Math.floor(i / 2), 4, 1, '#8f86a8');
-    r(108, 179, 7, 7, '#2a2440'); r(109, 180, 5, 6, '#4a5260'); r(112, 182, 1, 1, '#c9a95a');
+    r(84, 177, 16, 9, '#5b5378'); r(83, 175, 18, 2, '#8f86a8'); for (let i = 0; i < 5; i++) r(83 + i * 4, 174 - Math.floor(i / 2), 4, 1, '#8f86a8');
+    r(88, 179, 7, 7, '#2a2440'); r(89, 180, 5, 6, '#4a5260'); r(92, 182, 1, 1, '#c9a95a');
     // ===== площадка для мусора: бетонная плита, забор, два контейнера =====
     r(8, 191, 20, 2, '#5a4a6a'); r(8, 184, 1, 8, '#4a3e5a'); r(27, 184, 1, 8, '#4a3e5a'); r(8, 184, 20, 1, '#4a3e5a');
     for (const [cx, col] of [[10, '#3f6f5a'], [18, '#3f5a7a']]) { r(cx, 186, 7, 5, col); r(cx, 185, 7, 1, shade(col, 25)); r(cx + 1, 191, 1, 1, '#1a1424'); r(cx + 5, 191, 1, 1, '#1a1424'); }
@@ -2894,12 +2897,13 @@ function buildHouseArt() {
   });
   // окна: у некоторых балкон (плита + решётка), у некоторых застеклённая лоджия
   HOUSE_ART.win = [];
-  for (let f = 0; f < HM.floors; f++) for (const wx of [126, 142, 158, 230, 246, 262]) {
+  const WCOLS = [104, 122, 140, 158, 228, 246, 264, 282];   // по 4 квартиры с каждой стороны лестницы, как в подъезде
+  for (let f = 0; f < HM.floors; f++) for (const wx of WCOLS) {
     const y = HM.top + f * HM.fh + 2, kind = R() < .3 ? 'balcony' : R() < .25 ? 'loggia' : 'plain';
     const ex = R(); HOUSE_ART.win.push({ x: wx, y, kind, on: R() < .42, warm: pick(R, WIN_COLS), curtain: R() < .4, dim: R() < .3, tv: R() < .08,
       ac: kind === 'plain' && ex < .14, open: kind === 'plain' && ex > .9, laundry: kind === 'balcony' && R() < .5, plants: kind !== 'plain' && R() < .45 });
   }
-  HOUSE_ART.dishes = Array.from({ length: 7 }, () => ({ x: pick(R, [126, 142, 158, 230, 246, 262]) + 8, y: HM.top + Math.floor(R() * HM.floors) * HM.fh + 1 }));
+  HOUSE_ART.dishes = Array.from({ length: 7 }, () => ({ x: pick(R, WCOLS) + 8, y: HM.top + Math.floor(R() * HM.floors) * HM.fh + 1 }));
   // осенние кусты на переднем плане
   HOUSE_ART.fg = makeCanvas(W, H, ({ r }) => { const R2 = rng(9);
     pxCrown(r, R2, 14, 214, 10, 7); pxCrown(r, R2, 26, 217, 8, 5); });
@@ -3018,11 +3022,11 @@ function drawHouseItem(id, k, t) {
       break; }
     case 'bench': A(k, () => { for (const bx of [230, 256]) { rect(bx, 193, 10, 2, '#8a5a3a'); rect(bx, 190, 10, 1, '#8a5a3a'); rect(bx + 1, 195, 1, 2, '#2a2a2a'); rect(bx + 8, 195, 1, 2, '#2a2a2a'); } }); break;
     case 'flowers': A(k, () => { for (const fx of [126, 150, 228, 254]) { rect(fx, 186, 20, 3, '#4a3a2a'); for (let i = 0; i < 6; i++) rect(fx + 1 + i * 3, 184 + (i % 2), 2, 2, ['#e05a7a', '#f2c94c', '#f4f3ee'][i % 3]); } }); break;
-    case 'trees': A(k, () => { for (const [tx, s] of [[44, 1.1], [70, .9]]) { const h = Math.round(22 * s * Math.min(1, k * 1.2));
+    case 'trees': A(k, () => { for (const [tx, s] of [[40, 1.1], [62, .9]]) { const h = Math.round(22 * s * Math.min(1, k * 1.2));
       ctx.fillStyle = 'rgba(10,6,20,.35)'; ctx.fillRect(tx - 9, 200, 20, 2);                                  // тень
       rect(tx, 200 - h, 2, h, '#4a3028'); const g2 = Math.min(1, k * 1.2), rx = Math.max(2, Math.round(9 * s * g2)), ry = Math.max(2, Math.round(10 * s * g2));
       pxCrown(rect, rng(tx), tx + 1, 200 - h - ry * .4, rx, ry); } }); break;
-    case 'lamps': A(k, () => { for (const lx of [84, 396]) { rect(lx, 160, 1, 32, '#1a1e28'); rect(lx - 3, 159, 7, 2, '#2a2f3c'); rect(lx - 2, 161, 5, 1, '#fff1b8');
+    case 'lamps': A(k, () => { for (const lx of [78, 396]) { rect(lx, 160, 1, 32, '#1a1e28'); rect(lx - 3, 159, 7, 2, '#2a2f3c'); rect(lx - 2, 161, 5, 1, '#fff1b8');
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .18; ctx.fillStyle = '#ffd890'; ctx.beginPath(); ctx.moveTo(lx - 2, 162); ctx.lineTo(lx + 3, 162); ctx.lineTo(lx + 14, 192); ctx.lineTo(lx - 13, 192); ctx.fill(); ctx.restore(); } }); break;
     case 'parking': A(k, () => { rect(6, 204, 88, 18, '#2c2640'); for (let i = 0; i <= 3; i++) rect(8 + i * 28, 204, 1, 18, '#cfd6e4');
       for (const [cx, col] of [[10, '#b8443f'], [66, '#3f6f8c']]) { rect(cx, 211, 24, 5, col); rect(cx + 5, 207, 13, 4, col); rect(cx + 6, 208, 5, 2, '#1b2030'); rect(cx + 12, 208, 5, 2, '#1b2030'); rect(cx + 23, 212, 1, 1, '#f2d27a'); rect(cx + 3, 215, 4, 3, '#0d0f14'); rect(cx + 17, 215, 4, 3, '#0d0f14'); } }); break;
@@ -3036,9 +3040,9 @@ function drawHouseMap(t, anim) {
   if (Math.random() < 1 / 40) { const w = pick(Math.random, HOUSE_ART.win); w.on = !w.on; }
   for (const w of HOUSE_ART.win) drawHouseWindow(w, t);
   // провода между домом и столбом, кабель интернета по фасаду
-  for (let k = 0; k <= 18; k++) { p(280 + k, 62 + Math.round(Math.sin(k / 18 * Math.PI) * 4), '#1c1626'); p(280 + k, 66 + Math.round(Math.sin(k / 18 * Math.PI) * 3), '#1c1626'); }
-  for (let k = 0; k <= 16; k++) p(104 + k, 76 + Math.round(Math.sin(k / 16 * Math.PI) * 3), '#1c1626');
-  rect(296, 61, 2, 2, '#3a3050'); rect(296, 65, 2, 2, '#3a3050'); rect(102, 75, 2, 2, '#3a3050'); rect(120, 75, 2, 2, '#3a3050');
+  for (let k = 0; k <= 18; k++) { p(300 + k, 62 + Math.round(Math.sin(k / 18 * Math.PI) * 4), '#1c1626'); p(300 + k, 66 + Math.round(Math.sin(k / 18 * Math.PI) * 3), '#1c1626'); }
+  for (let k = 0; k <= 16; k++) p(84 + k, 76 + Math.round(Math.sin(k / 16 * Math.PI) * 3), '#1c1626');
+  rect(316, 61, 2, 2, '#3a3050'); rect(316, 65, 2, 2, '#3a3050'); rect(82, 75, 2, 2, '#3a3050'); rect(100, 75, 2, 2, '#3a3050');
   for (let yy = HM.top; yy < HM.bottom; yy++) if ((yy - HM.top) % HM.fh !== 0) p(224, yy, '#2a2238');
   // свет у входа: настенный фонарь под козырьком, тёплое пятно на ступенях, лёгкое мерцание
   { const fl = Math.sin(t / 61) > -.92 ? 1 : .45, glow = ctx.createRadialGradient(200, 168, 1, 200, 178, 34);

@@ -460,7 +460,10 @@ scenes.tour = {
   updateCam(dt) {
     const target = clamp(this.hero.y - (DLG.open ? DLG_BOX.y - 22 : 165), 0, this.WH - H);
     this.camY = lerp(this.camY, target, Math.min(1, dt / 160));
-    this.camX = lerp(this.camX, clamp(this.hero.x - W / 2, 0, SW - W), Math.min(1, dt / 200));
+    // по горизонтали камера стоит, пока герой в средней части экрана (лестница целиком в ней) — без качки на пролётах
+    const sx = this.hero.x - this.camX; let tx = this.camX;
+    if (sx < 120) tx = this.hero.x - 120; else if (sx > 280) tx = this.hero.x - 280;
+    this.camX = lerp(this.camX, clamp(tx, 0, SW - W), Math.min(1, dt / 200));
   },
   startClimb(d) {
     const h = this.hero, b = this.base(h.floor);
