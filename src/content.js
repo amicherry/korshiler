@@ -37,6 +37,8 @@ const UI = {
   floor:      { kz: '-қабат', ru: ' этаж' },
   apt:        { kz: 'пәтер', ru: 'кв.' },
   meetingT:   { kz: '{n}-ЖИНАЛЫС', ru: 'СОБРАНИЕ №{n}' },
+  councilName:{ kz: 'Үй кеңесі', ru: 'Совет дома' },
+  councilDone:{ kz: 'Кеңес мүшелері {f}-қабатты аралап шықты: +{n} дауыс.', ru: 'Члены совета обошли {f} этаж: +{n} голосов.' },
   day:        { kz: 'КҮН', ru: 'ДЕНЬ' },
   yesShort:   { kz: 'ИӘ', ru: 'ЗА' },
   turnShort:  { kz: 'ҚАТЫСТЫ', ru: 'ЯВКА' },
@@ -128,7 +130,7 @@ const UI = {
   // пролог, обучение
   pushOSI:    { kz: 'Сіздің үйде ОСИ құрылмаған. ОСИ болмаса, жөндеу мен жақсарту мүмкін емес.', ru: 'В вашем доме не создано ОСИ. Без ОСИ ремонт и улучшения невозможны.' },
   heroIntro1: { kz: 'Иә... Үй құлайын деп тұр. Шатыр ағады, подъезде шам жоқ.', ru: 'Да уж... Дом разваливается. Крыша течёт, в подъезде темно.' },
-  heroIntro2: { kz: 'Бастамашыл топқа 6 қолтаңба керек — пәтерлердің 10 %-ы. Кеттік!', ru: 'Для инициативной группы нужно 6 подписей — это 10 % квартир. Погнали!' },
+  heroIntro2: { kz: 'Бастамашыл топқа {g} қолтаңба керек — {n} пәтердің 10 %-ы. Кеттік!', ru: 'Для инициативной группы нужно {g} подписей — это 10 % от {n} квартир. Погнали!' },
   tutTap:     { kz: 'Есікке немесе басқа қабатқа бас — кейіпкер өзі барады.', ru: 'Нажми на дверь или на другой этаж — герой дойдёт сам.' },
   tut1:       { kz: 'Есікке жақындап, ҚАҒУ бас. Есік астындағы жарық — үйде біреу бар.', ru: 'Подойди к двери и нажми СТУК. Свет под дверью — кто-то дома.' },
   tut2:       { kz: 'Сол жақта саты. ▲▼ арқылы қабат ауыстыр. Әр әрекет уақыт алады!', ru: 'Слева лестница: ▲▼ — сменить этаж. Каждое действие тратит время!' },
@@ -331,7 +333,7 @@ const NAMES = {
    Каждый уровень — собрание жильцов по очередной жалобе. Победа на собрании даёт бюджет
    и одобрение ремонта; сам ремонт покупается на карте ЖК. Следующее собрание открывается,
    только когда предыдущая проблема исправлена — перепрыгнуть нельзя. */
-const HOUSE = { floors: 9, perFloor: 6, heroApt: 34 };
+const HOUSE = { floors: 13, perFloor: 8, heroApt: 53 };   // 104 квартиры; герой — 7 этаж
 const BADGES = {
   initiative_group:      { kz: 'Бастамашыл топ', ru: 'Инициативная группа', en: 'Initiative group' },
   chairman_elected:      { kz: 'Төраға сайланды', ru: 'Избран председателем', en: 'Chairman elected' },
@@ -358,7 +360,7 @@ const PROBLEMS = [
       { kz: 'Домофон бір жыл бойы істемейді. Курьер есік алдында тұрады.', ru: 'Домофон год не работает. Курьер стоит под дверью.' },
       { kz: 'Қыста есік ашық — подъезд мұздай.', ru: 'Зимой дверь нараспашку — в подъезде ледник.' },
       { kz: 'Есік ауыр, коляскамен өзім шыға алмаймын.', ru: 'Дверь тяжёлая, с коляской сама не выйду.' } ] },
-  { id: 'roof', cost: 400, pts: 140, floors: [7, 9],
+  { id: 'roof', cost: 400, pts: 140, floors: [11, 13],
     name: { kz: 'Шатыр', ru: 'Крыша' },
     desc: { kz: 'Жаңбыр жауса, жоғарғы қабаттарды су басады.', ru: 'Как дождь — верхние этажи заливает.' },
     lines: [
@@ -418,40 +420,40 @@ const DECOR = [
 ];
 
 /* ---------- туры: решения ОСИ по правилам голосования ----------
-   Дом в игре — 54 квартиры (9 этажей × 6). Пороги — от всех квартир дома:
+   Дом в игре — 104 квартиры (13 этажей × 8). Пороги — от всех квартир дома:
    0 инициативная группа — 10 % «за»; 1 председатель и 2 совет — явка 50 %+1, из голосовавших 50 %+1 «за»;
    3 тариф — 50 %+1 «за» от всех; 4–5 изменение конструкции — 2/3 «за» от всех.
    Обычный ремонт (свет, дверь, крыша…) голосования не требует — решает председатель.
    Время тура — 60 игровых дней. */
-const APTS = HOUSE.floors * HOUSE.perFloor;                                // 54
-const PCT = { tenth: Math.ceil(APTS * .1), half: Math.floor(APTS / 2) + 1, twoThirds: Math.ceil(APTS * 2 / 3) };   // 6, 28, 36
+const APTS = HOUSE.floors * HOUSE.perFloor;                                // 104
+const PCT = { tenth: Math.ceil(APTS * .1), half: Math.floor(APTS / 2) + 1, twoThirds: Math.ceil(APTS * 2 / 3) };   // 11, 53, 70
 const TOUR_DEFS = [
-  { code: 'initiative',   rule: 'yes',    goal: PCT.tenth,     duration: 75,  raccoon: 1, hard: 0,   badge: 'initiative_group',
+  { code: 'initiative',   rule: 'yes',    goal: PCT.tenth,     duration: 90,  raccoon: 2, hard: 0,   badge: 'initiative_group',
     title: { kz: 'Бастамашыл топ', ru: 'Инициативная группа', en: 'Initiative group' },
     ruleText: { kz: 'пәтерлердің 10 %-ы «иә» — {g} қолтаңба', ru: '10 % квартир «за» — {g} подписей', en: '10% of flats say yes — {g} signatures' },
     winT: { kz: 'БАСТАМАШЫЛ ТОП ҚҰРЫЛДЫ!', ru: 'ИНИЦИАТИВНАЯ ГРУППА ЕСТЬ!', en: 'INITIATIVE GROUP FORMED!' },
     winNote: { kz: 'Енді төрағаны сайлау керек — 2-жиналыс ашылды.', ru: 'Теперь нужно выбрать председателя — открыто собрание 2.', en: 'Now elect a chairman — meeting 2 is open.' } },
-  { code: 'chairman',     rule: 'quorum', goal: Math.floor(PCT.half / 2) + 1, quorum: PCT.half, duration: 150, raccoon: 3, hard: .04, badge: 'chairman_elected',
+  { code: 'chairman',     rule: 'quorum', goal: Math.floor(PCT.half / 2) + 1, quorum: PCT.half, duration: 200, raccoon: 5, hard: .04, badge: 'chairman_elected',
     title: { kz: 'Төрағаны сайлау', ru: 'Выбор председателя', en: 'Electing the chairman' },
     ruleText: { kz: 'кемінде {q} пәтер дауыс береді, жартысынан көбі «иә»', ru: 'голосуют не меньше {q} квартир, из них больше половины «за»', en: 'at least {q} flats vote, more than half say yes' },
     winT: { kz: 'СЕН ОСИ ТӨРАҒАСЫСЫҢ!', ru: 'ТЫ — ПРЕДСЕДАТЕЛЬ ОСИ!', en: 'YOU ARE THE CHAIRMAN!' },
     winNote: { kz: 'Кәдімгі жөндеуді (шам, есік, шатыр…) енді жиналыссыз өзің шешесің — «Менің ЖК».', ru: 'Обычный ремонт (свет, дверь, крыша…) теперь решаешь сам, без собрания — в «Мой ЖК».', en: 'Regular repairs (light, door, roof…) are now your call, no meeting needed — in “My block”.' } },
-  { code: 'council',      rule: 'quorum', goal: Math.floor(PCT.half / 2) + 1, quorum: PCT.half, duration: 150, raccoon: 3, hard: .07, badge: 'council_elected', needFix: ['light'],
+  { code: 'council',      rule: 'quorum', goal: Math.floor(PCT.half / 2) + 1, quorum: PCT.half, duration: 200, raccoon: 5, hard: .07, badge: 'council_elected', needFix: ['light'],
     title: { kz: 'Үй кеңесін сайлау', ru: 'Выбор совета дома', en: 'Electing the house council' },
     ruleText: { kz: 'кемінде {q} пәтер дауыс береді, жартысынан көбі «иә»', ru: 'голосуют не меньше {q} квартир, из них больше половины «за»', en: 'at least {q} flats vote, more than half say yes' },
     winT: { kz: 'ҮЙ КЕҢЕСІ САЙЛАНДЫ!', ru: 'СОВЕТ ДОМА ИЗБРАН!', en: 'HOUSE COUNCIL ELECTED!' },
     winNote: { kz: 'Тағы екі жөндеу жаса — көршілер тарифке сенеді.', ru: 'Сделай ещё пару ремонтов — и соседи поверят в тариф.', en: 'Do a couple more repairs — then neighbours will trust the tariff.' } },
-  { code: 'tariff',       rule: 'yes',    goal: PCT.half,      duration: 150, raccoon: 3, hard: .12, badge: 'tariff_approved', needFixCount: 3,
+  { code: 'tariff',       rule: 'yes',    goal: PCT.half,      duration: 210, raccoon: 5, hard: .12, badge: 'tariff_approved', needFixCount: 3,
     title: { kz: 'Тарифті бекіту', ru: 'Утверждение тарифа', en: 'Approving the tariff' },
     ruleText: { kz: 'барлық пәтердің 50 %+1-і «иә» — {g} дауыс', ru: '50 %+1 от всех квартир «за» — {g} голосов', en: '50%+1 of all flats say yes — {g} votes' },
     winT: { kz: 'ТАРИФ БЕКІТІЛДІ!', ru: 'ТАРИФ УТВЕРЖДЁН!', en: 'TARIFF APPROVED!' },
     winNote: { kz: 'Үйдің тұрақты бюджеті бар. Енді — ортақ антенна.', ru: 'У дома есть постоянный бюджет. Дальше — общая антенна.', en: 'The house now has a steady budget. Next — a shared antenna.' } },
-  { code: 'construction', rule: 'yes',    goal: PCT.twoThirds, duration: 195, raccoon: 4, hard: .1,  badge: 'construction_approved', problem: 'antenna',
+  { code: 'construction', rule: 'yes',    goal: PCT.twoThirds, duration: 270, raccoon: 7, hard: .1,  badge: 'construction_approved', problem: 'antenna',
     title: { kz: 'Шатырға антенна', ru: 'Антенна на крышу', en: 'Antenna on the roof' },
     ruleText: { kz: 'конструкцияны өзгерту: барлық пәтердің 2/3-і «иә» — {g} дауыс', ru: 'изменение конструкции: 2/3 квартир «за» — {g} голосов', en: 'structural change: 2/3 of flats say yes — {g} votes' },
     winT: { kz: 'АНТЕННА БОЛАДЫ!', ru: 'АНТЕННЕ БЫТЬ!', en: 'THE ANTENNA IS APPROVED!' },
     winNote: { kz: 'Антеннаны «Менің ЖК»-да орнат.', ru: 'Поставь антенну в «Мой ЖК».', en: 'Install the antenna in “My block”.' } },
-  { code: 'lift',         rule: 'yes',    goal: PCT.twoThirds, duration: 195, raccoon: 4, hard: .14, badge: 'all_tours', problem: 'lift', needFix: ['antenna'],
+  { code: 'lift',         rule: 'yes',    goal: PCT.twoThirds, duration: 270, raccoon: 7, hard: .14, badge: 'all_tours', problem: 'lift', needFix: ['antenna'],
     title: { kz: 'Лифтті ауыстыру', ru: 'Замена лифта', en: 'Replacing the lift' },
     ruleText: { kz: 'конструкцияны өзгерту: барлық пәтердің 2/3-і «иә» — {g} дауыс', ru: 'изменение конструкции: 2/3 квартир «за» — {g} голосов', en: 'structural change: 2/3 of flats say yes — {g} votes' },
     winT: { kz: 'ЖАҢА ЛИФТ БОЛАДЫ!', ru: 'НОВОМУ ЛИФТУ БЫТЬ!', en: 'A NEW LIFT IS COMING!' },
@@ -462,7 +464,7 @@ const LEVELS = TOUR_DEFS.map((d, i) => ({
   floors: HOUSE.floors, perFloor: HOUSE.perFloor, heroApt: HOUSE.heroApt,
   start: 0, secPerMin: 3, days: 60,
   awayShare: .22 + i * .02,
-  talkerFloor: [3, 5, 4, 7, 2, 6][i], helperAfter: 3, helperFloor: [8, 7, 9, 6, 8, 9][i],
+  talkerFloor: [3, 5, 4, 9, 2, 6][i], helperAfter: 3, helperFloor: [10, 11, 12, 9, 11, 12][i],
   reward: { first: [200, 320, 380, 620, 800, 900][i], replay: [60, 110, 130, 200, 260, 300][i], perExtra: 8 + i * 3 },
   mix: (() => {
     const total = APTS - 1, h = d.hard;

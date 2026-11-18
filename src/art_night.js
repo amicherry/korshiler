@@ -20,7 +20,7 @@ function fillPoly(g, pts, col) {
 const lerp2 = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
 
 // главная высотка: фасад (справа, широкий) и торец (слева, узкий, в тени)
-const BLD = { TL: [198, 80], TR: [384, 93], BL: [186, 240], BR: [404, 240], STL: [158, 96], SBL: [142, 240], rows: 9, cols: 16 };
+const BLD = { TL: [198, 70], TR: [384, 84], BL: [186, 240], BR: [404, 240], STL: [158, 87], SBL: [142, 240], rows: 13, cols: 16 };   // 13 этажей, как в игре
 const persp = v => Math.pow(v, 1.2);           // снизу этажи ближе — выше
 function FF(u, v) { const T = lerp2(BLD.TL, BLD.TR, u), B = lerp2(BLD.BL, BLD.BR, u); return lerp2(T, B, persp(v)); }
 function SF(u, v) { const T = lerp2(BLD.STL, BLD.TL, u), B = lerp2(BLD.SBL, BLD.BL, u); return lerp2(T, B, persp(v)); }

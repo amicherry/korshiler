@@ -5,8 +5,8 @@ const {chromium}=require('playwright'); const fs=require('fs');
  await pg.route('**/fonts.googleapis.com/**', r=>r.abort());
  await pg.addInitScript({content: fs.readFileSync('widefont.js','utf8')+`;localStorage.setItem('d67_lang','ru');localStorage.setItem('d67_save', JSON.stringify({created:true,seenIntro:true,name:'Bot',look:{},coins:0,tours:{},trust:{}}));`});
  await pg.goto('file://'+process.cwd()+'/index.html?stable'); await pg.waitForTimeout(1600);
- const NOISE=+(process.env.NOISE||0), WALK=+(process.env.WALK||1);
- const res = await pg.evaluate(async([NOISE,WALK])=>{
+ const NOISE=+(process.env.NOISE||0), WALK=+(process.env.WALK||1), RUNS=+(process.env.RUNS||24);
+ const res = await pg.evaluate(async([NOISE,WALK,RUNS])=>{
    say = async()=>{}; sayPage = async()=>{}; wait = async()=>{}; tweenDoor = async()=>{}; toast = ()=>{}; pop = ()=>{};
    let R0 = null;
    ask = async(menu)=>{ const r=R0, A=r.A, ks=menu.map(m=>m.k);
@@ -17,7 +17,7 @@ const {chromium}=require('playwright'); const fs=require('fs');
    const out = {};
    for (const id of ['L1','L2','L3','L4','L5','L6']) {
      const runs=[];
-     for (let s=0; s<24; s++) {
+     for (let s=0; s<RUNS; s++) {
        SAVE.trust = {}; SAVE.tours[id] = { tries: s }; USER.userId = 'bot-'+s;
        HOUSE_STATE.fixed = { L1: [], L2: [], L3: ['light'], L4: ['light','door','roof'], L5: ['light','door','roof'], L6: ['light','door','roof','antenna'] }[id];
        go('tour', { tour: id }); const sc = scenes.tour, T = sc.tour; sc.run = null;
@@ -30,7 +30,7 @@ const {chromium}=require('playwright'); const fs=require('fs');
              if (['yes','no','online','renter'].includes(r.status)) continue;
              if (sc.minute >= sc.end || sc.goalMet()) break;
              walk(sc.hero.x, DOOR_X[r.d], fl - sc.hero.floor); sc.hero.floor = fl; sc.hero.y = sc.base(fl); sc.hero.x = DOOR_X[r.d] - 23;
-             R0 = r; sc.walkTo = async x => { sc.hero.x = x; }; await sc.visit(r); sc.busy = false; DLG.open = false;
+             R0 = r; sc.walkTo = async x => { sc.hero.x = x; }; await sc.visit(r); sc.busy = false; DLG.open = false; sc.tickCouncil();
            }
          }
          pass++; if (rac > 0) { rac--; sc.busy = false; sc.useRaccoon(); }
@@ -43,5 +43,5 @@ const {chromium}=require('playwright'); const fs=require('fs');
      const ok = runs.filter(r=>r.ok).length, avg = k => (runs.reduce((a,r)=>a+r[k],0)/runs.length).toFixed(1);
      out[id] = { goal: TOURS[id].goal, quorum: TOURS[id].quorum||'-', wins: ok+'/'+runs.length, yes: avg('yes'), online: avg('online'), no: avg('no'), dayEnd: avg('day') };
    }
-   return out; }, [NOISE,WALK]);
+   return out; }, [NOISE,WALK,RUNS]);
  console.table(res); console.log(errs.slice(0,3)); await b.close(); })();

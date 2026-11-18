@@ -244,7 +244,7 @@ scenes.prologue = {
     await say(L(UI.pushOSI));
     dlgOpen(SAVE.name, e => portrait(SAVE.look, e), 420);
     await say(L(UI.heroIntro1), 'sad');
-    await say(L(UI.heroIntro2), 'happy');
+    await say(L(UI.heroIntro2).replace('{g}', TOURS.L1.goal).replace('{n}', APTS), 'happy');
     dlgClose();
     SAVE.seenIntro = true; persist();
     this.goal = STREET_DOOR_X; await new Promise(r => { this.arrived = r; });
@@ -324,10 +324,10 @@ scenes.tour = {
     this.hero = { x: DOOR_X[(tour.heroApt - 1) % tour.perFloor] + 20, floor: hf, y: floorBase(hf, tour.floors), dir: -1, walkT: 0, moving: false, climb: null, knockT: 0 };
     this.minute = tour.start; this.end = tour.start + tour.duration;
     this.events = []; this.raccoon = tour.raccoon; this.broadcasts = 0; this.remoteShown = 0; this.busy = false; this.ballot = false; this.goalShown = false; this.over = false;
-    this.camY = clamp(this.hero.y - 165, 0, this.WH - H);
+    this.camY = clamp(this.hero.y - 165, 0, this.WH - H); this.camX = clamp(this.hero.x - W / 2, 0, SW - W);
     this.talker = { floor: tour.talkerFloor, x: 95, done: false, look: { skin: '#d6a07a', hair: 'short', hairCol: '#3a2a20', top: 'hoodie', topCol: '#3b3f55', pants: '#2b2a33', hat: 'cap', capCol: '#3f6f8c', beard: true } };
-    this.helper = { state: 'hidden', floor: 2, x: 351, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
-    this.rats = this.fixed.has('basement') ? [] : [{ x: 80, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 320, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
+    this.helper = { state: 'hidden', floor: 2, x: 397, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
+    this.rats = this.fixed.has('basement') ? [] : [{ x: 80, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 380, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
     this.liftPick = false; this.drops = []; this.paused = false;
     this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
     this.run = null; API.tourStart(tour.id).then(r => this.run = r).catch(() => {});
@@ -337,7 +337,7 @@ scenes.tour = {
     setTimeout(() => { if (!here()) return; toast(L(UI.meetingT).replace('{n}', tour.n), L(UI.meetingB).replace('{t}', L(tour.title)).replace('{r}', ruleText(tour)), 5200);
       if (tour.n === 1) setTimeout(() => here() && toast('E-KNOT', L(UI.tutTap)), 4600); }, 500);
   },
-  focus() { return { x: this.hero.x, y: this.hero.y - this.camY - 14 }; },
+  focus() { return { x: this.hero.x - this.camX, y: this.hero.y - this.camY - 14 }; },
   signatures() { return Object.values(this.res).filter(r => r.status === 'yes').length; },
   // тур 2: онлайн-голоса двух других подъездов — та же формула, что на сервере
   remoteTarget() { const R = this.tour.remote; return R ? Math.min(R.max, Math.floor(this.signatures() * R.perYes + this.broadcasts * R.perBroadcast)) : 0; },
@@ -387,6 +387,7 @@ scenes.tour = {
       const now = Math.floor(this.remoteShown); if (now > before && now % 5 === 0) pop(this.hero.x, this.hero.y - 62, '+5 E-KNOT', '#7fc4a8');
       this.checkGoal(); }
     if (this.minute >= this.end && !this.busy) { this.finish(true); return; }
+    this.tickCouncil();
     // помощница возвращается с результатом
     if (this.helper.state === 'busy' && this.minute >= this.helper.doneAt) this.helperDone();
     if (this.helper.state === 'hidden' && this.signatures() >= T.helperAfter) this.helper.state = 'shown';
@@ -459,6 +460,7 @@ scenes.tour = {
   updateCam(dt) {
     const target = clamp(this.hero.y - (DLG.open ? DLG_BOX.y - 22 : 165), 0, this.WH - H);
     this.camY = lerp(this.camY, target, Math.min(1, dt / 160));
+    this.camX = lerp(this.camX, clamp(this.hero.x - W / 2, 0, SW - W), Math.min(1, dt / 200));
   },
   startClimb(d) {
     const h = this.hero, b = this.base(h.floor);
@@ -499,7 +501,7 @@ scenes.tour = {
       if (r.st === 'roam') {
         if (scared) { r.st = 'alert'; r.k = 0; continue; }
         if (r.pause > 0) { r.pause -= dt; continue; }
-        r.x += r.dir * dt * .045; if (r.x < 20 || r.x > 380) r.dir *= -1;
+        r.x += r.dir * dt * .045; if (r.x < 20 || r.x > SW - 20) r.dir *= -1;
         if (Math.random() < dt / 2500) r.pause = 300 + Math.random() * 900; if (Math.random() < dt / 4000) r.dir *= -1;
       } else if (r.st === 'alert') {                         // замерла, «!» — и бежит
         if (r.k > 260) { r.st = 'flee'; r.k = 0;
@@ -597,7 +599,7 @@ scenes.tour = {
   signed(r, via) {
     sfx.stamp(); this.events.push({ t: 'yes', apt: r.apt, via });
     // сосед подписал — остальным на этаже проще решиться
-    for (const o of Object.values(this.res)) if (o.floor === r.floor && o !== r && !['yes', 'no', 'renter'].includes(o.status)) o.mood += 6;
+    for (const o of Object.values(this.res)) if (o !== r && !['yes', 'no', 'renter'].includes(o.status)) { const df = Math.abs(o.floor - r.floor); if (df === 0) o.mood += 8; else if (df === 1) o.mood += 3; }
     pop(DOOR_X[r.d], this.base(r.floor) - 70, '+1 ✓', '#4caf6e');
     this.stampT = 900;
     this.checkGoal(400);
@@ -627,6 +629,19 @@ scenes.tour = {
     else { await say(L(UI.helperNo)); this.helper.state = 'done'; }
     dlgClose(); this.busy = false;
   },
+  // совет дома (после собрания 3): трижды за собрание обходит этаж, где больше всего нерешённых
+  tickCouncil() {
+    const T = this.tour; if (T.n < 4) return;
+    this.councilDone = this.councilDone || 0; if (this.councilDone >= 3) return;
+    if (this.minute < T.start + T.duration * (.15 + this.councilDone * .17)) return;
+    this.councilDone++;
+    const open = r => !r.A.renter && !['yes', 'no', 'online'].includes(r.status);
+    let best = 1, bn = -1; for (let f = 1; f <= T.floors; f++) { const k = Object.values(this.res).filter(r => r.floor === f && open(r)).length; if (k > bn) { bn = k; best = f; } }
+    let n = 0;
+    for (const r of Object.values(this.res)) { if (r.floor !== best || !open(r)) continue;
+      r.mood += 20; if (r.mood >= 60) { r.status = 'yes'; this.events.push({ t: 'yes', apt: r.apt, via: 'council' }); n++; } else if (r.status === 'unknown') r.status = 'thinking'; }
+    toast(L(UI.councilName), L(UI.councilDone).replace('{f}', best).replace('{n}', n), 3600);
+  },
   helperDone() {
     this.helper.state = 'done'; const f = this.tour.helperFloor; let n = 0;
     for (const r of Object.values(this.res)) {
@@ -650,8 +665,11 @@ scenes.tour = {
     // уведомление доходит до всех, но откликаются те, кто уже пользуется приложением и не против
     const R = rng(hashStr(USER.userId) + Math.floor(this.minute));
     for (const r of Object.values(this.res)) {
+      if (r.A.renter) { if (!['online', 'yes'].includes(r.status) && !r.ownerAsked && R() < .55) { r.ownerAsked = true; r.status = 'online'; this.events.push({ t: 'online', apt: r.apt, via: 'owner' }); n++; } continue; }
       if (!r.A.onlineOk) continue;
-      const chance = { away: .75, noanswer: .75, thinking: r.mood >= 40 ? .6 : 0, unknown: .45 }[r.status] || 0;
+      // чем больше соседей уже проголосовало, тем охотнее откликаются на рассылку («уже 30 соседей за»)
+      const social = Math.min(.35, this.signatures() / APTS * .8);
+      const chance = { away: .75, noanswer: .75, thinking: r.mood >= 35 ? .7 : .2, unknown: .4 + social }[r.status] || 0;
       if (R() >= chance) continue;
       r.status = 'online'; this.events.push({ t: 'online', apt: r.apt, via: 'raccoon' }); n++;
     }
@@ -680,17 +698,18 @@ scenes.tour = {
     if (result.totalCoins != null) SAVE.coins = result.totalCoins; persist();
     if (result.first && !HOUSE_STATE.won.includes(this.tour.id)) HOUSE_STATE.won.push(this.tour.id);
     const stats = { ...result, tourId: this.tour.id, goal: this.tour.goal, problem: this.problem, against: this.against(), thinking: Object.values(this.res).filter(r => r.status === 'thinking').length };
-    setTimeout(() => irisTo(this.hero.x, this.hero.y - this.camY - 14, () => go('result', stats)), timeUp ? 1200 : 200);
+    setTimeout(() => irisTo(this.hero.x - this.camX, this.hero.y - this.camY - 14, () => go('result', stats)), timeUp ? 1200 : 200);
   },
 
   draw(dt) {
-    const T = this.tour, h = this.hero, cy = Math.round(this.camY);
+    const T = this.tour, h = this.hero, cy = Math.round(this.camY), cx = Math.round(this.camX);
+    ctx.save(); ctx.translate(-cx, 0);
     ctx.drawImage(this.bg, 0, -cy);
     const t = performance.now();
     for (let f = 1; f <= T.floors; f++) {
       const b = this.base(f) - cy; if (b < -10 || b > H + 110) continue;
       // лампы: до ремонта света часть не горит, часть мигает; после — горят ровно
-      for (const [li, lx] of [[0, 72], [1, 328]]) {
+      for (const [li, lx] of [[0, 49], [1, 141], [2, 351], [3, 443]]) {
         const broken = !this.fixed.has('light') && (f * 7 + li * 3) % 5 === 0;
         const lampOn = this.fixed.has('light') || (!broken && Math.sin(t / 97 + f * 13 + li * 5 + this.lampSeed) > -.75);
         rect(lx, b - 94, 1, 6, '#0e1011'); rect(lx - 5, b - 88, 11, 4, '#1c1f24'); rect(lx - 3, b - 85, 7, 3, lampOn ? '#fff1b8' : '#4b4f4c');
@@ -754,7 +773,8 @@ scenes.tour = {
         if (Math.floor(t / 400) % 2) text(s, px, h.y - cy - 86, { col: '#f2c94c', align: 'center', shadow: '#0b0c10' }); }
       if (Math.abs(h.x - STAIR_FOOT) < 10) text((h.floor < T.floors ? '▲' : '') + (h.floor > 1 ? '▼' : ''), STAIR_FOOT - 14, h.y - cy - 56, { col: '#f2c94c', align: 'center', shadow: '#0b0c10' });
     }
-    drawPops(dt, 0, cy);
+    ctx.restore();
+    drawPops(dt, cx, cy);
     // енот с рассылкой
     if (this.racAnim) {
       const k = this.racAnim.t / 1800, rx = lerp(W + 20, -30, k), ry = 40 + Math.sin(k * Math.PI) * 30;
@@ -777,13 +797,14 @@ scenes.tour = {
       clicks.length = 0; return;
     }
     if (this.liftPick) {
-      rect(0, 0, W, H, 'rgba(11,12,16,.5)'); frameBox(120, 40, 160, 140); text(L(UI.lift), W / 2, 50, { align: 'center', col: '#f4f3ee' });
-      for (let k = 1; k <= 9; k++) { const c = (k - 1) % 3, rr = 2 - Math.floor((k - 1) / 3), bx = 150 + c * 36, by = 66 + rr * 30;
+      rect(0, 0, W, H, 'rgba(11,12,16,.5)'); frameBox(120, 30, 160, 170); text(L(UI.lift), W / 2, 40, { align: 'center', col: '#f4f3ee' });
+      const nf = T.floors, rows = Math.ceil(nf / 4);
+      for (let k = 1; k <= nf; k++) { const c = (k - 1) % 4, rr = rows - 1 - Math.floor((k - 1) / 4), bx = 146 + c * 36, by = 56 + rr * 28;
         if (button(String(k), bx, by, k === this.hero.floor ? 'off' : 'primary', { w: 28 })) { this.liftPick = false; this.useLift(k); } }
-      if (button(L(UI.close), W / 2, 162, 'alt')) this.liftPick = false;
+      if (button(L(UI.close), W / 2, 56 + rows * 28 + 4, 'alt')) this.liftPick = false;
     }
     // нажатие по подъезду: герой сам идёт к двери / на нужный этаж
-    if (!this.busy && !DLG.open && !this.ballot && !this.liftPick && !this.over && !this.hero.ride) { const c = clicks.find(c => c.y > 24); if (c) { clicks.splice(clicks.indexOf(c), 1); this.onTap(c.x, c.y + cy); } }
+    if (!this.busy && !DLG.open && !this.ballot && !this.liftPick && !this.over && !this.hero.ride) { const c = clicks.find(c => c.y > 24); if (c) { clicks.splice(clicks.indexOf(c), 1); this.onTap(c.x + cx, c.y + cy); } }
   },
   drawHUD() {
     const T = this.tour;
@@ -816,7 +837,7 @@ scenes.tour = {
     rect(0, 0, W, H, 'rgba(11,12,16,.55)');
     paper(40, 22, 320, 192, 8);
     text(L(UI.ballotTitle), W / 2, 30, { align: 'center', col: INK_RED });
-    const rowH = T.floors > 5 ? 13 : 24, ch = rowH - 2;
+    const rowH = T.floors > 9 ? 10 : T.floors > 5 ? 13 : 24, ch = rowH - 1;
     for (let f = T.floors; f >= 1; f--) {
       const y = 42 + (T.floors - f) * rowH;
       text(`${f}`, 54, y + Math.round(ch / 2) - 3, { col: INK_MUTED, size: 6 });
@@ -827,7 +848,7 @@ scenes.tour = {
         const ty = y + Math.round(ch / 2) - 3;
         text(String(apt), x + 3, ty, { col: INK, size: 6 });
         const st = apt === T.heroApt ? 'me' : r.status;
-        if (ICONS[st]) sprite(ICONS[st], x + 17, y + Math.round((ch - 9) / 2));
+        if (ICONS[st]) sprite(ICONS[st], x + cw - 10, y + Math.round((ch - 9) / 2));
         const nm = apt === T.heroApt ? L(UI.st.me) : (r.status === 'unknown' ? '' : r.name.split(' ')[0]);
         if (cw > 60) text(nm.length > 6 ? nm.slice(0, 5) + '.' : nm, x + 28, ty, { col: INK_MUTED, size: 6 });
       }
