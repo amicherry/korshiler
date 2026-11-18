@@ -382,7 +382,19 @@ const UI = {
   floor:      { kz: '-қабат', ru: ' этаж' },
   apt:        { kz: 'пәтер', ru: 'кв.' },
   meetingT:   { kz: '{n}-ЖИНАЛЫС', ru: 'СОБРАНИЕ №{n}' },
-  meetingB:   { kz: 'Күн тәртібі: {p}. {g} қолтаңба жина!', ru: 'Повестка: {p}. Собери {g} подписей!' },
+  day:        { kz: 'КҮН', ru: 'ДЕНЬ' },
+  yesShort:   { kz: 'ИӘ', ru: 'ЗА' },
+  turnShort:  { kz: 'ҚАТЫСТЫ', ru: 'ЯВКА' },
+  noQuorum:   { kz: 'КВОРУМ ЖОҚ', ru: 'КВОРУМА НЕТ' },
+  rTurnout:   { kz: 'Дауыс бергендер', ru: 'Явка' },
+  hNeedChair: { kz: 'Кәдімгі жөндеуді ОСИ төрағасы шешеді: 2-жиналыста («Төрағаны сайлау») жеңіп ал.', ru: 'Обычный ремонт решает председатель ОСИ: выиграй собрание 2 «Выбор председателя».' },
+  lkPrev:     { kz: '{n}-жиналыстан кейін ашылады', ru: 'Откроется после собрания {n}' },
+  lkFix:      { kz: 'Алдымен жөнде: {p}', ru: 'Сначала почини: {p}' },
+  lkFixCount: { kz: 'Алдымен «Менің ЖК»-да {n} жөндеу жаса', ru: 'Сначала сделай {n} ремонта в «Мой ЖК»' },
+  daysWord:   { kz: 'күн', ru: 'дней' },
+  lvYes:      { kz: '{g} «иә»', ru: '{g} «за»' },
+  lvQuorum:   { kz: '{q} қатысу, «иә» > ½', ru: 'явка {q}, «за» > ½' },
+  meetingB: { kz: 'Күн тәртібі: {t}. Ереже: {r}.', ru: 'Повестка: {t}. Правило: {r}.' },
   pause:      { kz: 'ҮЗІЛІС', ru: 'ПАУЗА' },
   pauseNote:  { kz: 'Шықсаң, бұл жиналыс есептелмейді.', ru: 'Если выйти, это собрание не засчитается.' },
   resume:     { kz: 'ЖАЛҒАСТЫРУ', ru: 'ПРОДОЛЖИТЬ' },
@@ -394,7 +406,7 @@ const UI = {
   bonusDay:   { kz: 'Күн бонусы', ru: 'Бонус дня' },
   hHint:      { kz: 'Үйдегі белгіні бас: «!» — жөндеуге болады, «?» — алдымен жиналыс', ru: 'Нажми на значок: «!» — можно чинить, «?» — сначала собрание' },
   hNeedPrev:  { kz: 'Алдымен алдыңғы ақауды жөнде.', ru: 'Сначала исправь предыдущую проблему.' },
-  hNeedVote:  { kz: 'Жөндеу үшін көршілердің келісімі керек: {n}-жиналысты өткіз.', ru: 'Для ремонта нужно согласие соседей: проведи собрание №{n}.' },
+  hNeedVote: { kz: 'Бұл — конструкцияны өзгерту: {n}-жиналыста 2/3 дауыс керек.', ru: 'Это изменение конструкции: нужно 2/3 голосов на собрании {n}.' },
   hDecorLock: { kz: '{n} ақауды жөндегеннен кейін ашылады.', ru: 'Откроется, когда исправишь {n} проблемы.' },
   hDecorDesc: { kz: 'Ауланы әдемілейді: ЖК ұпайы +{n}', ru: 'Украшает двор: очки ЖК +{n}' },
   hFix:       { kz: 'ЖӨНДЕУ', ru: 'ЧИНИТЬ' },
@@ -461,13 +473,13 @@ const UI = {
   // пролог, обучение
   pushOSI:    { kz: 'Сіздің үйде ОСИ құрылмаған. ОСИ болмаса, жөндеу мен жақсарту мүмкін емес.', ru: 'В вашем доме не создано ОСИ. Без ОСИ ремонт и улучшения невозможны.' },
   heroIntro1: { kz: 'Иә... Үй құлайын деп тұр. Шатыр ағады, подъезде шам жоқ.', ru: 'Да уж... Дом разваливается. Крыша течёт, в подъезде темно.' },
-  heroIntro2: { kz: 'Бастамашыл топ құру үшін 10 қолтаңба керек. Кеттік!', ru: 'Для инициативной группы нужно 10 подписей. Погнали!' },
+  heroIntro2: { kz: 'Бастамашыл топқа 6 қолтаңба керек — пәтерлердің 10 %-ы. Кеттік!', ru: 'Для инициативной группы нужно 6 подписей — это 10 % квартир. Погнали!' },
   tutTap:     { kz: 'Есікке немесе басқа қабатқа бас — кейіпкер өзі барады.', ru: 'Нажми на дверь или на другой этаж — герой дойдёт сам.' },
   tut1:       { kz: 'Есікке жақындап, ҚАҒУ бас. Есік астындағы жарық — үйде біреу бар.', ru: 'Подойди к двери и нажми СТУК. Свет под дверью — кто-то дома.' },
   tut2:       { kz: 'Сол жақта саты. ▲▼ арқылы қабат ауыстыр. Әр әрекет уақыт алады!', ru: 'Слева лестница: ▲▼ — сменить этаж. Каждое действие тратит время!' },
   nobody:     { kz: 'Ешкім жоқ сияқты. Кейін қайта келуге болады.', ru: 'Похоже, никого нет. Можно зайти позже.' },
   noOpen:     { kz: 'Ешкім ашпады... Тағы қағып көр.', ru: 'Никто не открыл... Попробуй ещё раз.' },
-  goalDone:   { kz: '10 қолтаңба жиналды! Турды аяқтауға немесе тағы жинауға болады.', ru: '10 подписей собрано! Можно завершить тур или собрать ещё.' },
+  goalDone: { kz: 'Қажетті дауыстар бар! Жиналысты аяқтауға немесе тағы жинауға болады.', ru: 'Нужные голоса есть! Можно завершить собрание или собрать ещё.' },
   timeUp:     { kz: 'Уақыт бітті!', ru: 'Время вышло!' },
   helperDone: { kz: 'Мадина {f}-қабаттан {n} қолтаңба жинады!', ru: 'Мадина собрала {n} подписей на {f} этаже!' },
   raccoonT:   { kz: 'ЕНОТ ТАРАТТЫ!', ru: 'ЕНОТ РАЗОСЛАЛ!' },
@@ -475,7 +487,7 @@ const UI = {
   noRaccoon:  { kz: 'Енот бұл турда көмектесіп қойды.', ru: 'Енот уже помог в этом туре.' },
   // итоги
   win:        { kz: 'СЕН ОСИ ТӨРАҒАСЫСЫҢ!', ru: 'ТЫ — ПРЕДСЕДАТЕЛЬ ОСИ!' },
-  lose:       { kz: 'ҚОЛТАҢБА ЖЕТПЕДІ', ru: 'ПОДПИСЕЙ НЕ ХВАТИЛО' },
+  lose: { kz: 'ДАУЫС ЖЕТПЕДІ', ru: 'ГОЛОСОВ НЕ ХВАТИЛО' },
   protocol:   { kz: 'ХАТТАМА №1', ru: 'ПРОТОКОЛ №1' },
   rSigned:    { kz: 'Қол қойғандар', ru: 'Подписали' },
   rOnline:    { kz: 'Онлайн, E-KNOT арқылы', ru: 'Онлайн через E-KNOT' },
@@ -500,8 +512,8 @@ const UI = {
   rScore:     { kz: 'Ұпай', ru: 'Очки' },
   rRank:      { kz: 'ЖК-дағы орын', ru: 'Место в ЖК' },
   rOffline:   { kz: 'Байланыс жоқ: нәтиже рейтингке кірмеді.', ru: 'Нет связи: результат не попал в рейтинг.' },
-  rRewardSent:{ kz: '+{n} бонус E-KNOT қосымшасына жіберілді!', ru: '+{n} бонусов отправлено в приложение E-KNOT!' },
-  rRewardGuest:{ kz: '+{n} бонус күтіп тұр — ойынды E-KNOT қосымшасынан ашыңыз.', ru: '+{n} бонусов ждут — откройте игру из приложения E-KNOT.' },
+  rRewardSent: { kz: '+{n} ұпай және «{b}» белгісі — E-KNOT-та!', ru: '+{n} баллов и значок «{b}» — в E-KNOT!' },
+  rRewardGuest: { kz: '«{b}» белгісі мен +{n} ұпай күтіп тұр — ойынды E-KNOT қосымшасынан ашыңыз.', ru: 'Значок «{b}» и +{n} баллов ждут — откройте игру из приложения E-KNOT.' },
   again:      { kz: 'ҚАЙТАЛАУ', ru: 'ЕЩЁ РАЗ' }, menu: { kz: 'МӘЗІР', ru: 'МЕНЮ' },
   // болтун и помощница
   talkerName: { kz: 'Жанат аға', ru: 'Жанат-ага' },
@@ -665,6 +677,14 @@ const NAMES = {
    и одобрение ремонта; сам ремонт покупается на карте ЖК. Следующее собрание открывается,
    только когда предыдущая проблема исправлена — перепрыгнуть нельзя. */
 const HOUSE = { floors: 9, perFloor: 6, heroApt: 34 };
+const BADGES = {
+  initiative_group:      { kz: 'Бастамашыл топ', ru: 'Инициативная группа', en: 'Initiative group' },
+  chairman_elected:      { kz: 'Төраға сайланды', ru: 'Избран председателем', en: 'Chairman elected' },
+  council_elected:       { kz: 'Үй кеңесі', ru: 'Совет дома', en: 'House council' },
+  tariff_approved:       { kz: 'Тарифті бекітті', ru: 'Утвердил тариф', en: 'Tariff approved' },
+  construction_approved: { kz: '2/3 дауыс', ru: 'Решение 2/3', en: 'Two-thirds decision' },
+  all_tours:             { kz: 'Барлық тур өтті', ru: 'Прошёл все туры', en: 'All tours passed' },
+};
 
 const PROBLEMS = [
   { id: 'light', cost: 150, pts: 100,
@@ -707,7 +727,7 @@ const PROBLEMS = [
       { kz: 'Балалар подъезде ойнайды — ауланда ештеңе жоқ.', ru: 'Дети играют в подъезде — во дворе ничего нет.' },
       { kz: 'Құмсалғыш баяғыда жоқ, тек тот басқан темір.', ru: 'Песочницы давно нет, одно ржавое железо.' },
       { kz: 'Немерелер келгенде, апаратын жер жоқ.', ru: 'Внуки приезжают — их и сводить некуда.' } ] },
-  { id: 'lift', cost: 900, pts: 220,
+  { id: 'lift', cost: 900, pts: 220, kind: 'construction', tour: 'L6',
     name: { kz: 'Лифт', ru: 'Лифт' },
     desc: { kz: 'Тоғыз қабат, ал лифт бір жыл тұр.', ru: 'Девять этажей, а лифт стоит уже год.' },
     lines: [
@@ -715,7 +735,7 @@ const PROBLEMS = [
       { kz: 'Коляскамен лифтсіз — азап.', ru: 'С коляской без лифта — мучение.' },
       { kz: 'Тізем ауырады, баспалдақпен шығу қиын.', ru: 'Колени болят, по лестнице тяжело.' },
       { kz: 'Азық-түлікті жоғары өзім көтеремін, лифт жоқ.', ru: 'Продукты наверх сама таскаю, лифта же нет.' } ] },
-  { id: 'antenna', cost: 1100, pts: 240,
+  { id: 'antenna', cost: 1100, pts: 240, kind: 'construction', tour: 'L5',
     name: { kz: 'Ортақ антенна', ru: 'Общая антенна' },
     desc: { kz: 'Теледидар мен интернет нашар, әркім өз тарелкасын іледі.', ru: 'Плохое ТВ и интернет, каждый вешает свою тарелку.' },
     lines: [
@@ -742,25 +762,83 @@ const DECOR = [
   { id: 'parking', cost: 200, pts: 45, after: 5, name: { kz: 'Көлік тұрағы', ru: 'Парковка' } },
 ];
 
-// уровни: собрание по проблеме i. Дальше — больше подписей, меньше времени, вреднее жильцы
-const LEVELS = PROBLEMS.map((p, i) => ({
-  id: 'L' + (i + 1), n: i + 1, problem: p.id,
+/* ---------- туры: решения ОСИ по правилам голосования ----------
+   Дом в игре — 54 квартиры (9 этажей × 6). Пороги — от всех квартир дома:
+   0 инициативная группа — 10 % «за»; 1 председатель и 2 совет — явка 50 %+1, из голосовавших 50 %+1 «за»;
+   3 тариф — 50 %+1 «за» от всех; 4–5 изменение конструкции — 2/3 «за» от всех.
+   Обычный ремонт (свет, дверь, крыша…) голосования не требует — решает председатель.
+   Время тура — 60 игровых дней. */
+const APTS = HOUSE.floors * HOUSE.perFloor;                                // 54
+const PCT = { tenth: Math.ceil(APTS * .1), half: Math.floor(APTS / 2) + 1, twoThirds: Math.ceil(APTS * 2 / 3) };   // 6, 28, 36
+const TOUR_DEFS = [
+  { code: 'initiative',   rule: 'yes',    goal: PCT.tenth,     duration: 75,  raccoon: 1, hard: 0,   badge: 'initiative_group',
+    title: { kz: 'Бастамашыл топ', ru: 'Инициативная группа', en: 'Initiative group' },
+    ruleText: { kz: 'пәтерлердің 10 %-ы «иә» — {g} қолтаңба', ru: '10 % квартир «за» — {g} подписей', en: '10% of flats say yes — {g} signatures' },
+    winT: { kz: 'БАСТАМАШЫЛ ТОП ҚҰРЫЛДЫ!', ru: 'ИНИЦИАТИВНАЯ ГРУППА ЕСТЬ!', en: 'INITIATIVE GROUP FORMED!' },
+    winNote: { kz: 'Енді төрағаны сайлау керек — 2-жиналыс ашылды.', ru: 'Теперь нужно выбрать председателя — открыто собрание 2.', en: 'Now elect a chairman — meeting 2 is open.' } },
+  { code: 'chairman',     rule: 'quorum', goal: Math.floor(PCT.half / 2) + 1, quorum: PCT.half, duration: 150, raccoon: 3, hard: .04, badge: 'chairman_elected',
+    title: { kz: 'Төрағаны сайлау', ru: 'Выбор председателя', en: 'Electing the chairman' },
+    ruleText: { kz: 'кемінде {q} пәтер дауыс береді, жартысынан көбі «иә»', ru: 'голосуют не меньше {q} квартир, из них больше половины «за»', en: 'at least {q} flats vote, more than half say yes' },
+    winT: { kz: 'СЕН ОСИ ТӨРАҒАСЫСЫҢ!', ru: 'ТЫ — ПРЕДСЕДАТЕЛЬ ОСИ!', en: 'YOU ARE THE CHAIRMAN!' },
+    winNote: { kz: 'Кәдімгі жөндеуді (шам, есік, шатыр…) енді жиналыссыз өзің шешесің — «Менің ЖК».', ru: 'Обычный ремонт (свет, дверь, крыша…) теперь решаешь сам, без собрания — в «Мой ЖК».', en: 'Regular repairs (light, door, roof…) are now your call, no meeting needed — in “My block”.' } },
+  { code: 'council',      rule: 'quorum', goal: Math.floor(PCT.half / 2) + 1, quorum: PCT.half, duration: 150, raccoon: 3, hard: .07, badge: 'council_elected', needFix: ['light'],
+    title: { kz: 'Үй кеңесін сайлау', ru: 'Выбор совета дома', en: 'Electing the house council' },
+    ruleText: { kz: 'кемінде {q} пәтер дауыс береді, жартысынан көбі «иә»', ru: 'голосуют не меньше {q} квартир, из них больше половины «за»', en: 'at least {q} flats vote, more than half say yes' },
+    winT: { kz: 'ҮЙ КЕҢЕСІ САЙЛАНДЫ!', ru: 'СОВЕТ ДОМА ИЗБРАН!', en: 'HOUSE COUNCIL ELECTED!' },
+    winNote: { kz: 'Тағы екі жөндеу жаса — көршілер тарифке сенеді.', ru: 'Сделай ещё пару ремонтов — и соседи поверят в тариф.', en: 'Do a couple more repairs — then neighbours will trust the tariff.' } },
+  { code: 'tariff',       rule: 'yes',    goal: PCT.half,      duration: 150, raccoon: 3, hard: .12, badge: 'tariff_approved', needFixCount: 3,
+    title: { kz: 'Тарифті бекіту', ru: 'Утверждение тарифа', en: 'Approving the tariff' },
+    ruleText: { kz: 'барлық пәтердің 50 %+1-і «иә» — {g} дауыс', ru: '50 %+1 от всех квартир «за» — {g} голосов', en: '50%+1 of all flats say yes — {g} votes' },
+    winT: { kz: 'ТАРИФ БЕКІТІЛДІ!', ru: 'ТАРИФ УТВЕРЖДЁН!', en: 'TARIFF APPROVED!' },
+    winNote: { kz: 'Үйдің тұрақты бюджеті бар. Енді — ортақ антенна.', ru: 'У дома есть постоянный бюджет. Дальше — общая антенна.', en: 'The house now has a steady budget. Next — a shared antenna.' } },
+  { code: 'construction', rule: 'yes',    goal: PCT.twoThirds, duration: 195, raccoon: 4, hard: .1,  badge: 'construction_approved', problem: 'antenna',
+    title: { kz: 'Шатырға антенна', ru: 'Антенна на крышу', en: 'Antenna on the roof' },
+    ruleText: { kz: 'конструкцияны өзгерту: барлық пәтердің 2/3-і «иә» — {g} дауыс', ru: 'изменение конструкции: 2/3 квартир «за» — {g} голосов', en: 'structural change: 2/3 of flats say yes — {g} votes' },
+    winT: { kz: 'АНТЕННА БОЛАДЫ!', ru: 'АНТЕННЕ БЫТЬ!', en: 'THE ANTENNA IS APPROVED!' },
+    winNote: { kz: 'Антеннаны «Менің ЖК»-да орнат.', ru: 'Поставь антенну в «Мой ЖК».', en: 'Install the antenna in “My block”.' } },
+  { code: 'lift',         rule: 'yes',    goal: PCT.twoThirds, duration: 195, raccoon: 4, hard: .14, badge: 'all_tours', problem: 'lift', needFix: ['antenna'],
+    title: { kz: 'Лифтті ауыстыру', ru: 'Замена лифта', en: 'Replacing the lift' },
+    ruleText: { kz: 'конструкцияны өзгерту: барлық пәтердің 2/3-і «иә» — {g} дауыс', ru: 'изменение конструкции: 2/3 квартир «за» — {g} голосов', en: 'structural change: 2/3 of flats say yes — {g} votes' },
+    winT: { kz: 'ЖАҢА ЛИФТ БОЛАДЫ!', ru: 'НОВОМУ ЛИФТУ БЫТЬ!', en: 'A NEW LIFT IS COMING!' },
+    winNote: { kz: 'Барлық жиналыс өтті! Лифтті «Менің ЖК»-да орнат.', ru: 'Все собрания пройдены! Поставь лифт в «Мой ЖК».', en: 'All meetings passed! Install the lift in “My block”.' } },
+];
+const LEVELS = TOUR_DEFS.map((d, i) => ({
+  ...d, id: 'L' + (i + 1), n: i + 1, problem: d.problem || null,
   floors: HOUSE.floors, perFloor: HOUSE.perFloor, heroApt: HOUSE.heroApt,
-  goal: [6, 7, 8, 9, 10, 11, 12, 13][i],
-  start: [18, 10, 19, 11, 18, 12, 19, 17][i] * 60,
-  duration: [90, 88, 86, 84, 82, 80, 78, 76][i], secPerMin: 4.5,
-  raccoon: i < 4 ? 2 : 1,
+  start: 0, secPerMin: 3, days: 60,
   awayShare: .22 + i * .02,
-  hard: i * .045,                      // доля «трудных» жильцов растёт: ворчуны, арендаторы, ночная смена
-  talkerFloor: [3, 5, 4, 7, 2, 6, 8, 5][i], helperAfter: 3, helperFloor: [8, 7, 9, 6, 8, 9, 7, 8][i],
-  reward: { first: [150, 190, 280, 360, 450, 560, 680, 800][i], replay: [60, 90, 130, 170, 210, 260, 320, 380][i], perExtra: 12 + i * 4 },
+  talkerFloor: [3, 5, 4, 7, 2, 6][i], helperAfter: 3, helperFloor: [8, 7, 9, 6, 8, 9][i],
+  reward: { first: [200, 320, 380, 620, 800, 900][i], replay: [60, 110, 130, 200, 260, 300][i], perExtra: 8 + i * 3 },
   mix: (() => {
-    const total = HOUSE.floors * HOUSE.perFloor - 1, h = i * .045;
+    const total = APTS - 1, h = d.hard;
     const share = { apa: .2 - h * .3, mom: .2 - h * .3, student: .18 - h * .2, business: .12, grump: .1 + h * .5, night: .1 + h * .2, renter: .1 + h * .1 };
     const out = []; for (const a in share) for (let k = 0; k < Math.round(share[a] * total); k++) out.push(a);
     while (out.length < total) out.push('mom'); return out.slice(0, total);
   })(),
 }));
+/* Правила доступа — общие для игры и сервера: H = { won: [...туры], fixed: [...ремонты] } */
+const ORDINARY = () => PROBLEMS.filter(p => p.kind !== 'construction');
+function tourOpen(t, H) {
+  const i = t.n - 1;
+  if (i > 0 && !H.won.includes(LEVELS[i - 1].id)) return { ok: false, why: 'prev', need: LEVELS[i - 1] };
+  for (const id of t.needFix || []) if (!H.fixed.includes(id)) return { ok: false, why: 'fix', need: PROBLEMS.find(p => p.id === id) };
+  if (t.needFixCount && ORDINARY().filter(p => H.fixed.includes(p.id)).length < t.needFixCount) return { ok: false, why: 'fixCount', n: t.needFixCount };
+  return { ok: true };
+}
+// можно ли чинить: обычный ремонт — после избрания председателем, конструкция — после своего собрания
+function canFix(p, H) {
+  if (H.fixed.includes(p.id)) return { ok: false, why: 'done' };
+  const t = p.kind === 'construction' ? TOURS[p.tour] : TOURS.L2;
+  if (!H.won.includes(t.id)) return { ok: false, why: p.kind === 'construction' ? 'vote' : 'chair', tour: t };
+  return { ok: true };
+}
+// итог голосования по правилам тура: yes — «за», no — «против»
+function ruleText(t) { return L(t.ruleText).replace('{g}', t.goal).replace('{q}', t.quorum || ''); }
+function voteOutcome(t, yes, no) {
+  const turnout = yes + no;
+  if (t.rule === 'quorum') { const need = Math.max(t.goal, Math.floor(turnout / 2) + 1); return { ok: turnout >= t.quorum && yes >= need, need, turnout }; }
+  return { ok: yes >= t.goal, need: t.goal, turnout };
+}
 const TOURS = Object.fromEntries(LEVELS.map(l => [l.id, l]));
 
 /* ---------- характеры жильцов ---------- */
@@ -806,7 +884,7 @@ const MockServer = (() => {
   const today = () => new Date().toISOString().slice(0, 10);
   const houseView = (u) => { const H = house(u.userId), prof = db.profiles[u.userId] || {}, score = houseScore(H);
     return { fixed: H.fixed, decor: H.decor, won: H.won, coins: prof.coins || 0, score, bonus: Math.floor(score / 10), claimable: H.claimDay !== today() && score > 0 }; };
-  const unlocked = (u, n) => n === 1 || house(u.userId).fixed.includes(PROBLEMS[n - 2].id);
+  const unlocked = (u, n) => tourOpen(LEVELS[n - 1], house(u.userId)).ok;   // те же правила, что в игре (content.js)
   const FAKE_HOUSES = [['ЖК «Нұрлы»', 'Динара', 'c-17', 880], ['ЖК «Нұрлы»', 'Ерлан', 'c-17', 640], ['ЖК «Нұрлы»', 'Роза апа', 'c-17', 360],
     ['ЖК «Самал»', 'Нұрлан', 'c-04', 1250], ['ЖК «Самал»', 'Ольга', 'c-04', 520], ['ЖК «Көктем»', 'Бақыт', 'c-09', 1010], ['ЖК «Арай»', 'Асхат', 'c-21', 760]];
   const me = token => {
@@ -854,12 +932,16 @@ const MockServer = (() => {
       if (run.finished) return run.result;                                     // повторная отправка — тот же ответ
       const tour = TOURS[run.tourId], maxApt = tour.floors * tour.perFloor;
       const seconds = (Date.now() - run.startedAt) / 1000;
-      const yes = new Map();
-      for (const e of body.events || []) if (e.t === 'yes' && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt) yes.set(e.apt, e.via || 'door');
-      const suspicious = seconds < 15 && yes.size > 3;                       // 10 подписей за 15 секунд не бывает
-      const own = suspicious ? 0 : yes.size, online = suspicious ? 0 : [...yes.values()].filter(v => v === 'online').length;
+      // голос квартиры — последнее её событие «за» или «против»; «за» после «против» — передумал
+      const vote = new Map(), via = new Map();
+      for (const e of body.events || []) if ((e.t === 'yes' || e.t === 'no') && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt) {
+        if (e.t === 'no' && vote.get(e.apt) === 'yes') continue;
+        vote.set(e.apt, e.t); if (e.t === 'yes') via.set(e.apt, e.via || 'door'); }
+      const yesN = [...vote.values()].filter(v => v === 'yes').length, noN = [...vote.values()].filter(v => v === 'no').length;
+      const suspicious = seconds < 15 && yesN > 3;                           // 4+ голоса за 15 секунд не бывает
+      const own = suspicious ? 0 : yesN, against = suspicious ? 0 : noN, online = suspicious ? 0 : [...via.values()].filter(v => v === 'online').length;
       const remote = 0, signatures = own;
-      const success = signatures >= tour.goal;
+      const out = voteOutcome(tour, own, against), success = out.ok;
       const score = signatures * 100 + online * 20 + (success ? 300 + Math.max(0, Math.round(600 - seconds) * 2) : 0);
       // бюджет: за первую победу на собрании — больше, за повтор — меньше; сверх нормы — доплата за подпись
       const H = house(u.userId), first = success && !H.won.includes(tour.id);
@@ -872,11 +954,12 @@ const MockServer = (() => {
       // бонусы в приложение — только вошедшим через E-KNOT и только за первую победу в туре
       let reward = null; db.rewards[u.userId] = db.rewards[u.userId] || [];
       if (success && !db.rewards[u.userId].some(r => r.tourId === tour.id)) {
-        reward = { tourId: tour.id, points: 50, status: u.guest ? 'needs_login' : 'sent', at: Date.now() };
+        reward = { tourId: tour.id, points: 50 + tour.n * 10, badge: tour.badge, status: u.guest ? 'needs_login' : 'sent', at: Date.now() };
         if (!u.guest) { db.rewards[u.userId].push(reward); prof.rewardsTotal = (prof.rewardsTotal || 0) + reward.points; }
       }
       run.finished = true;
-      run.result = { signatures, own, remote, online, success, first, score, best, newBest: score > prevBest, coins, totalCoins: prof.coins, reward, suspicious, problem: tour.problem };
+      run.result = { signatures, own, remote, online, against, turnout: out.turnout, need: out.need, success, first, score, best, newBest: score > prevBest, coins, totalCoins: prof.coins, reward, suspicious, problem: tour.problem,
+        badges: success && first ? [tour.badge] : [] };
       commit();
       return run.result;
     },
@@ -889,8 +972,7 @@ const MockServer = (() => {
       if (pi >= 0) {
         const p = PROBLEMS[pi];
         if (H.fixed.includes(p.id)) err(409, 'already');
-        if (pi > 0 && !H.fixed.includes(PROBLEMS[pi - 1].id)) err(403, 'order');
-        if (!H.won.includes('L' + (pi + 1))) err(403, 'no_vote');
+        const ok = canFix(p, H); if (!ok.ok) err(403, ok.why === 'chair' ? 'not_chairman' : 'no_vote');
         cost = p.cost;
       } else if (dc) {
         if (H.decor.includes(dc.id)) err(409, 'already');
@@ -2043,8 +2125,10 @@ function makeResidents(tour, seed) {
 scenes.tour = {
   enter(data) {
     const tour = this.tour = TOURS[data.tour || 'L1'];
-    this.fixed = new Set(HOUSE_STATE.fixed); this.problem = PROBLEMS.find(p => p.id === tour.problem);
+    this.fixed = new Set(HOUSE_STATE.fixed); this.problem = tour.problem ? PROBLEMS.find(p => p.id === tour.problem) : null;
     this.res = makeResidents(tour, hashStr(USER.userId + tour.id) + (SAVE.tours[tour.id]?.tries || 0));
+    // каждый сделанный ремонт — доверие к председателю: соседи видят результат
+    const repaired = Math.min(5, HOUSE_STATE.fixed.length); for (const r of Object.values(this.res)) r.mood += repaired * 4;
     const R = rng(hashStr(USER.userId) + 9);
     this.doorLook = {}; for (let apt = 1; apt <= tour.floors * tour.perFloor; apt++) this.doorLook[apt] = pick(R, DOOR_STYLES);
     this.doorLook[tour.heroApt] = { col: '#2f6f62', kind: 'metal' };
@@ -2064,7 +2148,7 @@ scenes.tour = {
     this.plan = null;
     // повестка собрания: какая жалоба и сколько подписей нужно
     const runId = this.runId = (this.runId || 0) + 1, here = () => scene === scenes.tour && this.runId === runId && !this.over;
-    setTimeout(() => { if (!here()) return; toast(L(UI.meetingT).replace('{n}', tour.n), L(UI.meetingB).replace('{p}', L(this.problem.name)).replace('{g}', tour.goal), 4200);
+    setTimeout(() => { if (!here()) return; toast(L(UI.meetingT).replace('{n}', tour.n), L(UI.meetingB).replace('{t}', L(tour.title)).replace('{r}', ruleText(tour)), 5200);
       if (tour.n === 1) setTimeout(() => here() && toast('E-KNOT', L(UI.tutTap)), 4600); }, 500);
   },
   focus() { return { x: this.hero.x, y: this.hero.y - this.camY - 14 }; },
@@ -2072,7 +2156,13 @@ scenes.tour = {
   // тур 2: онлайн-голоса двух других подъездов — та же формула, что на сервере
   remoteTarget() { const R = this.tour.remote; return R ? Math.min(R.max, Math.floor(this.signatures() * R.perYes + this.broadcasts * R.perBroadcast)) : 0; },
   votes() { return this.signatures() + Math.floor(this.remoteShown); },
-  goalMet() { return this.votes() >= this.tour.goal; },
+  against() { return Object.values(this.res).filter(r => r.status === 'no').length; },
+  outcome() { return voteOutcome(this.tour, this.votes(), this.against()); },
+  goalMet() { return this.outcome().ok; },
+  // с учётом обещавших проголосовать онлайн: можно закрыть собрание и дождаться их голосов
+  goalLikely() { const pend = Object.values(this.res).filter(r => r.status === 'online').length; return voteOutcome(this.tour, this.votes() + pend, this.against()).ok; },
+  // игровой день 1…60: время тура растянуто на 60 дней
+  day() { const T = this.tour; return clamp(Math.floor((this.minute - T.start) / T.duration * T.days) + 1, 1, T.days); },
   async intro2() {
     this.busy = true; await wait(500);
     dlgOpen('E-KNOT', () => EKNOT_PORT, 900);
@@ -2320,6 +2410,8 @@ scenes.tour = {
   },
   signed(r, via) {
     sfx.stamp(); this.events.push({ t: 'yes', apt: r.apt, via });
+    // сосед подписал — остальным на этаже проще решиться
+    for (const o of Object.values(this.res)) if (o.floor === r.floor && o !== r && !['yes', 'no', 'renter'].includes(o.status)) o.mood += 6;
     pop(DOOR_X[r.d], this.base(r.floor) - 70, '+1 ✓', '#4caf6e');
     this.stampT = 900;
     this.checkGoal(400);
@@ -2373,7 +2465,7 @@ scenes.tour = {
     const R = rng(hashStr(USER.userId) + Math.floor(this.minute));
     for (const r of Object.values(this.res)) {
       if (!r.A.onlineOk) continue;
-      const chance = { away: .75, noanswer: .75, thinking: r.mood >= 40 ? .6 : 0, unknown: .3 }[r.status] || 0;
+      const chance = { away: .75, noanswer: .75, thinking: r.mood >= 40 ? .6 : 0, unknown: .45 }[r.status] || 0;
       if (R() >= chance) continue;
       r.status = 'online'; this.events.push({ t: 'online', apt: r.apt, via: 'raccoon' }); n++;
     }
@@ -2393,14 +2485,15 @@ scenes.tour = {
     try { result = await API.tourFinish(this.run, this.events); }
     catch (e) {
       // сервер не ответил — показываем итог, посчитанный в игре, но без рейтинга и бонусов
-      const yes = new Set(this.events.filter(e => e.t === 'yes').map(e => e.apt)), own = yes.size, remote = this.remoteTarget(), n = own + remote, ok = n >= this.tour.goal;
-      result = { signatures: n, own, remote, online: this.events.filter(e => e.t === 'yes' && e.via === 'online').length, success: ok, coins: 0, score: null, offline: true };
+      const yes = new Set(this.events.filter(e => e.t === 'yes').map(e => e.apt)), own = yes.size, remote = this.remoteTarget(), n = own + remote;
+      const against = this.against(), out = voteOutcome(this.tour, n, against);
+      result = { signatures: n, own, remote, against, turnout: out.turnout, need: out.need, online: this.events.filter(e => e.t === 'yes' && e.via === 'online').length, success: out.ok, coins: 0, score: null, offline: true };
     }
     const T = this.tour.id, prev = SAVE.tours[T] || { tries: 0, best: 0, done: false };
     SAVE.tours[T] = { tries: prev.tries + 1, best: Math.max(prev.best, result.signatures), done: prev.done || result.success };
     if (result.totalCoins != null) SAVE.coins = result.totalCoins; persist();
     if (result.first && !HOUSE_STATE.won.includes(this.tour.id)) HOUSE_STATE.won.push(this.tour.id);
-    const stats = { ...result, tourId: this.tour.id, goal: this.tour.goal, problem: this.problem, against: Object.values(this.res).filter(r => r.status === 'no').length, thinking: Object.values(this.res).filter(r => r.status === 'thinking').length };
+    const stats = { ...result, tourId: this.tour.id, goal: this.tour.goal, problem: this.problem, against: this.against(), thinking: Object.values(this.res).filter(r => r.status === 'thinking').length };
     setTimeout(() => irisTo(this.hero.x, this.hero.y - this.camY - 14, () => go('result', stats)), timeUp ? 1200 : 200);
   },
 
@@ -2515,18 +2608,22 @@ scenes.tour = {
     // часы
     // кнопка паузы вместо значка часов
     if (button('II', 0, 1, 'dark', { left: 1, w: 16 }) && !this.busy && !DLG.open) this.paused = true;
-    text(`${hh}:${String(mm).padStart(2, '0')}`, 22, 5, { col: left < 8 ? '#e98f6f' : '#f4f3ee' });
-    rect(68, 6, 55, 6, '#2b2a33'); rect(68, 6, Math.round(55 * clamp(left / T.duration, 0, 1)), 6, left < 8 ? '#e98f6f' : '#7fc4a8');
+    const late = left < T.duration * .12;
+    text(`${L(UI.day)} ${this.day()}/${T.days}`, 22, 7, { col: late ? '#e98f6f' : '#f4f3ee', size: 6 });
+    rect(88, 7, 35, 5, '#2b2a33'); rect(88, 7, Math.round(35 * clamp(left / T.duration, 0, 1)), 5, late ? '#e98f6f' : '#7fc4a8');
     // подписи
-    const n = this.votes();
-    text(`${L(T.remote ? UI.votes : UI.signs)} ${n}/${T.goal}`, 132, 5, { col: n >= T.goal ? '#4caf6e' : '#f2c94c' });
+    const n = this.votes(), o = this.outcome();
+    if (T.rule === 'quorum') {
+      text(`${L(UI.yesShort)} ${n}/${o.need}`, 132, 3, { col: n >= o.need ? '#4caf6e' : '#f2c94c', size: 6 });
+      text(`${L(UI.turnShort)} ${o.turnout}/${T.quorum}`, 132, 11, { col: o.turnout >= T.quorum ? '#4caf6e' : '#9fb0cc', size: 6 });
+    } else text(`${L(T.n === 1 ? UI.signs : UI.yesShort)} ${n}/${T.goal}`, 132, 5, { col: n >= T.goal ? '#4caf6e' : '#f2c94c' });
     // обещали подписать онлайн в E-KNOT — придут к концу собрания, показываем отдельно, чтобы итог не был сюрпризом
     const pend = Object.values(this.res).filter(r => r.status === 'online').length;
-    if (pend) text(L(UI.hudOnline).replace('{n}', pend), 132, 15, { col: '#7fc4a8', size: 6 });
+    if (pend) text(L(UI.hudOnline).replace('{n}', pend), 132, 22, { col: '#7fc4a8', size: 6, shadow: '#0b0c10' });
     if (button(L(UI.ballot), 0, 1, 'dark', { left: 244 }) && !this.busy && !DLG.open) this.ballot = !this.ballot;
     if (button(`${L(UI.raccoon)}×${this.raccoon}`, 0, 1, this.raccoon ? 'alt' : 'off', { left: 330 })) this.useRaccoon();
     text(`${this.hero.floor}${L(UI.floor)}`, 8, 22, { col: '#f4f3ee', shadow: '#0b0c10', size: 6 });
-    if (this.goalMet() && !this.busy && !DLG.open) { if (button(L(UI.finish), W / 2, 22, 'primary')) this.finish(false); }
+    if ((this.goalMet() || this.goalLikely()) && !this.busy && !DLG.open) { if (button(L(UI.finish), W / 2, 30, 'primary')) this.finish(false); }
   },
   drawBallot() {
     const T = this.tour;
@@ -2576,26 +2673,33 @@ scenes.result = {
     paper(56, 10, 288, 210, 11);
     const t2 = d.tourId === 't2';
     text(L(UI.protocol).replace('1', d.tourId ? d.tourId.slice(1) : '1'), W / 2, 18, { align: 'center', col: INK_MUTED });
-    text(d.success ? (d.tourId === 'L1' ? L(UI.win) : L(UI.winMeeting)) : L(UI.lose), W / 2, 32, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
+    const TT = TOURS[d.tourId] || TOURS.L1;
+    text(d.success ? L(TT.winT) : TT.rule === 'quorum' && (d.turnout || 0) < TT.quorum ? L(UI.noQuorum) : L(UI.lose), W / 2, 32, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
     // у дверей + онлайн = всего: те же числа, что игрок видел на экране собрания
     const online = d.online || 0, door = Math.max(0, d.signatures - online - (d.remote || 0));
     const rows = [[L(UI.rDoor), String(door)]];
     if (online) rows.push([L(UI.rOnline), '+' + online]);
     if (d.remote) rows.push([L(UI.remote), '+' + d.remote]);
-    rows.push([L(UI.rTotal), `${d.signatures}/${d.goal || TOURS.L1.goal}`, d.signatures >= (d.goal || 0) ? INK_TEAL : INK_RED], [L(UI.rAgainst), String(d.against)], [L(UI.rThinking), String(d.thinking)]);
-    if (!d.offline) rows.push([L(UI.rScore), String(d.score) + (d.newBest ? ' ★' : ''), d.newBest ? INK_GOLD : INK], [L(UI.rRank), this.rank ? '#' + this.rank.rank : '…'], [L(UI.rBudget), '+₸' + d.coins]);
+    const need = d.need || TT.goal;
+    rows.push([L(UI.rTotal), `${d.signatures}/${need}`, d.signatures >= need ? INK_TEAL : INK_RED], [L(UI.rAgainst), String(d.against)]);
+    if (TT.rule === 'quorum') rows.push([L(UI.rTurnout), `${d.turnout || 0}/${TT.quorum}`, (d.turnout || 0) >= TT.quorum ? INK_TEAL : INK_RED]);
+    rows.push([L(UI.rThinking), String(d.thinking)]);
+    if (!d.offline) rows.push([L(UI.rScore) + ' / ' + L(UI.rRank), String(d.score) + (d.newBest ? '★' : '') + ' · ' + (this.rank ? '#' + this.rank.rank : '…'), d.newBest ? INK_GOLD : INK], [L(UI.rBudget), '+₸' + d.coins]);
     const rh = rows.length > 8 ? 10 : 11;
     rows.forEach(([a, b, c], i) => { text(a, 74, 46 + i * rh, { col: INK }); text(b, 326, 46 + i * rh, { col: c || INK, align: 'right' }); rect(74, 55 + i * rh, 252, 1, '#e2d9c2'); });
     // бонус в приложение
     let note, col = INK_MUTED;
     if (d.offline) note = L(UI.rOffline);
     else if (d.suspicious) { note = L(UI.rSuspicious); col = INK_RED; }
-    else if (d.reward && d.reward.status === 'sent') { note = L(UI.rRewardSent).replace('{n}', d.reward.points); col = INK_TEAL; }
-    else if (d.reward && d.reward.status === 'needs_login') { note = L(UI.rRewardGuest).replace('{n}', d.reward.points); col = INK_GOLD; }
-    else note = d.success ? (d.first && d.problem ? L(UI.rFirstWin).replace('{p}', L(d.problem.name)) : L(UI.rReplay)) : L(UI.rRetry);
-    wrapText(note, 200).slice(0, 3).forEach((l, i) => text(l, 172, 46 + rows.length * rh + 4 + i * 9, { align: 'center', col, size: 6 }));
-    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(296, 154); ctx.rotate(-.25); ctx.scale(s, s); ctx.globalAlpha = k;
-      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text(d.tourId === 'L1' ? 'ОСИ' : 'ИӘ', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
+    else note = d.success ? (d.first ? L(TT.winNote) : L(UI.rReplay)) : L(UI.rRetry);
+    let ny = 46 + rows.length * rh + 4;
+    wrapText(note, 250).slice(0, 3).forEach(l => { text(l, 200, ny, { align: 'center', col, size: 6 }); ny += 9; });
+    // значок и баллы в приложение — отдельной строкой
+    if (!d.offline && !d.suspicious && d.reward) { const b = BADGES[d.reward.badge] ? L(BADGES[d.reward.badge]) : '';
+      const rt = L(d.reward.status === 'sent' ? UI.rRewardSent : UI.rRewardGuest).replace('{n}', d.reward.points).replace('{b}', b);
+      wrapText(rt, 250).slice(0, 2).forEach(l => { text(l, 200, ny + 1, { align: 'center', col: d.reward.status === 'sent' ? INK_TEAL : INK_GOLD, size: 6 }); ny += 9; }); }
+    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(304, 15); ctx.rotate(-.15); ctx.scale(s, s); ctx.globalAlpha = k;
+      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text(d.tourId === 'L1' ? 'ОСИ' : LANG === 'kz' ? 'ИӘ' : 'ЗА', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
     const bw = 84;
     if (button(L(UI.toHouse), 108, 186, 'primary', { w: bw })) irisTo(108, 194, () => go('house', { focus: d.success && d.first && d.problem ? d.problem.id : null }));
     if (button(L(UI.rating), 200, 186, 'alt', { w: bw })) irisTo(200, 194, () => go('leaderboard', { from: 'result' }));
@@ -2669,9 +2773,11 @@ scenes.leaderboard = {
    ============================================================ */
 let HOUSE_STATE = { fixed: [], decor: [], won: [], coins: 0, score: 0, bonus: 0, claimable: false };
 const has = id => HOUSE_STATE.fixed.includes(id) || HOUSE_STATE.decor.includes(id);
-function levelInfo(i) {
-  const p = PROBLEMS[i], L = LEVELS[i];
-  return { p, L, fixed: HOUSE_STATE.fixed.includes(p.id), won: HOUSE_STATE.won.includes(L.id), open: i === 0 || HOUSE_STATE.fixed.includes(PROBLEMS[i - 1].id) };
+// собрание i: открыто ли и почему нет (правила общие с сервером — content.js)
+function tourInfo(i) {
+  const T = LEVELS[i], o = tourOpen(T, HOUSE_STATE);
+  const why = o.ok ? '' : o.why === 'prev' ? L(UI.lkPrev).replace('{n}', o.need.n) : o.why === 'fix' ? L(UI.lkFix).replace('{p}', L(o.need.name)) : L(UI.lkFixCount).replace('{n}', o.n);
+  return { L: T, won: HOUSE_STATE.won.includes(T.id), open: o.ok, why };
 }
 
 // геометрия дома на карте
@@ -2964,11 +3070,12 @@ scenes.house = {
   // что можно сделать с вещью сейчас
   status(id) {
     const pi = PROBLEMS.findIndex(p => p.id === id);
-    if (pi >= 0) { const I = levelInfo(pi);
-      if (I.fixed) return { kind: 'done' };
-      if (!I.open) return { kind: 'locked', text: L(UI.hNeedPrev) };
-      if (!I.won) return { kind: 'vote', text: L(UI.hNeedVote).replace('{n}', I.L.n), level: I.L.id };
-      return { kind: 'buy', cost: I.p.cost };
+    if (pi >= 0) { const P = PROBLEMS[pi], c = canFix(P, HOUSE_STATE);
+      if (c.why === 'done') return { kind: 'done' };
+      if (!c.ok) { const I = tourInfo(c.tour.n - 1);
+        if (!I.open) return { kind: 'locked', text: (c.why === 'chair' ? L(UI.hNeedChair) + ' ' : '') + I.why };
+        return { kind: 'vote', text: c.why === 'chair' ? L(UI.hNeedChair) : L(UI.hNeedVote).replace('{n}', c.tour.n), level: c.tour.id }; }
+      return { kind: 'buy', cost: P.cost };
     }
     const d = DECOR.find(x => x.id === id);
     if (has(id)) return { kind: 'done' };
@@ -3056,16 +3163,16 @@ scenes.levels = {
     frameBox(20, 8, 360, 210, .95);
     text(L(UI.meetings), W / 2, 15, { align: 'center', col: '#f4f3ee' });
     text(`₸${HOUSE_STATE.coins}`, 370, 15, { align: 'right', col: '#f2c94c', size: 6 });
-    PROBLEMS.forEach((_, i) => {
-      const I = levelInfo(i), y = 28 + i * 20, x = 30;
-      rect(x, y, 340, 19, I.open ? '#1d2130' : '#151822'); rect(x, y + 18, 340, 1, '#0a0c12');
-      text(`${I.L.n}.`, x + 6, y + 6, { col: I.open ? '#f2c94c' : '#55607c', size: 6 });
-      text(L(I.p.name), x + 22, y + 3, { col: I.open ? '#f4f3ee' : '#55607c', size: 6 });
-      const info = !I.open ? L(UI.lvLocked) : `${L(UI.lvGoal).replace('{g}', I.L.goal)} · +₸${I.won ? I.L.reward.replay : I.L.reward.first}`;
-      text(info, x + 22, y + 11, { col: I.open ? '#9fd9c2' : '#55607c', size: 6 });
-      const mark = I.fixed ? '✓' : I.won ? '★' : '';
-      if (mark) text(mark, x + 266, y + 6, { col: I.fixed ? '#7fc4a8' : '#f2c94c', size: 6, align: 'center' });
-      if (I.open && button(L(UI.play2), x + 306, y + 2, I.won ? 'alt' : 'primary', { w: 60 })) irisTo(W / 2, 120, () => go('tour', { tour: I.L.id }));
+    LEVELS.forEach((_, i) => {
+      const I = tourInfo(i), y = 28 + i * 26, x = 30;
+      rect(x, y, 340, 25, I.open ? '#1d2130' : '#151822'); rect(x, y + 24, 340, 1, '#0a0c12');
+      text(`${I.L.n}.`, x + 6, y + 9, { col: I.open ? '#f2c94c' : '#55607c', size: 6 });
+      text(L(I.L.title), x + 22, y + 3, { col: I.open ? '#f4f3ee' : '#55607c', size: 6 });
+      const short = I.L.rule === 'quorum' ? L(UI.lvQuorum).replace('{q}', I.L.quorum) : L(UI.lvYes).replace('{g}', I.L.goal);
+      text(`${short} · ${I.L.days} ${L(UI.daysWord)}`, x + 22, y + 11, { col: I.open ? '#cfd6e4' : '#55607c', size: 6 });
+      text(I.open ? `+₸${I.won ? I.L.reward.replay : I.L.reward.first}` : I.why, x + 22, y + 18, { col: I.open ? '#9fd9c2' : '#8a6a6a', size: 6 });
+      if (I.won) text('★', x + 266, y + 9, { col: '#f2c94c', size: 6, align: 'center' });
+      if (I.open && button(L(UI.play2), x + 306, y + 5, I.won ? 'alt' : 'primary', { w: 60 })) irisTo(W / 2, 120, () => go('tour', { tour: I.L.id }));
     });
     if (button(L(UI.back), W / 2, 200, 'alt')) irisTo(W / 2, 120, () => go('house'));
   },

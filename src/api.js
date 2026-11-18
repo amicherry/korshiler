@@ -38,7 +38,7 @@ const MockServer = (() => {
   const today = () => new Date().toISOString().slice(0, 10);
   const houseView = (u) => { const H = house(u.userId), prof = db.profiles[u.userId] || {}, score = houseScore(H);
     return { fixed: H.fixed, decor: H.decor, won: H.won, coins: prof.coins || 0, score, bonus: Math.floor(score / 10), claimable: H.claimDay !== today() && score > 0 }; };
-  const unlocked = (u, n) => n === 1 || house(u.userId).fixed.includes(PROBLEMS[n - 2].id);
+  const unlocked = (u, n) => tourOpen(LEVELS[n - 1], house(u.userId)).ok;   // те же правила, что в игре (content.js)
   const FAKE_HOUSES = [['ЖК «Нұрлы»', 'Динара', 'c-17', 880], ['ЖК «Нұрлы»', 'Ерлан', 'c-17', 640], ['ЖК «Нұрлы»', 'Роза апа', 'c-17', 360],
     ['ЖК «Самал»', 'Нұрлан', 'c-04', 1250], ['ЖК «Самал»', 'Ольга', 'c-04', 520], ['ЖК «Көктем»', 'Бақыт', 'c-09', 1010], ['ЖК «Арай»', 'Асхат', 'c-21', 760]];
   const me = token => {
@@ -86,12 +86,16 @@ const MockServer = (() => {
       if (run.finished) return run.result;                                     // повторная отправка — тот же ответ
       const tour = TOURS[run.tourId], maxApt = tour.floors * tour.perFloor;
       const seconds = (Date.now() - run.startedAt) / 1000;
-      const yes = new Map();
-      for (const e of body.events || []) if (e.t === 'yes' && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt) yes.set(e.apt, e.via || 'door');
-      const suspicious = seconds < 15 && yes.size > 3;                       // 10 подписей за 15 секунд не бывает
-      const own = suspicious ? 0 : yes.size, online = suspicious ? 0 : [...yes.values()].filter(v => v === 'online').length;
+      // голос квартиры — последнее её событие «за» или «против»; «за» после «против» — передумал
+      const vote = new Map(), via = new Map();
+      for (const e of body.events || []) if ((e.t === 'yes' || e.t === 'no') && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt) {
+        if (e.t === 'no' && vote.get(e.apt) === 'yes') continue;
+        vote.set(e.apt, e.t); if (e.t === 'yes') via.set(e.apt, e.via || 'door'); }
+      const yesN = [...vote.values()].filter(v => v === 'yes').length, noN = [...vote.values()].filter(v => v === 'no').length;
+      const suspicious = seconds < 15 && yesN > 3;                           // 4+ голоса за 15 секунд не бывает
+      const own = suspicious ? 0 : yesN, against = suspicious ? 0 : noN, online = suspicious ? 0 : [...via.values()].filter(v => v === 'online').length;
       const remote = 0, signatures = own;
-      const success = signatures >= tour.goal;
+      const out = voteOutcome(tour, own, against), success = out.ok;
       const score = signatures * 100 + online * 20 + (success ? 300 + Math.max(0, Math.round(600 - seconds) * 2) : 0);
       // бюджет: за первую победу на собрании — больше, за повтор — меньше; сверх нормы — доплата за подпись
       const H = house(u.userId), first = success && !H.won.includes(tour.id);
@@ -104,11 +108,12 @@ const MockServer = (() => {
       // бонусы в приложение — только вошедшим через E-KNOT и только за первую победу в туре
       let reward = null; db.rewards[u.userId] = db.rewards[u.userId] || [];
       if (success && !db.rewards[u.userId].some(r => r.tourId === tour.id)) {
-        reward = { tourId: tour.id, points: 50, status: u.guest ? 'needs_login' : 'sent', at: Date.now() };
+        reward = { tourId: tour.id, points: 50 + tour.n * 10, badge: tour.badge, status: u.guest ? 'needs_login' : 'sent', at: Date.now() };
         if (!u.guest) { db.rewards[u.userId].push(reward); prof.rewardsTotal = (prof.rewardsTotal || 0) + reward.points; }
       }
       run.finished = true;
-      run.result = { signatures, own, remote, online, success, first, score, best, newBest: score > prevBest, coins, totalCoins: prof.coins, reward, suspicious, problem: tour.problem };
+      run.result = { signatures, own, remote, online, against, turnout: out.turnout, need: out.need, success, first, score, best, newBest: score > prevBest, coins, totalCoins: prof.coins, reward, suspicious, problem: tour.problem,
+        badges: success && first ? [tour.badge] : [] };
       commit();
       return run.result;
     },
@@ -121,8 +126,7 @@ const MockServer = (() => {
       if (pi >= 0) {
         const p = PROBLEMS[pi];
         if (H.fixed.includes(p.id)) err(409, 'already');
-        if (pi > 0 && !H.fixed.includes(PROBLEMS[pi - 1].id)) err(403, 'order');
-        if (!H.won.includes('L' + (pi + 1))) err(403, 'no_vote');
+        const ok = canFix(p, H); if (!ok.ok) err(403, ok.why === 'chair' ? 'not_chairman' : 'no_vote');
         cost = p.cost;
       } else if (dc) {
         if (H.decor.includes(dc.id)) err(409, 'already');

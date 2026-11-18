@@ -311,8 +311,10 @@ function makeResidents(tour, seed) {
 scenes.tour = {
   enter(data) {
     const tour = this.tour = TOURS[data.tour || 'L1'];
-    this.fixed = new Set(HOUSE_STATE.fixed); this.problem = PROBLEMS.find(p => p.id === tour.problem);
+    this.fixed = new Set(HOUSE_STATE.fixed); this.problem = tour.problem ? PROBLEMS.find(p => p.id === tour.problem) : null;
     this.res = makeResidents(tour, hashStr(USER.userId + tour.id) + (SAVE.tours[tour.id]?.tries || 0));
+    // каждый сделанный ремонт — доверие к председателю: соседи видят результат
+    const repaired = Math.min(5, HOUSE_STATE.fixed.length); for (const r of Object.values(this.res)) r.mood += repaired * 4;
     const R = rng(hashStr(USER.userId) + 9);
     this.doorLook = {}; for (let apt = 1; apt <= tour.floors * tour.perFloor; apt++) this.doorLook[apt] = pick(R, DOOR_STYLES);
     this.doorLook[tour.heroApt] = { col: '#2f6f62', kind: 'metal' };
@@ -332,7 +334,7 @@ scenes.tour = {
     this.plan = null;
     // повестка собрания: какая жалоба и сколько подписей нужно
     const runId = this.runId = (this.runId || 0) + 1, here = () => scene === scenes.tour && this.runId === runId && !this.over;
-    setTimeout(() => { if (!here()) return; toast(L(UI.meetingT).replace('{n}', tour.n), L(UI.meetingB).replace('{p}', L(this.problem.name)).replace('{g}', tour.goal), 4200);
+    setTimeout(() => { if (!here()) return; toast(L(UI.meetingT).replace('{n}', tour.n), L(UI.meetingB).replace('{t}', L(tour.title)).replace('{r}', ruleText(tour)), 5200);
       if (tour.n === 1) setTimeout(() => here() && toast('E-KNOT', L(UI.tutTap)), 4600); }, 500);
   },
   focus() { return { x: this.hero.x, y: this.hero.y - this.camY - 14 }; },
@@ -340,7 +342,13 @@ scenes.tour = {
   // тур 2: онлайн-голоса двух других подъездов — та же формула, что на сервере
   remoteTarget() { const R = this.tour.remote; return R ? Math.min(R.max, Math.floor(this.signatures() * R.perYes + this.broadcasts * R.perBroadcast)) : 0; },
   votes() { return this.signatures() + Math.floor(this.remoteShown); },
-  goalMet() { return this.votes() >= this.tour.goal; },
+  against() { return Object.values(this.res).filter(r => r.status === 'no').length; },
+  outcome() { return voteOutcome(this.tour, this.votes(), this.against()); },
+  goalMet() { return this.outcome().ok; },
+  // с учётом обещавших проголосовать онлайн: можно закрыть собрание и дождаться их голосов
+  goalLikely() { const pend = Object.values(this.res).filter(r => r.status === 'online').length; return voteOutcome(this.tour, this.votes() + pend, this.against()).ok; },
+  // игровой день 1…60: время тура растянуто на 60 дней
+  day() { const T = this.tour; return clamp(Math.floor((this.minute - T.start) / T.duration * T.days) + 1, 1, T.days); },
   async intro2() {
     this.busy = true; await wait(500);
     dlgOpen('E-KNOT', () => EKNOT_PORT, 900);
@@ -588,6 +596,8 @@ scenes.tour = {
   },
   signed(r, via) {
     sfx.stamp(); this.events.push({ t: 'yes', apt: r.apt, via });
+    // сосед подписал — остальным на этаже проще решиться
+    for (const o of Object.values(this.res)) if (o.floor === r.floor && o !== r && !['yes', 'no', 'renter'].includes(o.status)) o.mood += 6;
     pop(DOOR_X[r.d], this.base(r.floor) - 70, '+1 ✓', '#4caf6e');
     this.stampT = 900;
     this.checkGoal(400);
@@ -641,7 +651,7 @@ scenes.tour = {
     const R = rng(hashStr(USER.userId) + Math.floor(this.minute));
     for (const r of Object.values(this.res)) {
       if (!r.A.onlineOk) continue;
-      const chance = { away: .75, noanswer: .75, thinking: r.mood >= 40 ? .6 : 0, unknown: .3 }[r.status] || 0;
+      const chance = { away: .75, noanswer: .75, thinking: r.mood >= 40 ? .6 : 0, unknown: .45 }[r.status] || 0;
       if (R() >= chance) continue;
       r.status = 'online'; this.events.push({ t: 'online', apt: r.apt, via: 'raccoon' }); n++;
     }
@@ -661,14 +671,15 @@ scenes.tour = {
     try { result = await API.tourFinish(this.run, this.events); }
     catch (e) {
       // сервер не ответил — показываем итог, посчитанный в игре, но без рейтинга и бонусов
-      const yes = new Set(this.events.filter(e => e.t === 'yes').map(e => e.apt)), own = yes.size, remote = this.remoteTarget(), n = own + remote, ok = n >= this.tour.goal;
-      result = { signatures: n, own, remote, online: this.events.filter(e => e.t === 'yes' && e.via === 'online').length, success: ok, coins: 0, score: null, offline: true };
+      const yes = new Set(this.events.filter(e => e.t === 'yes').map(e => e.apt)), own = yes.size, remote = this.remoteTarget(), n = own + remote;
+      const against = this.against(), out = voteOutcome(this.tour, n, against);
+      result = { signatures: n, own, remote, against, turnout: out.turnout, need: out.need, online: this.events.filter(e => e.t === 'yes' && e.via === 'online').length, success: out.ok, coins: 0, score: null, offline: true };
     }
     const T = this.tour.id, prev = SAVE.tours[T] || { tries: 0, best: 0, done: false };
     SAVE.tours[T] = { tries: prev.tries + 1, best: Math.max(prev.best, result.signatures), done: prev.done || result.success };
     if (result.totalCoins != null) SAVE.coins = result.totalCoins; persist();
     if (result.first && !HOUSE_STATE.won.includes(this.tour.id)) HOUSE_STATE.won.push(this.tour.id);
-    const stats = { ...result, tourId: this.tour.id, goal: this.tour.goal, problem: this.problem, against: Object.values(this.res).filter(r => r.status === 'no').length, thinking: Object.values(this.res).filter(r => r.status === 'thinking').length };
+    const stats = { ...result, tourId: this.tour.id, goal: this.tour.goal, problem: this.problem, against: this.against(), thinking: Object.values(this.res).filter(r => r.status === 'thinking').length };
     setTimeout(() => irisTo(this.hero.x, this.hero.y - this.camY - 14, () => go('result', stats)), timeUp ? 1200 : 200);
   },
 
@@ -783,18 +794,22 @@ scenes.tour = {
     // часы
     // кнопка паузы вместо значка часов
     if (button('II', 0, 1, 'dark', { left: 1, w: 16 }) && !this.busy && !DLG.open) this.paused = true;
-    text(`${hh}:${String(mm).padStart(2, '0')}`, 22, 5, { col: left < 8 ? '#e98f6f' : '#f4f3ee' });
-    rect(68, 6, 55, 6, '#2b2a33'); rect(68, 6, Math.round(55 * clamp(left / T.duration, 0, 1)), 6, left < 8 ? '#e98f6f' : '#7fc4a8');
+    const late = left < T.duration * .12;
+    text(`${L(UI.day)} ${this.day()}/${T.days}`, 22, 7, { col: late ? '#e98f6f' : '#f4f3ee', size: 6 });
+    rect(88, 7, 35, 5, '#2b2a33'); rect(88, 7, Math.round(35 * clamp(left / T.duration, 0, 1)), 5, late ? '#e98f6f' : '#7fc4a8');
     // подписи
-    const n = this.votes();
-    text(`${L(T.remote ? UI.votes : UI.signs)} ${n}/${T.goal}`, 132, 5, { col: n >= T.goal ? '#4caf6e' : '#f2c94c' });
+    const n = this.votes(), o = this.outcome();
+    if (T.rule === 'quorum') {
+      text(`${L(UI.yesShort)} ${n}/${o.need}`, 132, 3, { col: n >= o.need ? '#4caf6e' : '#f2c94c', size: 6 });
+      text(`${L(UI.turnShort)} ${o.turnout}/${T.quorum}`, 132, 11, { col: o.turnout >= T.quorum ? '#4caf6e' : '#9fb0cc', size: 6 });
+    } else text(`${L(T.n === 1 ? UI.signs : UI.yesShort)} ${n}/${T.goal}`, 132, 5, { col: n >= T.goal ? '#4caf6e' : '#f2c94c' });
     // обещали подписать онлайн в E-KNOT — придут к концу собрания, показываем отдельно, чтобы итог не был сюрпризом
     const pend = Object.values(this.res).filter(r => r.status === 'online').length;
-    if (pend) text(L(UI.hudOnline).replace('{n}', pend), 132, 15, { col: '#7fc4a8', size: 6 });
+    if (pend) text(L(UI.hudOnline).replace('{n}', pend), 132, 22, { col: '#7fc4a8', size: 6, shadow: '#0b0c10' });
     if (button(L(UI.ballot), 0, 1, 'dark', { left: 244 }) && !this.busy && !DLG.open) this.ballot = !this.ballot;
     if (button(`${L(UI.raccoon)}×${this.raccoon}`, 0, 1, this.raccoon ? 'alt' : 'off', { left: 330 })) this.useRaccoon();
     text(`${this.hero.floor}${L(UI.floor)}`, 8, 22, { col: '#f4f3ee', shadow: '#0b0c10', size: 6 });
-    if (this.goalMet() && !this.busy && !DLG.open) { if (button(L(UI.finish), W / 2, 22, 'primary')) this.finish(false); }
+    if ((this.goalMet() || this.goalLikely()) && !this.busy && !DLG.open) { if (button(L(UI.finish), W / 2, 30, 'primary')) this.finish(false); }
   },
   drawBallot() {
     const T = this.tour;
@@ -844,26 +859,33 @@ scenes.result = {
     paper(56, 10, 288, 210, 11);
     const t2 = d.tourId === 't2';
     text(L(UI.protocol).replace('1', d.tourId ? d.tourId.slice(1) : '1'), W / 2, 18, { align: 'center', col: INK_MUTED });
-    text(d.success ? (d.tourId === 'L1' ? L(UI.win) : L(UI.winMeeting)) : L(UI.lose), W / 2, 32, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
+    const TT = TOURS[d.tourId] || TOURS.L1;
+    text(d.success ? L(TT.winT) : TT.rule === 'quorum' && (d.turnout || 0) < TT.quorum ? L(UI.noQuorum) : L(UI.lose), W / 2, 32, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
     // у дверей + онлайн = всего: те же числа, что игрок видел на экране собрания
     const online = d.online || 0, door = Math.max(0, d.signatures - online - (d.remote || 0));
     const rows = [[L(UI.rDoor), String(door)]];
     if (online) rows.push([L(UI.rOnline), '+' + online]);
     if (d.remote) rows.push([L(UI.remote), '+' + d.remote]);
-    rows.push([L(UI.rTotal), `${d.signatures}/${d.goal || TOURS.L1.goal}`, d.signatures >= (d.goal || 0) ? INK_TEAL : INK_RED], [L(UI.rAgainst), String(d.against)], [L(UI.rThinking), String(d.thinking)]);
-    if (!d.offline) rows.push([L(UI.rScore), String(d.score) + (d.newBest ? ' ★' : ''), d.newBest ? INK_GOLD : INK], [L(UI.rRank), this.rank ? '#' + this.rank.rank : '…'], [L(UI.rBudget), '+₸' + d.coins]);
+    const need = d.need || TT.goal;
+    rows.push([L(UI.rTotal), `${d.signatures}/${need}`, d.signatures >= need ? INK_TEAL : INK_RED], [L(UI.rAgainst), String(d.against)]);
+    if (TT.rule === 'quorum') rows.push([L(UI.rTurnout), `${d.turnout || 0}/${TT.quorum}`, (d.turnout || 0) >= TT.quorum ? INK_TEAL : INK_RED]);
+    rows.push([L(UI.rThinking), String(d.thinking)]);
+    if (!d.offline) rows.push([L(UI.rScore) + ' / ' + L(UI.rRank), String(d.score) + (d.newBest ? '★' : '') + ' · ' + (this.rank ? '#' + this.rank.rank : '…'), d.newBest ? INK_GOLD : INK], [L(UI.rBudget), '+₸' + d.coins]);
     const rh = rows.length > 8 ? 10 : 11;
     rows.forEach(([a, b, c], i) => { text(a, 74, 46 + i * rh, { col: INK }); text(b, 326, 46 + i * rh, { col: c || INK, align: 'right' }); rect(74, 55 + i * rh, 252, 1, '#e2d9c2'); });
     // бонус в приложение
     let note, col = INK_MUTED;
     if (d.offline) note = L(UI.rOffline);
     else if (d.suspicious) { note = L(UI.rSuspicious); col = INK_RED; }
-    else if (d.reward && d.reward.status === 'sent') { note = L(UI.rRewardSent).replace('{n}', d.reward.points); col = INK_TEAL; }
-    else if (d.reward && d.reward.status === 'needs_login') { note = L(UI.rRewardGuest).replace('{n}', d.reward.points); col = INK_GOLD; }
-    else note = d.success ? (d.first && d.problem ? L(UI.rFirstWin).replace('{p}', L(d.problem.name)) : L(UI.rReplay)) : L(UI.rRetry);
-    wrapText(note, 200).slice(0, 3).forEach((l, i) => text(l, 172, 46 + rows.length * rh + 4 + i * 9, { align: 'center', col, size: 6 }));
-    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(296, 154); ctx.rotate(-.25); ctx.scale(s, s); ctx.globalAlpha = k;
-      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text(d.tourId === 'L1' ? 'ОСИ' : 'ИӘ', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
+    else note = d.success ? (d.first ? L(TT.winNote) : L(UI.rReplay)) : L(UI.rRetry);
+    let ny = 46 + rows.length * rh + 4;
+    wrapText(note, 250).slice(0, 3).forEach(l => { text(l, 200, ny, { align: 'center', col, size: 6 }); ny += 9; });
+    // значок и баллы в приложение — отдельной строкой
+    if (!d.offline && !d.suspicious && d.reward) { const b = BADGES[d.reward.badge] ? L(BADGES[d.reward.badge]) : '';
+      const rt = L(d.reward.status === 'sent' ? UI.rRewardSent : UI.rRewardGuest).replace('{n}', d.reward.points).replace('{b}', b);
+      wrapText(rt, 250).slice(0, 2).forEach(l => { text(l, 200, ny + 1, { align: 'center', col: d.reward.status === 'sent' ? INK_TEAL : INK_GOLD, size: 6 }); ny += 9; }); }
+    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(304, 15); ctx.rotate(-.15); ctx.scale(s, s); ctx.globalAlpha = k;
+      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text(d.tourId === 'L1' ? 'ОСИ' : LANG === 'kz' ? 'ИӘ' : 'ЗА', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
     const bw = 84;
     if (button(L(UI.toHouse), 108, 186, 'primary', { w: bw })) irisTo(108, 194, () => go('house', { focus: d.success && d.first && d.problem ? d.problem.id : null }));
     if (button(L(UI.rating), 200, 186, 'alt', { w: bw })) irisTo(200, 194, () => go('leaderboard', { from: 'result' }));

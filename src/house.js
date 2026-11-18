@@ -6,9 +6,11 @@
    ============================================================ */
 let HOUSE_STATE = { fixed: [], decor: [], won: [], coins: 0, score: 0, bonus: 0, claimable: false };
 const has = id => HOUSE_STATE.fixed.includes(id) || HOUSE_STATE.decor.includes(id);
-function levelInfo(i) {
-  const p = PROBLEMS[i], L = LEVELS[i];
-  return { p, L, fixed: HOUSE_STATE.fixed.includes(p.id), won: HOUSE_STATE.won.includes(L.id), open: i === 0 || HOUSE_STATE.fixed.includes(PROBLEMS[i - 1].id) };
+// собрание i: открыто ли и почему нет (правила общие с сервером — content.js)
+function tourInfo(i) {
+  const T = LEVELS[i], o = tourOpen(T, HOUSE_STATE);
+  const why = o.ok ? '' : o.why === 'prev' ? L(UI.lkPrev).replace('{n}', o.need.n) : o.why === 'fix' ? L(UI.lkFix).replace('{p}', L(o.need.name)) : L(UI.lkFixCount).replace('{n}', o.n);
+  return { L: T, won: HOUSE_STATE.won.includes(T.id), open: o.ok, why };
 }
 
 // геометрия дома на карте
@@ -301,11 +303,12 @@ scenes.house = {
   // что можно сделать с вещью сейчас
   status(id) {
     const pi = PROBLEMS.findIndex(p => p.id === id);
-    if (pi >= 0) { const I = levelInfo(pi);
-      if (I.fixed) return { kind: 'done' };
-      if (!I.open) return { kind: 'locked', text: L(UI.hNeedPrev) };
-      if (!I.won) return { kind: 'vote', text: L(UI.hNeedVote).replace('{n}', I.L.n), level: I.L.id };
-      return { kind: 'buy', cost: I.p.cost };
+    if (pi >= 0) { const P = PROBLEMS[pi], c = canFix(P, HOUSE_STATE);
+      if (c.why === 'done') return { kind: 'done' };
+      if (!c.ok) { const I = tourInfo(c.tour.n - 1);
+        if (!I.open) return { kind: 'locked', text: (c.why === 'chair' ? L(UI.hNeedChair) + ' ' : '') + I.why };
+        return { kind: 'vote', text: c.why === 'chair' ? L(UI.hNeedChair) : L(UI.hNeedVote).replace('{n}', c.tour.n), level: c.tour.id }; }
+      return { kind: 'buy', cost: P.cost };
     }
     const d = DECOR.find(x => x.id === id);
     if (has(id)) return { kind: 'done' };
@@ -393,16 +396,16 @@ scenes.levels = {
     frameBox(20, 8, 360, 210, .95);
     text(L(UI.meetings), W / 2, 15, { align: 'center', col: '#f4f3ee' });
     text(`₸${HOUSE_STATE.coins}`, 370, 15, { align: 'right', col: '#f2c94c', size: 6 });
-    PROBLEMS.forEach((_, i) => {
-      const I = levelInfo(i), y = 28 + i * 20, x = 30;
-      rect(x, y, 340, 19, I.open ? '#1d2130' : '#151822'); rect(x, y + 18, 340, 1, '#0a0c12');
-      text(`${I.L.n}.`, x + 6, y + 6, { col: I.open ? '#f2c94c' : '#55607c', size: 6 });
-      text(L(I.p.name), x + 22, y + 3, { col: I.open ? '#f4f3ee' : '#55607c', size: 6 });
-      const info = !I.open ? L(UI.lvLocked) : `${L(UI.lvGoal).replace('{g}', I.L.goal)} · +₸${I.won ? I.L.reward.replay : I.L.reward.first}`;
-      text(info, x + 22, y + 11, { col: I.open ? '#9fd9c2' : '#55607c', size: 6 });
-      const mark = I.fixed ? '✓' : I.won ? '★' : '';
-      if (mark) text(mark, x + 266, y + 6, { col: I.fixed ? '#7fc4a8' : '#f2c94c', size: 6, align: 'center' });
-      if (I.open && button(L(UI.play2), x + 306, y + 2, I.won ? 'alt' : 'primary', { w: 60 })) irisTo(W / 2, 120, () => go('tour', { tour: I.L.id }));
+    LEVELS.forEach((_, i) => {
+      const I = tourInfo(i), y = 28 + i * 26, x = 30;
+      rect(x, y, 340, 25, I.open ? '#1d2130' : '#151822'); rect(x, y + 24, 340, 1, '#0a0c12');
+      text(`${I.L.n}.`, x + 6, y + 9, { col: I.open ? '#f2c94c' : '#55607c', size: 6 });
+      text(L(I.L.title), x + 22, y + 3, { col: I.open ? '#f4f3ee' : '#55607c', size: 6 });
+      const short = I.L.rule === 'quorum' ? L(UI.lvQuorum).replace('{q}', I.L.quorum) : L(UI.lvYes).replace('{g}', I.L.goal);
+      text(`${short} · ${I.L.days} ${L(UI.daysWord)}`, x + 22, y + 11, { col: I.open ? '#cfd6e4' : '#55607c', size: 6 });
+      text(I.open ? `+₸${I.won ? I.L.reward.replay : I.L.reward.first}` : I.why, x + 22, y + 18, { col: I.open ? '#9fd9c2' : '#8a6a6a', size: 6 });
+      if (I.won) text('★', x + 266, y + 9, { col: '#f2c94c', size: 6, align: 'center' });
+      if (I.open && button(L(UI.play2), x + 306, y + 5, I.won ? 'alt' : 'primary', { w: 60 })) irisTo(W / 2, 120, () => go('tour', { tour: I.L.id }));
     });
     if (button(L(UI.back), W / 2, 200, 'alt')) irisTo(W / 2, 120, () => go('house'));
   },

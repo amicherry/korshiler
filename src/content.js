@@ -37,7 +37,19 @@ const UI = {
   floor:      { kz: '-қабат', ru: ' этаж' },
   apt:        { kz: 'пәтер', ru: 'кв.' },
   meetingT:   { kz: '{n}-ЖИНАЛЫС', ru: 'СОБРАНИЕ №{n}' },
-  meetingB:   { kz: 'Күн тәртібі: {p}. {g} қолтаңба жина!', ru: 'Повестка: {p}. Собери {g} подписей!' },
+  day:        { kz: 'КҮН', ru: 'ДЕНЬ' },
+  yesShort:   { kz: 'ИӘ', ru: 'ЗА' },
+  turnShort:  { kz: 'ҚАТЫСТЫ', ru: 'ЯВКА' },
+  noQuorum:   { kz: 'КВОРУМ ЖОҚ', ru: 'КВОРУМА НЕТ' },
+  rTurnout:   { kz: 'Дауыс бергендер', ru: 'Явка' },
+  hNeedChair: { kz: 'Кәдімгі жөндеуді ОСИ төрағасы шешеді: 2-жиналыста («Төрағаны сайлау») жеңіп ал.', ru: 'Обычный ремонт решает председатель ОСИ: выиграй собрание 2 «Выбор председателя».' },
+  lkPrev:     { kz: '{n}-жиналыстан кейін ашылады', ru: 'Откроется после собрания {n}' },
+  lkFix:      { kz: 'Алдымен жөнде: {p}', ru: 'Сначала почини: {p}' },
+  lkFixCount: { kz: 'Алдымен «Менің ЖК»-да {n} жөндеу жаса', ru: 'Сначала сделай {n} ремонта в «Мой ЖК»' },
+  daysWord:   { kz: 'күн', ru: 'дней' },
+  lvYes:      { kz: '{g} «иә»', ru: '{g} «за»' },
+  lvQuorum:   { kz: '{q} қатысу, «иә» > ½', ru: 'явка {q}, «за» > ½' },
+  meetingB: { kz: 'Күн тәртібі: {t}. Ереже: {r}.', ru: 'Повестка: {t}. Правило: {r}.' },
   pause:      { kz: 'ҮЗІЛІС', ru: 'ПАУЗА' },
   pauseNote:  { kz: 'Шықсаң, бұл жиналыс есептелмейді.', ru: 'Если выйти, это собрание не засчитается.' },
   resume:     { kz: 'ЖАЛҒАСТЫРУ', ru: 'ПРОДОЛЖИТЬ' },
@@ -49,7 +61,7 @@ const UI = {
   bonusDay:   { kz: 'Күн бонусы', ru: 'Бонус дня' },
   hHint:      { kz: 'Үйдегі белгіні бас: «!» — жөндеуге болады, «?» — алдымен жиналыс', ru: 'Нажми на значок: «!» — можно чинить, «?» — сначала собрание' },
   hNeedPrev:  { kz: 'Алдымен алдыңғы ақауды жөнде.', ru: 'Сначала исправь предыдущую проблему.' },
-  hNeedVote:  { kz: 'Жөндеу үшін көршілердің келісімі керек: {n}-жиналысты өткіз.', ru: 'Для ремонта нужно согласие соседей: проведи собрание №{n}.' },
+  hNeedVote: { kz: 'Бұл — конструкцияны өзгерту: {n}-жиналыста 2/3 дауыс керек.', ru: 'Это изменение конструкции: нужно 2/3 голосов на собрании {n}.' },
   hDecorLock: { kz: '{n} ақауды жөндегеннен кейін ашылады.', ru: 'Откроется, когда исправишь {n} проблемы.' },
   hDecorDesc: { kz: 'Ауланы әдемілейді: ЖК ұпайы +{n}', ru: 'Украшает двор: очки ЖК +{n}' },
   hFix:       { kz: 'ЖӨНДЕУ', ru: 'ЧИНИТЬ' },
@@ -116,13 +128,13 @@ const UI = {
   // пролог, обучение
   pushOSI:    { kz: 'Сіздің үйде ОСИ құрылмаған. ОСИ болмаса, жөндеу мен жақсарту мүмкін емес.', ru: 'В вашем доме не создано ОСИ. Без ОСИ ремонт и улучшения невозможны.' },
   heroIntro1: { kz: 'Иә... Үй құлайын деп тұр. Шатыр ағады, подъезде шам жоқ.', ru: 'Да уж... Дом разваливается. Крыша течёт, в подъезде темно.' },
-  heroIntro2: { kz: 'Бастамашыл топ құру үшін 10 қолтаңба керек. Кеттік!', ru: 'Для инициативной группы нужно 10 подписей. Погнали!' },
+  heroIntro2: { kz: 'Бастамашыл топқа 6 қолтаңба керек — пәтерлердің 10 %-ы. Кеттік!', ru: 'Для инициативной группы нужно 6 подписей — это 10 % квартир. Погнали!' },
   tutTap:     { kz: 'Есікке немесе басқа қабатқа бас — кейіпкер өзі барады.', ru: 'Нажми на дверь или на другой этаж — герой дойдёт сам.' },
   tut1:       { kz: 'Есікке жақындап, ҚАҒУ бас. Есік астындағы жарық — үйде біреу бар.', ru: 'Подойди к двери и нажми СТУК. Свет под дверью — кто-то дома.' },
   tut2:       { kz: 'Сол жақта саты. ▲▼ арқылы қабат ауыстыр. Әр әрекет уақыт алады!', ru: 'Слева лестница: ▲▼ — сменить этаж. Каждое действие тратит время!' },
   nobody:     { kz: 'Ешкім жоқ сияқты. Кейін қайта келуге болады.', ru: 'Похоже, никого нет. Можно зайти позже.' },
   noOpen:     { kz: 'Ешкім ашпады... Тағы қағып көр.', ru: 'Никто не открыл... Попробуй ещё раз.' },
-  goalDone:   { kz: '10 қолтаңба жиналды! Турды аяқтауға немесе тағы жинауға болады.', ru: '10 подписей собрано! Можно завершить тур или собрать ещё.' },
+  goalDone: { kz: 'Қажетті дауыстар бар! Жиналысты аяқтауға немесе тағы жинауға болады.', ru: 'Нужные голоса есть! Можно завершить собрание или собрать ещё.' },
   timeUp:     { kz: 'Уақыт бітті!', ru: 'Время вышло!' },
   helperDone: { kz: 'Мадина {f}-қабаттан {n} қолтаңба жинады!', ru: 'Мадина собрала {n} подписей на {f} этаже!' },
   raccoonT:   { kz: 'ЕНОТ ТАРАТТЫ!', ru: 'ЕНОТ РАЗОСЛАЛ!' },
@@ -130,7 +142,7 @@ const UI = {
   noRaccoon:  { kz: 'Енот бұл турда көмектесіп қойды.', ru: 'Енот уже помог в этом туре.' },
   // итоги
   win:        { kz: 'СЕН ОСИ ТӨРАҒАСЫСЫҢ!', ru: 'ТЫ — ПРЕДСЕДАТЕЛЬ ОСИ!' },
-  lose:       { kz: 'ҚОЛТАҢБА ЖЕТПЕДІ', ru: 'ПОДПИСЕЙ НЕ ХВАТИЛО' },
+  lose: { kz: 'ДАУЫС ЖЕТПЕДІ', ru: 'ГОЛОСОВ НЕ ХВАТИЛО' },
   protocol:   { kz: 'ХАТТАМА №1', ru: 'ПРОТОКОЛ №1' },
   rSigned:    { kz: 'Қол қойғандар', ru: 'Подписали' },
   rOnline:    { kz: 'Онлайн, E-KNOT арқылы', ru: 'Онлайн через E-KNOT' },
@@ -155,8 +167,8 @@ const UI = {
   rScore:     { kz: 'Ұпай', ru: 'Очки' },
   rRank:      { kz: 'ЖК-дағы орын', ru: 'Место в ЖК' },
   rOffline:   { kz: 'Байланыс жоқ: нәтиже рейтингке кірмеді.', ru: 'Нет связи: результат не попал в рейтинг.' },
-  rRewardSent:{ kz: '+{n} бонус E-KNOT қосымшасына жіберілді!', ru: '+{n} бонусов отправлено в приложение E-KNOT!' },
-  rRewardGuest:{ kz: '+{n} бонус күтіп тұр — ойынды E-KNOT қосымшасынан ашыңыз.', ru: '+{n} бонусов ждут — откройте игру из приложения E-KNOT.' },
+  rRewardSent: { kz: '+{n} ұпай және «{b}» белгісі — E-KNOT-та!', ru: '+{n} баллов и значок «{b}» — в E-KNOT!' },
+  rRewardGuest: { kz: '«{b}» белгісі мен +{n} ұпай күтіп тұр — ойынды E-KNOT қосымшасынан ашыңыз.', ru: 'Значок «{b}» и +{n} баллов ждут — откройте игру из приложения E-KNOT.' },
   again:      { kz: 'ҚАЙТАЛАУ', ru: 'ЕЩЁ РАЗ' }, menu: { kz: 'МӘЗІР', ru: 'МЕНЮ' },
   // болтун и помощница
   talkerName: { kz: 'Жанат аға', ru: 'Жанат-ага' },
@@ -320,6 +332,14 @@ const NAMES = {
    и одобрение ремонта; сам ремонт покупается на карте ЖК. Следующее собрание открывается,
    только когда предыдущая проблема исправлена — перепрыгнуть нельзя. */
 const HOUSE = { floors: 9, perFloor: 6, heroApt: 34 };
+const BADGES = {
+  initiative_group:      { kz: 'Бастамашыл топ', ru: 'Инициативная группа', en: 'Initiative group' },
+  chairman_elected:      { kz: 'Төраға сайланды', ru: 'Избран председателем', en: 'Chairman elected' },
+  council_elected:       { kz: 'Үй кеңесі', ru: 'Совет дома', en: 'House council' },
+  tariff_approved:       { kz: 'Тарифті бекітті', ru: 'Утвердил тариф', en: 'Tariff approved' },
+  construction_approved: { kz: '2/3 дауыс', ru: 'Решение 2/3', en: 'Two-thirds decision' },
+  all_tours:             { kz: 'Барлық тур өтті', ru: 'Прошёл все туры', en: 'All tours passed' },
+};
 
 const PROBLEMS = [
   { id: 'light', cost: 150, pts: 100,
@@ -362,7 +382,7 @@ const PROBLEMS = [
       { kz: 'Балалар подъезде ойнайды — ауланда ештеңе жоқ.', ru: 'Дети играют в подъезде — во дворе ничего нет.' },
       { kz: 'Құмсалғыш баяғыда жоқ, тек тот басқан темір.', ru: 'Песочницы давно нет, одно ржавое железо.' },
       { kz: 'Немерелер келгенде, апаратын жер жоқ.', ru: 'Внуки приезжают — их и сводить некуда.' } ] },
-  { id: 'lift', cost: 900, pts: 220,
+  { id: 'lift', cost: 900, pts: 220, kind: 'construction', tour: 'L6',
     name: { kz: 'Лифт', ru: 'Лифт' },
     desc: { kz: 'Тоғыз қабат, ал лифт бір жыл тұр.', ru: 'Девять этажей, а лифт стоит уже год.' },
     lines: [
@@ -370,7 +390,7 @@ const PROBLEMS = [
       { kz: 'Коляскамен лифтсіз — азап.', ru: 'С коляской без лифта — мучение.' },
       { kz: 'Тізем ауырады, баспалдақпен шығу қиын.', ru: 'Колени болят, по лестнице тяжело.' },
       { kz: 'Азық-түлікті жоғары өзім көтеремін, лифт жоқ.', ru: 'Продукты наверх сама таскаю, лифта же нет.' } ] },
-  { id: 'antenna', cost: 1100, pts: 240,
+  { id: 'antenna', cost: 1100, pts: 240, kind: 'construction', tour: 'L5',
     name: { kz: 'Ортақ антенна', ru: 'Общая антенна' },
     desc: { kz: 'Теледидар мен интернет нашар, әркім өз тарелкасын іледі.', ru: 'Плохое ТВ и интернет, каждый вешает свою тарелку.' },
     lines: [
@@ -397,25 +417,83 @@ const DECOR = [
   { id: 'parking', cost: 200, pts: 45, after: 5, name: { kz: 'Көлік тұрағы', ru: 'Парковка' } },
 ];
 
-// уровни: собрание по проблеме i. Дальше — больше подписей, меньше времени, вреднее жильцы
-const LEVELS = PROBLEMS.map((p, i) => ({
-  id: 'L' + (i + 1), n: i + 1, problem: p.id,
+/* ---------- туры: решения ОСИ по правилам голосования ----------
+   Дом в игре — 54 квартиры (9 этажей × 6). Пороги — от всех квартир дома:
+   0 инициативная группа — 10 % «за»; 1 председатель и 2 совет — явка 50 %+1, из голосовавших 50 %+1 «за»;
+   3 тариф — 50 %+1 «за» от всех; 4–5 изменение конструкции — 2/3 «за» от всех.
+   Обычный ремонт (свет, дверь, крыша…) голосования не требует — решает председатель.
+   Время тура — 60 игровых дней. */
+const APTS = HOUSE.floors * HOUSE.perFloor;                                // 54
+const PCT = { tenth: Math.ceil(APTS * .1), half: Math.floor(APTS / 2) + 1, twoThirds: Math.ceil(APTS * 2 / 3) };   // 6, 28, 36
+const TOUR_DEFS = [
+  { code: 'initiative',   rule: 'yes',    goal: PCT.tenth,     duration: 75,  raccoon: 1, hard: 0,   badge: 'initiative_group',
+    title: { kz: 'Бастамашыл топ', ru: 'Инициативная группа', en: 'Initiative group' },
+    ruleText: { kz: 'пәтерлердің 10 %-ы «иә» — {g} қолтаңба', ru: '10 % квартир «за» — {g} подписей', en: '10% of flats say yes — {g} signatures' },
+    winT: { kz: 'БАСТАМАШЫЛ ТОП ҚҰРЫЛДЫ!', ru: 'ИНИЦИАТИВНАЯ ГРУППА ЕСТЬ!', en: 'INITIATIVE GROUP FORMED!' },
+    winNote: { kz: 'Енді төрағаны сайлау керек — 2-жиналыс ашылды.', ru: 'Теперь нужно выбрать председателя — открыто собрание 2.', en: 'Now elect a chairman — meeting 2 is open.' } },
+  { code: 'chairman',     rule: 'quorum', goal: Math.floor(PCT.half / 2) + 1, quorum: PCT.half, duration: 150, raccoon: 3, hard: .04, badge: 'chairman_elected',
+    title: { kz: 'Төрағаны сайлау', ru: 'Выбор председателя', en: 'Electing the chairman' },
+    ruleText: { kz: 'кемінде {q} пәтер дауыс береді, жартысынан көбі «иә»', ru: 'голосуют не меньше {q} квартир, из них больше половины «за»', en: 'at least {q} flats vote, more than half say yes' },
+    winT: { kz: 'СЕН ОСИ ТӨРАҒАСЫСЫҢ!', ru: 'ТЫ — ПРЕДСЕДАТЕЛЬ ОСИ!', en: 'YOU ARE THE CHAIRMAN!' },
+    winNote: { kz: 'Кәдімгі жөндеуді (шам, есік, шатыр…) енді жиналыссыз өзің шешесің — «Менің ЖК».', ru: 'Обычный ремонт (свет, дверь, крыша…) теперь решаешь сам, без собрания — в «Мой ЖК».', en: 'Regular repairs (light, door, roof…) are now your call, no meeting needed — in “My block”.' } },
+  { code: 'council',      rule: 'quorum', goal: Math.floor(PCT.half / 2) + 1, quorum: PCT.half, duration: 150, raccoon: 3, hard: .07, badge: 'council_elected', needFix: ['light'],
+    title: { kz: 'Үй кеңесін сайлау', ru: 'Выбор совета дома', en: 'Electing the house council' },
+    ruleText: { kz: 'кемінде {q} пәтер дауыс береді, жартысынан көбі «иә»', ru: 'голосуют не меньше {q} квартир, из них больше половины «за»', en: 'at least {q} flats vote, more than half say yes' },
+    winT: { kz: 'ҮЙ КЕҢЕСІ САЙЛАНДЫ!', ru: 'СОВЕТ ДОМА ИЗБРАН!', en: 'HOUSE COUNCIL ELECTED!' },
+    winNote: { kz: 'Тағы екі жөндеу жаса — көршілер тарифке сенеді.', ru: 'Сделай ещё пару ремонтов — и соседи поверят в тариф.', en: 'Do a couple more repairs — then neighbours will trust the tariff.' } },
+  { code: 'tariff',       rule: 'yes',    goal: PCT.half,      duration: 150, raccoon: 3, hard: .12, badge: 'tariff_approved', needFixCount: 3,
+    title: { kz: 'Тарифті бекіту', ru: 'Утверждение тарифа', en: 'Approving the tariff' },
+    ruleText: { kz: 'барлық пәтердің 50 %+1-і «иә» — {g} дауыс', ru: '50 %+1 от всех квартир «за» — {g} голосов', en: '50%+1 of all flats say yes — {g} votes' },
+    winT: { kz: 'ТАРИФ БЕКІТІЛДІ!', ru: 'ТАРИФ УТВЕРЖДЁН!', en: 'TARIFF APPROVED!' },
+    winNote: { kz: 'Үйдің тұрақты бюджеті бар. Енді — ортақ антенна.', ru: 'У дома есть постоянный бюджет. Дальше — общая антенна.', en: 'The house now has a steady budget. Next — a shared antenna.' } },
+  { code: 'construction', rule: 'yes',    goal: PCT.twoThirds, duration: 195, raccoon: 4, hard: .1,  badge: 'construction_approved', problem: 'antenna',
+    title: { kz: 'Шатырға антенна', ru: 'Антенна на крышу', en: 'Antenna on the roof' },
+    ruleText: { kz: 'конструкцияны өзгерту: барлық пәтердің 2/3-і «иә» — {g} дауыс', ru: 'изменение конструкции: 2/3 квартир «за» — {g} голосов', en: 'structural change: 2/3 of flats say yes — {g} votes' },
+    winT: { kz: 'АНТЕННА БОЛАДЫ!', ru: 'АНТЕННЕ БЫТЬ!', en: 'THE ANTENNA IS APPROVED!' },
+    winNote: { kz: 'Антеннаны «Менің ЖК»-да орнат.', ru: 'Поставь антенну в «Мой ЖК».', en: 'Install the antenna in “My block”.' } },
+  { code: 'lift',         rule: 'yes',    goal: PCT.twoThirds, duration: 195, raccoon: 4, hard: .14, badge: 'all_tours', problem: 'lift', needFix: ['antenna'],
+    title: { kz: 'Лифтті ауыстыру', ru: 'Замена лифта', en: 'Replacing the lift' },
+    ruleText: { kz: 'конструкцияны өзгерту: барлық пәтердің 2/3-і «иә» — {g} дауыс', ru: 'изменение конструкции: 2/3 квартир «за» — {g} голосов', en: 'structural change: 2/3 of flats say yes — {g} votes' },
+    winT: { kz: 'ЖАҢА ЛИФТ БОЛАДЫ!', ru: 'НОВОМУ ЛИФТУ БЫТЬ!', en: 'A NEW LIFT IS COMING!' },
+    winNote: { kz: 'Барлық жиналыс өтті! Лифтті «Менің ЖК»-да орнат.', ru: 'Все собрания пройдены! Поставь лифт в «Мой ЖК».', en: 'All meetings passed! Install the lift in “My block”.' } },
+];
+const LEVELS = TOUR_DEFS.map((d, i) => ({
+  ...d, id: 'L' + (i + 1), n: i + 1, problem: d.problem || null,
   floors: HOUSE.floors, perFloor: HOUSE.perFloor, heroApt: HOUSE.heroApt,
-  goal: [6, 7, 8, 9, 10, 11, 12, 13][i],
-  start: [18, 10, 19, 11, 18, 12, 19, 17][i] * 60,
-  duration: [90, 88, 86, 84, 82, 80, 78, 76][i], secPerMin: 4.5,
-  raccoon: i < 4 ? 2 : 1,
+  start: 0, secPerMin: 3, days: 60,
   awayShare: .22 + i * .02,
-  hard: i * .045,                      // доля «трудных» жильцов растёт: ворчуны, арендаторы, ночная смена
-  talkerFloor: [3, 5, 4, 7, 2, 6, 8, 5][i], helperAfter: 3, helperFloor: [8, 7, 9, 6, 8, 9, 7, 8][i],
-  reward: { first: [150, 190, 280, 360, 450, 560, 680, 800][i], replay: [60, 90, 130, 170, 210, 260, 320, 380][i], perExtra: 12 + i * 4 },
+  talkerFloor: [3, 5, 4, 7, 2, 6][i], helperAfter: 3, helperFloor: [8, 7, 9, 6, 8, 9][i],
+  reward: { first: [200, 320, 380, 620, 800, 900][i], replay: [60, 110, 130, 200, 260, 300][i], perExtra: 8 + i * 3 },
   mix: (() => {
-    const total = HOUSE.floors * HOUSE.perFloor - 1, h = i * .045;
+    const total = APTS - 1, h = d.hard;
     const share = { apa: .2 - h * .3, mom: .2 - h * .3, student: .18 - h * .2, business: .12, grump: .1 + h * .5, night: .1 + h * .2, renter: .1 + h * .1 };
     const out = []; for (const a in share) for (let k = 0; k < Math.round(share[a] * total); k++) out.push(a);
     while (out.length < total) out.push('mom'); return out.slice(0, total);
   })(),
 }));
+/* Правила доступа — общие для игры и сервера: H = { won: [...туры], fixed: [...ремонты] } */
+const ORDINARY = () => PROBLEMS.filter(p => p.kind !== 'construction');
+function tourOpen(t, H) {
+  const i = t.n - 1;
+  if (i > 0 && !H.won.includes(LEVELS[i - 1].id)) return { ok: false, why: 'prev', need: LEVELS[i - 1] };
+  for (const id of t.needFix || []) if (!H.fixed.includes(id)) return { ok: false, why: 'fix', need: PROBLEMS.find(p => p.id === id) };
+  if (t.needFixCount && ORDINARY().filter(p => H.fixed.includes(p.id)).length < t.needFixCount) return { ok: false, why: 'fixCount', n: t.needFixCount };
+  return { ok: true };
+}
+// можно ли чинить: обычный ремонт — после избрания председателем, конструкция — после своего собрания
+function canFix(p, H) {
+  if (H.fixed.includes(p.id)) return { ok: false, why: 'done' };
+  const t = p.kind === 'construction' ? TOURS[p.tour] : TOURS.L2;
+  if (!H.won.includes(t.id)) return { ok: false, why: p.kind === 'construction' ? 'vote' : 'chair', tour: t };
+  return { ok: true };
+}
+// итог голосования по правилам тура: yes — «за», no — «против»
+function ruleText(t) { return L(t.ruleText).replace('{g}', t.goal).replace('{q}', t.quorum || ''); }
+function voteOutcome(t, yes, no) {
+  const turnout = yes + no;
+  if (t.rule === 'quorum') { const need = Math.max(t.goal, Math.floor(turnout / 2) + 1); return { ok: turnout >= t.quorum && yes >= need, need, turnout }; }
+  return { ok: yes >= t.goal, need: t.goal, turnout };
+}
 const TOURS = Object.fromEntries(LEVELS.map(l => [l.id, l]));
 
 /* ---------- характеры жильцов ---------- */

@@ -3,30 +3,43 @@ const {chromium}=require('playwright'); const fs=require('fs');
  await pg.route('**/fonts.googleapis.com/**', r=>r.abort());
  await pg.addInitScript({content: fs.readFileSync('widefont.js','utf8')+`;localStorage.setItem('d67_lang','ru');if(!localStorage.getItem('kn_server_db'))localStorage.setItem('d67_save', JSON.stringify({created:true,seenIntro:true,name:'Әмина',look:{skin:'#e3ad86',hair:'curly',hairCol:'#a5503c',top:'leather',topCol:'#6b4a2e'},coins:0,tours:{},trust:{}}));`});
  await pg.goto('file://'+process.cwd()+'/index.html?stable'); await pg.waitForTimeout(1600);
- // выиграть собрание 1 через сервер (как будто прошло 3 минуты)
- const win=async(id, n)=>pg.evaluate(async([id,n])=>{ const run=await API.tourStart(id); MockServer.debugDB().runs[run.runId].startedAt-=180000;
-   const ev=[]; for(let a=1;a<=n;a++) if(a!==34) ev.push({t:'yes',apt:a}); return API.tourFinish(run, ev); }, [id,n]);
- const t0=Date.now();
- // попытка прыгнуть на 3-е собрание — сервер не пустит
- console.log('skip L3:', await pg.evaluate(async()=>{ try { await API.tourStart('L3'); return 'ALLOWED'; } catch(e){ return e.code; } }));
- console.log('L1', JSON.stringify(await win('L1', 8)));
- console.log('buy door before light:', await pg.evaluate(async()=>{ try{ await API.buy('door'); return 'ALLOWED'; } catch(e){ return e.code; } }));
- console.log('L2 before fix:', await pg.evaluate(async()=>{ try { await API.tourStart('L2'); return 'ALLOWED'; } catch(e){ return e.code; } }));
- await pg.evaluate(async()=>{ HOUSE_STATE=await API.house(); }); await pg.keyboard.press('Enter'); await pg.waitForTimeout(1400);
- console.log('scene', await pg.evaluate(()=>Object.keys(scenes).find(k=>scenes[k]===scene)));
+ // сыграть собрание через сервер: yes — «за» (кв. 1…), no — «против» (кв. 54 вниз), как будто прошло 3 минуты
+ const play=async(id, yes, no=0)=>pg.evaluate(async([id,yes,no])=>{ const run=await API.tourStart(id); MockServer.debugDB().runs[run.runId].startedAt-=180000;
+   const ev=[]; let a=1; while(ev.length<yes){ if(a!==34) ev.push({t:'yes',apt:a}); a++; } let b=54; for(let k=0;k<no;k++){ if(b===34) b--; ev.push({t:'no',apt:b--}); }
+   const r=await API.tourFinish(run, ev); return {ok:r.success, yes:r.signatures, turnout:r.turnout, need:r.need, badges:r.badges, coins:r.totalCoins}; }, [id,yes,no]);
+ const tryStart=id=>pg.evaluate(async id=>{ try { await API.tourStart(id); return 'ALLOWED'; } catch(e){ return e.code; } }, id);
+ const buy=id=>pg.evaluate(async id=>{ try { HOUSE_STATE=await API.buy(id); return 'OK'; } catch(e){ return e.code; } }, id);
+ const check=(name, got, want)=>console.log((JSON.stringify(got)===JSON.stringify(want)?'✓':'✗ FAIL'), name, JSON.stringify(got));
+ check('пороги 6/28/36 и кворум 28', await pg.evaluate(()=>[TOURS.L1.goal,TOURS.L2.quorum,TOURS.L2.goal,TOURS.L4.goal,TOURS.L5.goal,TOURS.L6.goal]), [6,28,15,28,36,36]);
+ check('L3 сразу нельзя', await tryStart('L3'), 'locked');
+ check('L1: 5 подписей мало', (await play('L1',5)).ok, false);
+ const r1=await play('L1',6); check('L1: 6 подписей = 10 %', [r1.ok, r1.badges], [true,['initiative_group']]);
+ check('свет до председателя нельзя', await buy('light'), 'not_chairman');
+ check('L3 до председателя нельзя', await tryStart('L3'), 'locked');
+ check('L2: 20 «за», явка 20 < 28', (await play('L2',20,0)).ok, false);
+ check('L2: 14 «за» из 28 — не больше половины', (await play('L2',14,14)).ok, false);
+ const r2=await play('L2',15,13); check('L2: 15 «за» из 28', [r2.ok, r2.turnout, r2.need, r2.badges], [true,28,15,['chairman_elected']]);
+ check('L2: 18 «за» из 34 — нужно 18', [(await play('L2',17,17)).ok, (await play('L2',18,16)).ok], [false,true]);
+ check('L3 без ремонта света нельзя', await tryStart('L3'), 'locked');
+ check('председатель чинит свет без собрания', await buy('light'), 'OK');
+ check('антенну без собрания 2/3 нельзя', await buy('antenna'), 'no_vote');
+ check('L3: совет', (await play('L3',16,12)).ok, true);
+ check('L4 до 3 ремонтов нельзя', await tryStart('L4'), 'locked');
+ check('дверь', await buy('door'), 'OK'); check('крыша', await buy('roof'), 'OK');
+ check('L4: 27 «за» мало, 28 — тариф', [(await play('L4',27)).ok, (await play('L4',28)).ok], [false,true]);
+ check('L5: 35 мало, 36 = 2/3', [(await play('L5',35)).ok, (await play('L5',36)).ok], [false,true]);
+ check('L6 до антенны нельзя', await tryStart('L6'), 'locked');
+ let ant='no_money'; for(let k=0;k<6&&ant==='no_money';k++){ ant=await buy('antenna'); if(ant==='no_money') await play('L5',40); } check('антенна', ant, 'OK');
+ const r6=await play('L6',36); check('L6: лифт', [r6.ok, r6.badges], [true,['all_tours']]);
+ await pg.evaluate(async()=>{ HOUSE_STATE=await API.house(); }); await pg.evaluate(()=>go('house')); await pg.waitForTimeout(1400);
  await pg.screenshot({path:'shots/h_hub.png'});
- // выбрать свет и починить
- await pg.mouse.click(200*3, 112*3); await pg.waitForTimeout(300); await pg.screenshot({path:'shots/h_panel.png'});
- await pg.mouse.click(318*3, 180*3); await pg.waitForTimeout(1900); await pg.screenshot({path:'shots/h_anim.png'});
- await pg.waitForTimeout(1500); await pg.screenshot({path:'shots/h_after.png'});
- console.log('state', JSON.stringify(await pg.evaluate(()=>HOUSE_STATE)));
- // накопим денег и починим всё, чтобы посмотреть готовый двор
- for (let i=2;i<=8;i++){ await win('L'+i, 14); await pg.evaluate(async(i)=>{ for(let k=0;k<4;k++){ try{ HOUSE_STATE=await API.buy(PROBLEMS[i-1].id); break; }catch(e){ const run=await API.tourStart('L'+i); MockServer.debugDB().runs[run.runId].startedAt-=180000; const ev=[]; for(let a=1;a<=20;a++) if(a!==34) ev.push({t:'yes',apt:a}); await API.tourFinish(run,ev); } } }, i); }
- await pg.evaluate(async()=>{ for(const d of DECOR){ for(let k=0;k<3;k++){ try{ HOUSE_STATE=await API.buy(d.id); break;}catch(e){ const run=await API.tourStart('L8'); MockServer.debugDB().runs[run.runId].startedAt-=180000; const ev=[]; for(let a=1;a<=30;a++) if(a!==34) ev.push({t:'yes',apt:a}); await API.tourFinish(run,ev);} } } HOUSE_STATE=await API.house(); });
- console.log('final', JSON.stringify(await pg.evaluate(()=>[HOUSE_STATE.fixed.length, HOUSE_STATE.decor.length, HOUSE_STATE.score])));
+ // накопим денег повторами и починим всё
+ for (const id of ['lift','basement','playground','sign','bench','flowers','trees','lamps','parking']) { let r='no_money'; for(let k=0;k<8&&r==='no_money';k++){ r=await buy(id); if(r==='no_money') await play('L6',45); } if(r!=='OK') console.log('✗ FAIL buy', id, r); }
+ await pg.evaluate(async()=>{ HOUSE_STATE=await API.house(); });
+ console.log('final', JSON.stringify(await pg.evaluate(()=>[HOUSE_STATE.fixed.length, HOUSE_STATE.decor.length, HOUSE_STATE.won])));
  await pg.evaluate(()=>go('house')); await pg.waitForTimeout(1200); await pg.screenshot({path:'shots/h_full.png'});
  await pg.evaluate(()=>go('levels')); await pg.waitForTimeout(800); await pg.screenshot({path:'shots/h_levels.png'});
  await pg.evaluate(()=>go('title')); await pg.waitForTimeout(800); await pg.screenshot({path:'shots/h_title.png'});
  await pg.evaluate(()=>go('leaderboard',{})); await pg.waitForTimeout(900); await pg.screenshot({path:'shots/h_lb.png'});
- await pg.evaluate(()=>go('tour',{tour:'L8'})); await pg.waitForTimeout(1500); await pg.evaluate(()=>{toasts.length=0;}); await pg.screenshot({path:'shots/h_tour_fixed.png'});
+ await pg.evaluate(()=>go('tour',{tour:'L2'})); await pg.waitForTimeout(1500); await pg.evaluate(()=>{toasts.length=0;}); await pg.screenshot({path:'shots/h_tour_fixed.png'});
  console.log(errs); await b.close(); })();
