@@ -78,94 +78,68 @@ function chibiSprite(look, frame) {
 }
 const BUMAZHKIN = { body: 'm', skin: '#d9a07a', hair: 'bald', hairCol: '#5a4a40', top: 'jacket', topCol: '#4a4a58', pants: '#2e2e38', bottom: 'pants', glasses: true };
 
-/* ---------- крупный герой-раннер 40×58 (как на макете): большая голова, худи, кеды ---------- */
-const RUNNER_CACHE = new Map();
-function runnerSprite(look, frame) {
+/* ---------- мини-герой (по референсу): сетка 24×30, на экране ×2 ----------
+   Собирается из персонажа игрока: волосы (причёска, цвет), кожа, верх (вид, цвет + полоска), низ, шапка. */
+const MINI_CACHE = new Map();
+function miniSprite(look, frame) {
   const key = JSON.stringify(look) + '|' + frame;
-  if (RUNNER_CACHE.has(key)) return RUNNER_CACHE.get(key);
-  const c = makeCanvas(42, 60, (P) => {
-    const { r, p } = P, D = Math.PI / 180;
-    const [skL, sk, skD] = tones(look.skin || '#e3ad86'), hair = tones(look.hairCol || '#5a3a2a'), top = tones(look.topCol || '#8a2e3a');
-    const pants = tones(look.pants || '#2a2d3a'), skirt = look.bottom === 'skirt';
-    const run = frame.startsWith('run') ? +frame.slice(3) % 6 : -1, jump = frame === 'jump', trip = frame === 'trip';
-    const ph = run >= 0 ? run / 6 * Math.PI * 2 : 0, bob = run >= 0 ? Math.round(Math.abs(Math.cos(ph))) : 0, lean = run >= 0 ? 2 : trip ? 4 : 0;
-    // толстый отрезок с тенью сзади
-    const seg = (x0, y0, ang, len, w, col, colD) => { let x = x0, y = y0;
-      for (let i = 0; i <= len; i++) { x = x0 + Math.sin(ang) * i; y = y0 + Math.cos(ang) * i; r(Math.round(x - w / 2), Math.round(y - w / 2), w, w, col); p(Math.round(x - w / 2), Math.round(y + w / 2 - 1), colD); }
-      return [x, y]; };
-    const hipY = 37 + bob;
-    const leg = (phase, near) => {
-      let a, bend;
-      if (jump) { a = (near ? 55 : 30) * D; bend = (near ? 95 : 70) * D; }
-      else if (trip) { a = (near ? -10 : 25) * D; bend = 30 * D; }
-      else if (run >= 0) { a = 38 * Math.sin(phase) * D; bend = (55 * Math.max(0, -Math.cos(phase)) + 8) * D; }
-      else { a = (near ? 4 : -4) * D; bend = 2 * D; }
-      const col = skirt ? (near ? '#3b3742' : '#2a2730') : near ? pants[1] : pants[2], colD = skirt ? '#1d1b22' : near ? pants[2] : pants[3];
-      const [kx, ky] = seg(20 + lean + (near ? 2 : -1), hipY, a, 9, skirt ? 4 : 5, col, colD);
-      const [fx, fy] = seg(kx, ky, a - bend, 9, skirt ? 3 : 4, col, colD);
-      const X = Math.round(fx), Y = Math.min(57, Math.round(fy));
-      r(X - 3, Y - 1, 8, 3, near ? '#2a2830' : '#1e1c24'); r(X - 3, Y + 2, 8, 1, near ? '#e8e4dc' : '#a8a49c'); p(X + 4, Y - 1, '#4a4652');   // кеды с белой подошвой
-    };
-    const arm = (phase, near) => {
-      let a, el;
-      if (jump) { a = (near ? -50 : 40) * D; el = (near ? 40 : 70) * D; }
-      else if (trip) { a = 80 * D; el = 10 * D; }
-      else if (run >= 0) { a = -42 * Math.sin(phase) * D; el = 80 * D; }
-      else { a = (near ? 8 : -8) * D; el = 20 * D; }
-      const col = near ? top[1] : top[2], colD = near ? top[2] : top[3], sx = 21 + lean + (near ? 5 : -3), sy = 25 + bob;
-      const [ex, ey] = seg(sx, sy, a, 6, 4, col, colD);
-      const [hx, hy] = seg(ex, ey, a + el, 6, 4, col, colD);
-      r(Math.round(hx - 2), Math.round(hy - 1), 4, 4, near ? sk : skD); p(Math.round(hx + 1), Math.round(hy - 1), near ? skL : sk);
-      if (near && look.briefcase) { r(Math.round(hx - 4), Math.round(hy + 2), 10, 8, '#5a3a2a'); r(Math.round(hx - 4), Math.round(hy + 2), 10, 1, '#7a5a3a'); r(Math.round(hx - 1), Math.round(hy), 4, 2, '#3a2a1a'); }
-    };
-    // дальние конечности
-    arm(ph + Math.PI, false); leg(ph + Math.PI, false);
-    // корпус: худи/куртка
-    const tx = 14 + lean, ty = 22 + bob, tw = 15, th = 16;
-    r(tx, ty + 1, tw, th, top[1]); r(tx + 1, ty, tw - 2, 1, top[1]); r(tx, ty + 1, 2, th, top[2]); r(tx + tw - 2, ty + 2, 1, th - 3, top[0]);
-    r(tx, ty + th - 1, tw, 2, top[2]);                                                                         // резинка снизу
-    if (look.top === 'hoodie' || !look.top) { r(tx - 1, ty - 1, 6, 5, top[2]); r(tx + 9, ty + 9, 5, 4, top[2]); r(tx + 10, ty + 2, 1, 4, '#e8e4dc'); }   // капюшон, карман, шнурок
-    if (look.top === 'leather') { r(tx + 10, ty + 1, 1, th - 1, '#c9c3b0'); r(tx + 8, ty, 5, 3, top[0]); }
-    if (look.top === 'shirt') { r(tx + 9, ty - 1, 5, 3, '#f4f3ee'); for (let y = ty + 4; y < ty + th; y += 3) p(tx + 11, y, top[3]); }
-    if (look.top === 'jacket') { r(tx + 8, ty, 4, 6, '#e8e4dc'); r(tx + 9, ty + 1, 2, 5, '#3a3d48'); }
-    if (look.top === 'chapan') { r(tx - 1, ty + th - 2, tw + 2, 7, top[1]); for (let x = tx; x < tx + tw; x += 3) p(x, ty + th + 3, '#f2c94c'); }
-    if (skirt) { r(tx - 1, hipY - 2, tw + 2, 7, top[2]); r(tx - 2, hipY + 4, tw + 4, 2, top[3]); }
-    else r(tx + 1, hipY - 2, tw - 2, 3, pants[1]);
-    // ближние конечности
-    leg(ph, true);
-    // голова: крупная, чуть скруглённая
-    const hx = 9 + lean, hy = (trip ? 4 : 1) + bob, hw = 24, hh = 21;
-    // скруглённая голова: углы срезаны, подбородок отделён от худи тёмной линией
-    r(hx + 2, hy + 1, hw - 4, hh - 1, sk); r(hx + 1, hy + 2, hw - 2, hh - 4, sk); r(hx, hy + 4, hw, hh - 8, sk);
-    r(hx + 3, hy + hh - 1, hw - 6, 1, skD); r(hx, hy + 4, 1, hh - 8, skD); r(hx + hw - 2, hy + 5, 1, 8, skL);
-    r(hx + 3, hy + hh, hw - 6, 1, '#14121a');
-    r(hx + 7, hy + 11, 2, 3, skD);                                                                              // ухо
-    // волосы
-    const hc = hair[1], hd = hair[2], hl = hair[0];
+  if (MINI_CACHE.has(key)) return MINI_CACHE.get(key);
+  const small = makeCanvas(26, 32, (P) => {
+    const R = (x, y, w, h, c) => P.r(x + 1, y + 1, w, h, c), Pt = (x, y, c) => P.p(x + 1, y + 1, c);
+    const [skL, sk, skD] = tones(look.skin || '#efc3a0'), hair = tones(look.hairCol || '#4a3a35'), top = tones(look.topCol || '#7a2a3a');
+    const pants = tones(look.pants || '#24302c'), skirt = look.bottom === 'skirt', shoe = '#1a1a1e';
+    const run = frame.startsWith('run') ? +frame.slice(3) % 4 : -1, jump = frame === 'jump', trip = frame === 'trip';
+    const bob = run === 1 || run === 3 ? 1 : 0, by = bob + (trip ? 1 : 0);
+    // ноги и обувь
+    const leg = (x, y, h, sx, near) => { R(x, y, 3, h, skirt ? (near ? '#3b3742' : '#2a2730') : near ? pants[1] : pants[2]); R(x + sx, y + h, 4, 2, shoe); };
+    if (jump) { leg(7, 22, 2, 0, false); leg(13, 21, 2, 1, true); }
+    else if (trip) { leg(6, 23 + by, 3, -1, false); leg(14, 22 + by, 3, 1, true); }
+    else if (run === 0) { leg(6, 23 + by, 2, -1, false); leg(14, 23 + by, 3, 1, true); }
+    else if (run === 2) { leg(13, 23 + by, 2, 0, false); leg(7, 23 + by, 3, 0, true); }
+    else { leg(8, 23 + by, 3, 0, false); leg(12, 23 + by, 3, 1, true); }
+    // руки (за корпусом — дальняя)
+    const sw = run === 0 ? 1 : run === 2 ? -1 : 0, ay = jump ? -3 : 0;
+    R(5 - sw, 18 + by + ay, 2, 4, top[2]); Pt(5 - sw, 22 + by + ay, skD);
+    // корпус: свитер с полоской
+    R(7, 17 + by, 10, 6, top[1]); R(7, 17 + by, 1, 6, top[2]); R(16, 18 + by, 1, 4, top[0]);
+    if (look.top === 'shirt') { R(10, 17 + by, 4, 2, '#f4f3ee'); }
+    else if (look.top === 'jacket') { R(11, 17 + by, 2, 6, '#e8e4dc'); }
+    else if (look.top === 'leather') { R(11, 17 + by, 1, 6, '#c9c3b0'); R(8, 19 + by, 8, 1, top[0]); }
+    else if (look.top === 'chapan') { R(6, 21 + by, 12, 3, top[1]); for (let x = 7; x < 17; x += 2) Pt(x, 22 + by, '#f2c94c'); }
+    else { R(7, 19 + by, 10, 2, shade(look.topCol || '#7a2a3a', 45)); R(7, 20 + by, 10, 1, shade(look.topCol || '#7a2a3a', 25)); }   // полоска, как на свитере референса
+    if (skirt) { R(6, 22 + by, 12, 3, top[2]); R(6, 24 + by, 12, 1, top[3]); }
+    R(17 + sw, 18 + by + ay, 2, 4, top[1]); Pt(18 + sw, 22 + by + ay, sk);                       // ближняя рука
+    if (look.briefcase) { R(17 + sw, 22 + by, 6, 5, '#5a3a2a'); R(17 + sw, 22 + by, 6, 1, '#7a5a3a'); R(19 + sw, 21 + by, 2, 1, '#3a2a1a'); }
+    // голова 16×14: лицо смотрит вправо, тень от волос слева
+    const hy = by + (trip ? 1 : 0);
+    R(4, 4 + hy, 16, 13, sk); R(5, 3 + hy, 14, 1, sk); R(5, 17 + hy, 13, 1, sk);
+    R(4, 9 + hy, 6, 8, skD); R(19, 8 + hy, 1, 6, skL);
+    R(8, 11 + hy, 2, 3, shade(look.skin || '#efc3a0', -40)); Pt(9, 12 + hy, skD);                  // ухо
+    // глаз — один, как у референса
+    if (trip) { R(14, 12 + hy, 3, 1, '#0e0e12'); } else { R(15, 10 + hy, 2, 3, '#0e0e12'); }
+    if (look.glasses) { R(13, 9 + hy, 6, 5, '#0e0e12'); R(14, 10 + hy, 4, 3, '#b8c8dc'); R(16, 10 + hy, 1, 3, '#0e0e12'); Pt(14, 10 + hy, '#e8f0f8'); R(9, 10 + hy, 4, 1, '#0e0e12'); }   // очки: линза, дужка к уху
+    // волосы: лохматые, с торчащими прядями
+    const H1 = hair[1], H0 = hair[0], H2 = hair[2];
     if (look.hair !== 'bald') {
-      r(hx, hy, hw, 7, hc); r(hx + 1, hy - 1, hw - 3, 1, hc); r(hx - 1, hy + 2, 6, 12, hc); r(hx + 3, hy + 6, 3, 5, hc);
-      for (let i = 0; i < 5; i++) r(hx + 10 + i * 3, hy + 6 + (i % 2), 3, 2 + (i % 2), hc);                     // чёлка зубчиками
-      r(hx + 4, hy, 10, 1, hl); r(hx + 15, hy + 1, 5, 1, hl); r(hx - 1, hy + 12, 3, 2, hd); r(hx + 8, hy + 6, 2, 3, hd);
-      if (look.hair === 'long') { r(hx - 2, hy + 6, 6, 20, hc); r(hx - 2, hy + 24, 6, 2, hd); }
-      if (look.hair === 'bun') { r(hx + 1, hy - 5, 8, 6, hc); r(hx + 3, hy - 5, 3, 1, hl); }
-      if (look.hair === 'curly') for (const [x, y] of [[0, -2], [5, -3], [10, -3], [15, -3], [20, -2], [-2, 4], [-2, 9]]) r(hx + x, hy + y, 4, 4, hc);
-    } else { r(hx + 8, hy + 2, 6, 2, skL); r(hx - 1, hy + 9, 3, 6, '#7a6a5a'); }
-    if (look.hat === 'cap') { r(hx, hy - 2, hw - 2, 7, '#b8443f'); r(hx + hw - 4, hy + 3, 8, 2, '#8a2f2c'); r(hx + 3, hy - 2, 8, 1, '#d86a5f'); }
-    if (look.hat === 'tyube') { r(hx + 2, hy - 3, hw - 6, 5, '#2a3a5a'); for (let x = hx + 4; x < hx + hw - 5; x += 3) p(x, hy - 1, '#f2c94c'); }
-    // лицо
-    const ex = hx + 15, ey = hy + 10;
-    if (trip) { r(ex, ey + 2, 3, 1, '#14121a'); r(ex + 5, ey + 2, 3, 1, '#14121a'); r(ex + 3, ey + 7, 3, 2, '#7a3a3a'); }
-    else { r(ex, ey, 2, 4, '#14121a'); r(ex + 6, ey, 2, 4, '#14121a'); p(ex, ey, '#6a6a7a'); p(ex + 6, ey, '#6a6a7a');
-      r(ex + 3, ey + 7, 3, 1, skD); r(ex - 2, ey + 5, 2, 1, '#e8a0a0'); }
-    if (look.glasses) { r(ex - 2, ey - 1, 6, 1, '#14121a'); r(ex + 4, ey - 1, 6, 1, '#14121a'); r(ex - 2, ey + 3, 6, 1, '#14121a'); r(ex + 4, ey + 3, 6, 1, '#14121a'); r(ex - 2, ey - 1, 1, 5, '#14121a'); r(ex + 9, ey - 1, 1, 5, '#14121a'); }
-    arm(ph, true);
+      R(3, 2 + hy, 18, 5, H1); R(4, 1 + hy, 15, 1, H1); R(2, 4 + hy, 8, 6, H1); R(2, 10 + hy, 3, 3, H1);   // макушка и затылок
+      for (const [x, h] of [[10, 2], [12, 1], [14, 2], [16, 1], [18, 2], [20, 1]]) R(x, 7 + hy, 2, h, H1);   // чёлка зубчиками
+      for (const [x, y] of [[6, -1], [10, -2], [15, -1], [20, 0], [22, 2], [1, 3], [0, 6]]) Pt(x, y + hy + 1, H1);   // торчащие пряди
+      R(7, 2 + hy, 6, 1, H0); R(14, 3 + hy, 4, 1, H0); Pt(5, 4 + hy, H0); R(3, 9 + hy, 2, 2, H2);
+      if (look.hair === 'long') { R(1, 6 + hy, 5, 13, H1); R(1, 18 + hy, 5, 1, H2); }
+      if (look.hair === 'bun') { R(3, -2 + hy, 6, 4, H1); Pt(4, -2 + hy, H0); }
+      if (look.hair === 'curly') for (const [x, y] of [[2, 0], [7, -1], [12, -1], [17, 0], [0, 5], [0, 9]]) R(x, y + hy, 3, 3, H1);
+    } else { R(8, 3 + hy, 6, 1, skL); R(3, 8 + hy, 3, 6, '#8a8a90'); R(4, 7 + hy, 2, 1, '#a8a8b0'); }   // лысина, седина на висках
+    if (look.hat === 'cap') { R(3, 1 + hy, 17, 5, '#b8443f'); R(17, 5 + hy, 6, 2, '#8a2f2c'); R(6, 1 + hy, 6, 1, '#d86a5f'); }
+    if (look.hat === 'tyube') { R(5, 0 + hy, 13, 4, '#2a3a5a'); for (let x = 6; x < 17; x += 3) Pt(x, 2 + hy, '#f2c94c'); }
     // контур
-    const g = P.g, img = g.getImageData(0, 0, 42, 60), d = img.data, a = (x, y) => x >= 0 && y >= 0 && x < 42 && y < 60 && d[(y * 42 + x) * 4 + 3] > 0, out = [];
-    for (let y = 0; y < 60; y++) for (let x = 0; x < 42; x++) if (!a(x, y) && (a(x - 1, y) || a(x + 1, y) || a(x, y - 1) || a(x, y + 1))) out.push([x, y]);
-    for (const [x, y] of out) p(x, y, '#14121a');
+    const g = P.g, img = g.getImageData(0, 0, 26, 32), d = img.data, a = (x, y) => x >= 0 && y >= 0 && x < 26 && y < 32 && d[(y * 26 + x) * 4 + 3] > 0, out = [];
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 26; x++) if (!a(x, y) && (a(x - 1, y) || a(x + 1, y) || a(x, y - 1) || a(x, y + 1))) out.push([x, y]);
+    for (const [x, y] of out) P.p(x, y, '#0e0e12');
   });
-  RUNNER_CACHE.set(key, c); return c;
+  const big = makeCanvas(52, 64, ({ g }) => { g.imageSmoothingEnabled = false; g.drawImage(small, 0, 0, 52, 64); });
+  MINI_CACHE.set(key, big); return big;
 }
+const runnerSprite = (look, frame) => miniSprite(look, frame.startsWith('run') ? 'run' + (+frame.slice(3) % 4) : frame);
 const BUMAZHKIN_R = { ...BUMAZHKIN, briefcase: true, topCol: '#4a4a58', pants: '#2e2e38' };
 
 /* ---------- коридор (как на макете): трубы, лампы, окно, панели, кафель с отражениями ---------- */
@@ -222,8 +196,8 @@ function buildQuizArt() {
     r(23, 36, 3, 9, '#8a8e96'); r(23, 36, 3, 1, '#b8bcc4'); r(12, 14, 8, 3, '#b8b2a0'); });
   QZ.goalDoor = outlined(32, 70, ({ r }) => { r(0, 0, 32, 70, '#1f3a34'); r(3, 3, 26, 67, '#2e6a5a'); r(3, 3, 26, 1, '#4a8a78'); r(7, 8, 18, 24, '#357a68'); r(7, 38, 18, 26, '#357a68'); r(23, 36, 3, 9, '#c9a95a'); });
   // преграды крупнее — под рост героя
-  QZ.obs.boxes = outlined(36, 30, ({ r }) => { const box = (x, y, w, h) => { r(x, y, w, h, '#9a7048'); r(x, y, w, 1, '#c09468'); r(x, y, 1, h, '#b0845a'); r(x + w - 1, y, 1, h, '#7a5434'); r(x + (w >> 1) - 1, y, 2, 4, '#7a5434'); };
-    box(0, 12, 12, 18); box(24, 14, 12, 16); box(9, 0, 18, 30); r(14, 10, 8, 5, '#d8d2bf'); });
+  QZ.obs.boxes = outlined(30, 26, ({ r }) => { const box = (x, y, w, h) => { r(x, y, w, h, '#9a7048'); r(x, y, w, 1, '#c09468'); r(x, y, 1, h, '#b0845a'); r(x + w - 1, y, 1, h, '#7a5434'); r(x + (w >> 1) - 1, y, 2, 4, '#7a5434'); };
+    box(0, 10, 10, 16); box(20, 12, 10, 14); box(7, 0, 16, 26); r(11, 9, 8, 5, '#d8d2bf'); });
   QZ.obs.bucket = outlined(20, 30, ({ r }) => { r(13, 0, 2, 16, '#8a6a4a'); r(10, 1, 7, 2, '#6a5a4a');
     r(2, 15, 15, 14, '#5f6b74'); r(2, 15, 15, 1, '#8a98a2'); r(3, 16, 2, 12, '#7a8892'); r(15, 16, 1, 12, '#4a545c'); r(3, 18, 12, 3, '#4a6a8a'); r(1, 14, 17, 1, '#3e464c');
     r(9, 12, 8, 4, '#c9c3b0'); r(2, 28, 15, 1, '#3e464c'); });
@@ -257,7 +231,7 @@ scenes.quiz = {
     this.total = n; this.queue = pool.slice(0, n).map(prepQuestion);
     // трасса: [бег, двери] × n, затем бег и финиш
     this.segs = []; let x = 60;
-    for (const q of this.queue) { x = this.addRun(x, 300 + Math.random() * 80, 2); x = this.addDoors(x, q); }
+    for (const q of this.queue) { x = this.addRun(x, 380 + Math.random() * 80, 2); x = this.addDoors(x, q); }
     x = this.addRun(x, 240, 1); this.segs.push({ type: 'goal', x0: x, len: 260 });
     this.hx = 30; this.jy = 0; this.vy = 0; this.trip = 0; this.buffer = 0; this.cam = 0; this.cur = null; this.pick = -1; this.fb = null; this.bRun = 0; this.bx = 0;
     this.startedAt = Date.now(); this.state = 'intro';
@@ -302,9 +276,9 @@ scenes.quiz = {
       else this.hx = nx;
       if (this.jy === 0 && (this.t / 130 | 0) !== this.lastPuff) { this.lastPuff = this.t / 130 | 0; this.puff(1); }
       for (const s of this.segs) if (s.obs) for (const o of s.obs) {
-        if (o.kind === 'rat' && !o.hit && o.x + o.mx - this.hx < 230 && o.mx > -70) o.mx -= .045 * dt;
+        if (o.kind === 'rat' && !o.hit && o.x + o.mx - this.hx < 220 && o.mx > -50) o.mx -= .03 * dt;
         const img = QZ.obs[o.kind === 'rat' ? 'rat0' : o.kind], ox = o.x + o.mx;
-        if (o.hit || this.hx + 28 < ox + 4 || this.hx + 12 > ox + img.width - 4) continue;
+        if (o.hit || this.hx + 35 < ox + 5 || this.hx + 16 > ox + img.width - 5) continue;
         if (-this.jy < img.height - 6) { o.hit = true; this.trip = 480; this.coins = Math.max(0, this.coins - 2); beep(180, .12, 'sawtooth', .05); }
       }
       const g = this.segs[this.segs.length - 1];
@@ -312,13 +286,13 @@ scenes.quiz = {
       if (this.hx >= g.x0 + 120) { this.hx = g.x0 + 120; this.finishRun(); }
     }
     if (this.bRun) this.bx += .2 * dt;
-    if (this.state === 'go') { const tx = this.cur.doors[this.pick] - 20; this.hx = Math.min(tx, this.hx + QZ_SPEED * 1.3 * dt);
+    if (this.state === 'go') { const tx = this.cur.doors[this.pick] - 26; this.hx = Math.min(tx, this.hx + QZ_SPEED * 1.3 * dt);
       if (this.hx >= tx) { this.state = 'enter'; this.cur.open = this.pick; this.et = 0; beep(300, .08, 'square', .04); } }
     if (this.state === 'enter') { this.et += dt; this.cur.ok = Math.min(1, this.et / 300); if (this.et > 720 && !this.fb) this.answer(); }
     for (const d of this.dust) { d.t += dt; d.x -= .02 * dt; d.y -= .012 * dt; } this.dust = this.dust.filter(d => d.t < 450);
     this.cam = clamp(this.hx - 120, 0, Math.max(0, this.totalLen() - W));
   },
-  puff(n) { for (let i = 0; i < n; i++) this.dust.push({ x: this.hx + 10 + Math.random() * 6, y: QZ.GY - 2 - Math.random() * 3, t: 0, s: 2 + Math.random() * 3 }); },
+  puff(n) { for (let i = 0; i < n; i++) this.dust.push({ x: this.hx + 14 + Math.random() * 6, y: QZ.GY - 2 - Math.random() * 3, t: 0, s: 2 + Math.random() * 3 }); },
   choose(i) { if (this.state !== 'ask') return; this.pick = i; this.state = 'go'; },
   answer() {
     const s = this.cur, q = s.q, ok = this.pick === q.correct; q.tries = (q.tries || 0) + 1;
@@ -334,9 +308,9 @@ scenes.quiz = {
     irisTo(this.hx - this.cam + 20, QZ.GY - 30, () => {
       if (!ok) {
         // путь удлиняется: лишний участок с тремя преградами, вопрос (ответы заново перемешаны) — перед финишем
-        const extra = { type: 'run', x0: 0, len: 380, obs: [] }; this.segs.splice(idx + 1, 0, extra);
+        const extra = { type: 'run', x0: 0, len: 480, obs: [] }; this.segs.splice(idx + 1, 0, extra);
         const goal = this.segs.pop(), q2 = prepQuestion(s.q.src); q2.tries = s.q.tries;
-        const runB = { type: 'run', x0: 0, len: 300, obs: [] }, dn = { type: 'door', x0: 0, len: this.doorLen(q2.answers.length), q: q2, doors: [], open: -1, ok: 0 };
+        const runB = { type: 'run', x0: 0, len: 380, obs: [] }, dn = { type: 'door', x0: 0, len: this.doorLen(q2.answers.length), q: q2, doors: [], open: -1, ok: 0 };
         this.segs.push(runB, dn, goal); this.relayout(idx);
         const fill = (seg, n) => { const slot = seg.len / (n + 1); seg.obs = []; for (let i = 1; i <= n; i++) seg.obs.push({ x: seg.x0 + Math.round(slot * i), kind: pick(Math.random, ['boxes', 'bucket', 'wet', 'rat']), hit: false, mx: 0 }); };
         fill(extra, 3); fill(runB, 2); dn.doors = q2.answers.map((_, i) => dn.x0 + 70 + i * 92);
@@ -398,21 +372,21 @@ scenes.quiz = {
         rect(x - 11, GY + 1, 22, 2, 'rgba(242,210,122,.2)'); });
       if (s.type === 'goal') { const x = s.x0 + 140 - cx; if (x > -60 && x < W + 60) {
         sprite(QZ.goalDoor, x - 16, GY - 70); rect(x - 12, GY - 84, 24, 10, '#f4f3ee'); text('ОСИ', x, GY - 83, { align: 'center', col: '#2e6a5a', size: 6 });
-        if (!this.bRun) { sprite(runnerSprite(BUMAZHKIN_R, 'idle'), x - 60, GY - 58, true); sprite(QZ.folder, x - 70, GY - 30); }
-        else { sprite(runnerSprite(BUMAZHKIN_R, 'run' + ((t / 70 | 0) % 6)), x - 60 + this.bx, GY - 58); sprite(QZ.folder, x - 70, GY - 15); } } }
+        if (!this.bRun) { sprite(runnerSprite(BUMAZHKIN_R, 'idle'), x - 64, GY - 62, true); sprite(QZ.folder, x - 70, GY - 30); }
+        else { sprite(runnerSprite(BUMAZHKIN_R, 'run' + ((t / 70 | 0) % 4)), x - 64 + this.bx, GY - 62); sprite(QZ.folder, x - 70, GY - 15); } } }
       if (s.obs) for (const o of s.obs) { const img = o.kind === 'rat' ? QZ.obs[(t / 110 | 0) % 2 ? 'rat0' : 'rat1'] : QZ.obs[o.kind], sx = o.x + o.mx - cx;
         if (sx > -40 && sx < W + 40) { sprite(img, sx, GY - img.height + 1, o.kind === 'rat', o.hit ? .45 : 1);
           ctx.save(); ctx.globalAlpha = .14; ctx.translate(Math.round(sx), GY + img.height); ctx.scale(1, -1); if (o.kind === 'rat') { ctx.translate(img.width, 0); ctx.scale(-1, 1); } ctx.drawImage(img, 0, 0); ctx.restore(); } }
     }
     // герой: отражение в полу, полосы скорости, пыль
-    const fr = this.trip > 0 ? 'trip' : this.jy < 0 ? 'jump' : ['run', 'go'].includes(this.state) ? 'run' + ((t / 75 | 0) % 6) : 'idle';
+    const fr = this.trip > 0 ? 'trip' : this.jy < 0 ? 'jump' : ['run', 'go'].includes(this.state) ? 'run' + ((t / 90 | 0) % 4) : 'idle';
     const alpha = this.state === 'enter' ? clamp(1 - (this.et - 300) / 320, 0, 1) : ['feedback', 'trans'].includes(this.state) ? 0 : this.trip > 0 && (t / 80 | 0) % 2 ? .5 : 1;
-    const hsx = Math.round(this.hx - cx), hy = GY - 58 + Math.round(this.jy), img = runnerSprite(this.look, fr);
+    const hsx = Math.round(this.hx - cx), hy = GY - 62 + Math.round(this.jy), img = runnerSprite(this.look, fr);
     if (alpha > 0) {
       ctx.save(); ctx.globalAlpha = .16 * alpha; ctx.translate(hsx, GY * 2 - hy); ctx.scale(1, -1); ctx.drawImage(img, 0, 0); ctx.restore();
-      rect(hsx + 9, GY - 1, 22, 2, `rgba(0,0,0,${(.35 * (1 + this.jy / 80)).toFixed(2)})`);
+      rect(hsx + 12, GY - 1, 28, 2, `rgba(0,0,0,${(.35 * (1 + this.jy / 80)).toFixed(2)})`);
       for (const d of this.dust) { const a = 1 - d.t / 450; ctx.fillStyle = `rgba(190,186,176,${(a * .6).toFixed(2)})`; ctx.fillRect(Math.round(d.x - cx), Math.round(d.y), Math.round(d.s * (1 + d.t / 300)), Math.round(d.s * (1 + d.t / 300))); }
-      if (['run', 'go'].includes(this.state) && this.trip === 0) for (let i = 0; i < 3; i++) { const yy = hy + 22 + i * 8, len = 10 + ((t / 60 + i * 3) % 6); rect(hsx - len - 2 + (i === 1 ? -4 : 0), yy, len, 1, 'rgba(230,234,240,.45)'); }
+      if (['run', 'go'].includes(this.state) && this.trip === 0) for (let i = 0; i < 3; i++) { const yy = hy + 34 + i * 7, len = 10 + ((t / 60 + i * 3) % 6); rect(hsx - len - 2 + (i === 1 ? -4 : 0), yy, len, 1, 'rgba(230,234,240,.45)'); }
       sprite(img, hsx, hy, false, alpha);
     }
     // передний план с параллаксом и виньетка
@@ -458,7 +432,7 @@ scenes.quiz = {
   drawIntro() {
     rect(0, 0, W, H, 'rgba(10,12,20,.55)'); frameBox(40, 34, 320, 150, .96);
     rect(52, 50, 78, 108, '#1a1e26'); rect(52, 150, 78, 8, '#2a2e36');
-    sprite(runnerSprite(BUMAZHKIN_R, 'idle'), 70, 94, true);
+    sprite(runnerSprite(BUMAZHKIN_R, 'idle'), 66, 90, true);
     for (let i = 0; i < 5; i++) { const a = this.t / 700 + i * 1.26; sprite(QZ.page, 86 + Math.round(Math.cos(a) * 28), 78 + Math.round(Math.sin(a) * 16)); }
     text(L(UI.qzTitle), 245, 44, { align: 'center', col: '#f2c94c' });
     wrapText(L(UI.qzIntro).replace('{n}', this.total), 210, 6).slice(0, 10).forEach((l, i) => text(l, 140, 60 + i * 9, { col: '#f4f3ee', size: 6 }));

@@ -23,7 +23,7 @@ const {chromium}=require('playwright'); const fs=require('fs');
  await pg.evaluate(()=>{ window._wrongDone=false; window._lens=[];
    window._bot=setInterval(()=>{ const s=scene; if(s!==scenes.quiz) return;
      if(s.state==='intro') s.state='run';
-     if(s.state==='run') for(const g of s.segs) if(g.obs) for(const o of g.obs){ const d=o.x+o.mx-(s.hx+28); if(!o.hit && d>2 && d<(o.kind==='rat'?40:30) && s.jy===0) s.jump(); }
+     if(s.state==='run') for(const g of s.segs) if(g.obs) for(const o of g.obs){ const d=o.x+o.mx-(s.hx+36); if(!o.hit && d>2 && d<(o.kind==='rat'?40:30) && s.jy===0) s.jump(); }
      for(const g of s.segs) if(g.obs) for(const o of g.obs) if(o.hit && !o.logged){ o.logged=1; (window._hits=window._hits||[]).push(o.kind+' d='+(o.x+o.mx-s.hx).toFixed(0)+' jy='+s.jy.toFixed(0)); }
      if(s.state==='ask' && !window._asking){ window._asking=true; setTimeout(()=>{ window._asking=false; const q=s.cur.q; let i=q.correct; if(!window._wrongDone){ i=(q.correct+1)%q.answers.length; window._wrongDone=true; window._lens.push(s.totalLen()); } s.choose(i); }, 500); }
      if(s.state==='feedback' && !window._fb){ window._fb=true; setTimeout(()=>{ window._fb=false; s.next(); setTimeout(()=>{ if(window._lens.length===1) window._lens.push(s.totalLen()); }, 900); }, 700); }
@@ -43,4 +43,4 @@ const {chromium}=require('playwright'); const fs=require('fs');
  console.log('монеты', r.res && r.res.coins, 'споткнулся', r.trips, 'длина пути', r.lens);
  check('монеты пришли в бюджет ЖК', await pg.evaluate(()=>HOUSE_STATE.coins) - coins0, r.res && r.res.coins);
  check('результат ушёл в приложение', r.last && [r.last.type, r.last.payload.tourCode, r.last.payload.badges], ['result','quiz',['zhkh_expert']]);
- console.log((await pg.evaluate(()=>window._hits||[])).slice(0,8)); console.log(errs); await b.close(); })();
+ console.log(JSON.stringify((await pg.evaluate(()=>window._hits||[])))); console.log(errs); await b.close(); })();
