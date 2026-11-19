@@ -144,6 +144,7 @@ const BUMAZHKIN_R = { ...BUMAZHKIN, briefcase: true, topCol: '#4a4a58', pants: '
 
 /* ---------- коридор (как на макете): трубы, лампы, окно, панели, кафель с отражениями ---------- */
 const QZ = { GY: 176, obs: {}, deco: {} };
+const DW = 46, DH = 82;
 function outlined(w, h, draw, col = '#14121a') {
   return makeCanvas(w, h, P => { draw(P);
     const g = P.g, img = g.getImageData(0, 0, w, h), d = img.data, a = (x, y) => x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] > 0, out = [];
@@ -173,10 +174,15 @@ function buildQuizArt() {
   });
   // окно с ночным двором, объявления, решётка вентиляции, щиток с трубой вниз
   QZ.deco.window = outlined(80, 54, ({ r, p }) => { r(0, 0, 80, 54, '#3a3f44'); r(2, 2, 76, 50, '#2b3036');
-    for (let y = 4; y < 50; y++) r(4, y, 72, 1, `rgb(${50 + y * .5 | 0},${62 + y * .6 | 0},${92 + y * .7 | 0})`);
-    for (const [x, h] of [[6, 18], [16, 26], [28, 14], [40, 22], [52, 30], [66, 20]]) for (let i = 0; i < h; i++) r(x - i / 3, 50 - i, 4 + i * .6, 1, '#2a3540');
-    for (let i = 0; i < 12; i++) p(6 + R() * 68, 6 + R() * 20, '#9aa8c8');
+    for (let y = 4; y < 50; y++) r(4, y, 72, 1, `rgb(${22 + y * .5 | 0},${30 + y * .6 | 0},${54 + y * .7 | 0})`);
+    for (let i = 0; i < 9; i++) p(6 + R() * 68, 5 + R() * 9, '#9aa8c8');
+    // соседняя панелька во дворе: этажи с окнами, часть горит
+    const blk = (x0, y0, w, col, lit) => { r(x0, y0, w, 50 - y0, col); r(x0, y0, w, 1, '#3c4656');
+      for (let y = y0 + 3; y < 48; y += 5) for (let x = x0 + 2; x < x0 + w - 2; x += 4) r(x, y, 2, 2, R() < lit ? (R() < .3 ? '#f2d08a' : '#e8b860') : '#1c222c'); };
+    blk(4, 16, 34, '#262d38', .3); blk(44, 22, 32, '#2a313c', .25);
+    r(4, 44, 72, 6, '#1a1f26'); r(52, 38, 2, 8, '#1a1f26'); r(48, 34, 10, 6, '#1e252c');
     r(38, 2, 3, 50, '#3a3f44'); r(2, 26, 76, 3, '#3a3f44'); r(19, 2, 2, 50, '#3a3f44'); r(59, 2, 2, 50, '#3a3f44');
+    r(3, 3, 15, 1, 'rgba(255,255,255,.08)'); r(42, 30, 16, 1, 'rgba(255,255,255,.06)');
     r(0, 52, 80, 2, '#4a5058'); r(-1, 52, 82, 1, '#5a6068'); });
   QZ.deco.notes = outlined(34, 30, ({ r }) => { r(0, 6, 12, 16, '#d8d2bf'); for (let y = 9; y < 20; y += 2) r(2, y, 8, 1, '#8a8478'); r(16, 0, 18, 28, '#e4dfcf'); r(23, 0, 4, 2, '#c9a95a');
     for (let y = 4; y < 26; y += 2) r(18, y, 13 - (y % 4), 1, '#8a8478'); r(18, 4, 8, 1, '#5a5448'); });
@@ -191,10 +197,10 @@ function buildQuizArt() {
   QZ.streak = makeCanvas(16, 40, ({ g }) => { for (let y = 0; y < 40; y++) { const a = .16 * (1 - y / 40); for (let x = 0; x < 16; x++) { const k = 1 - Math.abs(x - 7.5) / 8; g.fillStyle = `rgba(255,226,160,${(a * k).toFixed(3)})`; g.fillRect(x, y, 1, 1); } } });
   QZ.glow = makeCanvas(90, 60, ({ g }) => { const gr = g.createRadialGradient(45, 10, 2, 45, 20, 50); gr.addColorStop(0, 'rgba(255,226,160,.35)'); gr.addColorStop(1, 'rgba(255,226,160,0)'); g.fillStyle = gr; g.fillRect(0, 0, 90, 60); });
   // двери: тёмный металл с филёнками, наличник
-  QZ.door = outlined(32, 70, ({ r, p }) => { r(0, 0, 32, 70, '#2a2d32'); r(3, 3, 26, 67, '#3d4148'); r(3, 3, 26, 1, '#55595f'); r(3, 3, 1, 67, '#4a4e55'); r(28, 3, 1, 67, '#2c2f34');
-    r(7, 8, 18, 24, '#363a41'); r(7, 8, 18, 1, '#2a2d32'); r(7, 38, 18, 26, '#363a41'); r(7, 38, 18, 1, '#2a2d32'); r(7, 31, 18, 1, '#4a4e55');
-    r(23, 36, 3, 9, '#8a8e96'); r(23, 36, 3, 1, '#b8bcc4'); r(12, 14, 8, 3, '#b8b2a0'); });
-  QZ.goalDoor = outlined(32, 70, ({ r }) => { r(0, 0, 32, 70, '#1f3a34'); r(3, 3, 26, 67, '#2e6a5a'); r(3, 3, 26, 1, '#4a8a78'); r(7, 8, 18, 24, '#357a68'); r(7, 38, 18, 26, '#357a68'); r(23, 36, 3, 9, '#c9a95a'); });
+  QZ.door = outlined(DW, DH, ({ r }) => { r(0, 0, DW, DH, '#2a2d32'); r(3, 3, DW - 6, DH - 3, '#3d4148'); r(3, 3, DW - 6, 1, '#55595f'); r(3, 3, 1, DH - 3, '#4a4e55'); r(DW - 4, 3, 1, DH - 3, '#2c2f34');
+    r(8, 9, DW - 16, 28, '#363a41'); r(8, 9, DW - 16, 1, '#2a2d32'); r(8, 44, DW - 16, 30, '#363a41'); r(8, 44, DW - 16, 1, '#2a2d32'); r(8, 36, DW - 16, 1, '#4a4e55');
+    r(DW - 11, 40, 4, 11, '#8a8e96'); r(DW - 11, 40, 4, 1, '#b8bcc4'); r((DW >> 1) - 6, 16, 12, 4, '#b8b2a0'); r((DW >> 1) - 1, 24, 3, 3, '#1e2024'); });
+  QZ.goalDoor = outlined(DW, DH, ({ r }) => { r(0, 0, DW, DH, '#1f3a34'); r(3, 3, DW - 6, DH - 3, '#2e6a5a'); r(3, 3, DW - 6, 1, '#4a8a78'); r(8, 9, DW - 16, 28, '#357a68'); r(8, 44, DW - 16, 30, '#357a68'); r(DW - 11, 40, 4, 11, '#c9a95a'); });
   // преграды крупнее — под рост героя
   QZ.obs.boxes = outlined(30, 26, ({ r }) => { const box = (x, y, w, h) => { r(x, y, w, h, '#9a7048'); r(x, y, w, 1, '#c09468'); r(x, y, 1, h, '#b0845a'); r(x + w - 1, y, 1, h, '#7a5434'); r(x + (w >> 1) - 1, y, 2, 4, '#7a5434'); };
     box(0, 10, 10, 16); box(20, 12, 10, 14); box(7, 0, 16, 26); r(11, 9, 8, 5, '#d8d2bf'); });
@@ -361,17 +367,19 @@ scenes.quiz = {
       if (s.type === 'door') s.doors.forEach((dx, i) => { const x = dx - cx; if (x < -40 || x > W + 40) return;
         const lit = s === this.cur && (this.state === 'ask' || this.pick === i);
         if (s.open === i) { const k = s.ok;
-          rect(x - 13, GY - 66, 26, 66, '#2a2018'); ctx.fillStyle = 'rgba(242,198,106,.55)'; ctx.fillRect(x - 13, GY - 66, 26, 66);
-          rect(x - 9, GY - 58, 3, 16, '#5a3a2a'); rect(x - 10, GY - 59, 5, 1, '#3a2a1a');
-          const dw = Math.max(4, Math.round(26 * (1 - k))); sprite(QZ.door, x - 16, GY - 70, false, 0); rect(x - 16, GY - 70, 32, 4, '#2a2d32'); rect(x - 16, GY - 70, 3, 70, '#2a2d32'); rect(x + 13, GY - 70, 3, 70, '#2a2d32');
-          rect(x + 13 - dw, GY - 66, dw, 66, '#3d4148'); rect(x + 13 - dw, GY - 66, 1, 66, '#14121a');
-          ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(242,198,106,${(.07 * k).toFixed(3)})`; ctx.beginPath(); ctx.moveTo(x - 13, GY); ctx.lineTo(x + 13, GY); ctx.lineTo(x + 30, GY + 30); ctx.lineTo(x - 30, GY + 30); ctx.fill(); ctx.restore();
-        } else sprite(QZ.door, x - 16, GY - 70);
-        rect(x - 10, GY - 86, 20, 13, '#14121a'); rect(x - 9, GY - 85, 18, 11, lit ? '#f2c94c' : '#c9c3b0'); rect(x - 9, GY - 85, 18, 1, lit ? '#fbe39a' : '#e4dfcf');
-        text('ABCD'[i], x, GY - 83, { align: 'center', col: '#14121a' });
-        rect(x - 11, GY + 1, 22, 2, 'rgba(242,210,122,.2)'); });
+          const hw = (DW >> 1) - 3, ih = DH - 3;
+          rect(x - hw, GY - ih, hw * 2, ih, '#2a2018'); ctx.fillStyle = 'rgba(242,198,106,.55)'; ctx.fillRect(x - hw, GY - ih, hw * 2, ih);
+          rect(x - hw + 5, GY - ih + 10, 4, 22, '#5a3a2a'); rect(x - hw + 4, GY - ih + 9, 6, 1, '#3a2a1a');
+          const dw = Math.max(5, Math.round(hw * 2 * (1 - k)));
+          rect(x - hw - 3, GY - DH, DW, 3, '#2a2d32'); rect(x - hw - 3, GY - DH, 3, DH, '#2a2d32'); rect(x + hw, GY - DH, 3, DH, '#2a2d32');
+          rect(x + hw - dw, GY - ih, dw, ih, '#3d4148'); rect(x + hw - dw, GY - ih, 1, ih, '#14121a');
+          ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(242,198,106,${(.07 * k).toFixed(3)})`; ctx.beginPath(); ctx.moveTo(x - hw, GY); ctx.lineTo(x + hw, GY); ctx.lineTo(x + hw + 18, GY + 30); ctx.lineTo(x - hw - 18, GY + 30); ctx.fill(); ctx.restore();
+        } else sprite(QZ.door, x - (DW >> 1), GY - DH);
+        rect(x - 10, GY - DH - 16, 20, 13, '#14121a'); rect(x - 9, GY - DH - 15, 18, 11, lit ? '#f2c94c' : '#c9c3b0'); rect(x - 9, GY - DH - 15, 18, 1, lit ? '#fbe39a' : '#e4dfcf');
+        text('ABCD'[i], x, GY - DH - 13, { align: 'center', col: '#14121a' });
+        rect(x - (DW >> 1) + 2, GY + 1, DW - 4, 2, 'rgba(242,210,122,.2)'); });
       if (s.type === 'goal') { const x = s.x0 + 140 - cx; if (x > -60 && x < W + 60) {
-        sprite(QZ.goalDoor, x - 16, GY - 70); rect(x - 12, GY - 84, 24, 10, '#f4f3ee'); text('ОСИ', x, GY - 83, { align: 'center', col: '#2e6a5a', size: 6 });
+        sprite(QZ.goalDoor, x - (DW >> 1), GY - DH); rect(x - 12, GY - DH - 14, 24, 10, '#f4f3ee'); text('ОСИ', x, GY - DH - 13, { align: 'center', col: '#2e6a5a', size: 6 });
         if (!this.bRun) { sprite(runnerSprite(BUMAZHKIN_R, 'idle'), x - 64, GY - 62, true); sprite(QZ.folder, x - 70, GY - 30); }
         else { sprite(runnerSprite(BUMAZHKIN_R, 'run' + ((t / 70 | 0) % 4)), x - 64 + this.bx, GY - 62); sprite(QZ.folder, x - 70, GY - 15); } } }
       if (s.obs) for (const o of s.obs) { const img = o.kind === 'rat' ? QZ.obs[(t / 110 | 0) % 2 ? 'rat0' : 'rat1'] : QZ.obs[o.kind], sx = o.x + o.mx - cx;
@@ -416,7 +424,7 @@ scenes.quiz = {
       const s = L(a), sz = textW(s, 8) > 340 ? 6 : 8; text(s, 34, y + (sz === 8 ? 2 : 4), { col: sel ? '#f2c94c' : '#cfd6e4', size: sz });
       if (this.state === 'ask' && clickIn(16, y, 368, ah - 2)) this.choose(i); });
     if (this.state === 'ask') {
-      const c = clicks.find(c => c.y > 24 + h); if (c) { const wx = c.x + this.cam, i = this.cur.doors.findIndex(d => Math.abs(d - wx) < 20); if (i >= 0) { clicks.splice(clicks.indexOf(c), 1); this.choose(i); } }
+      const c = clicks.find(c => c.y > 24 + h); if (c) { const wx = c.x + this.cam, i = this.cur.doors.findIndex(d => Math.abs(d - wx) < 27); if (i >= 0) { clicks.splice(clicks.indexOf(c), 1); this.choose(i); } }
       const n = q.answers.length; if (hit('up') || hit('left')) this.pick = (this.pick + n - 1) % n; if (hit('down') || hit('right')) this.pick = (this.pick + 1) % n; if (hit('act') && this.pick >= 0) this.choose(this.pick);
     }
   },
