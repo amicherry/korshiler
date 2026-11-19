@@ -1,7 +1,8 @@
 /* ===================== Викторина «Знаток ЖКХ» =====================
-   Аркада в коридоре подъезда. Бюрократ Бумажкин растащил страницы техпаспорта дома.
-   Чиби-герой бежит, перепрыгивает преграды (тап / пробел), у трёх дверей — вопрос:
-   верная дверь — страница и монеты, неверная — объяснение, путь удлиняется, вопрос вернётся позже.
+   Аркада в том же подъезде, что и в игре. Бюрократ Бумажкин растащил страницы техпаспорта по этажам.
+   Чиби-герой бежит по этажу, перепрыгивает преграды, у дверей квартир — вопрос:
+   верная дверь — страница, монеты и этаж выше; неверная — объяснение, тот же этаж ещё раз, вопрос вернётся позже.
+   Наверху, на 13 этаже, ждёт Бумажкин.
    Вопросы — quiz.json (встроенная копия QUIZ_BUILTIN; на сайте берётся свежий файл). */
 
 let QUIZ_DATA = null;
@@ -78,146 +79,127 @@ function chibiSprite(look, frame) {
 }
 const BUMAZHKIN = { body: 'm', skin: '#d9a07a', hair: 'bald', hairCol: '#5a4a40', top: 'jacket', topCol: '#4a4a58', pants: '#2e2e38', bottom: 'pants', glasses: true };
 
-/* ---------- коридор подъезда: тайл 480 px (стиль лестничной клетки) ---------- */
-const QZ = { tile: null, doors: {}, obs: {}, page: null, GY: 186 };
+/* ---------- предметы на этаже: тот же стиль, что у подъезда (тёмный контур) ---------- */
+function outlined(w, h, draw) {
+  return makeCanvas(w, h, P => { draw(P);
+    const g = P.g, img = g.getImageData(0, 0, w, h), d = img.data, a = (x, y) => x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] > 0, out = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (!a(x, y) && (a(x - 1, y) || a(x + 1, y) || a(x, y - 1))) out.push([x, y]);
+    for (const [x, y] of out) P.p(x, y, '#0e1011'); });
+}
+const QZ = { obs: {}, page: null, GY: 186 };
 function buildQuizArt() {
-  if (QZ.tile) return;
-  const R = rng(77);
-  QZ.tile = makeCanvas(480, H, ({ r, p }) => {
-    r(0, 0, 480, 22, '#1b1d1a'); r(0, 20, 480, 2, '#2c302a');                                    // потолок
-    r(0, 22, 480, 92, '#5d6a4e'); r(0, 114, 480, 72, '#2f5a57'); r(0, 112, 480, 2, '#1f2a24');   // стена: олива и бирюзовая панель
-    for (let i = 0; i < 1400; i++) p(R() * 480, 22 + R() * 164, pick(R, ['#566248', '#64714f', '#2a5250', '#356360']));
-    for (let x = 0; x < 480; x += 60) { r(x, 116, 1, 68, '#29504d'); }                          // швы панели
-    r(0, 182, 480, 4, '#20302c'); r(0, 182, 480, 1, '#3a5a54');                                 // плинтус
-    r(0, 186, 480, 39, '#3e3830'); for (let x = 0; x < 480; x += 24) r(x, 186, 1, 39, '#332e28'); r(0, 186, 480, 1, '#5a5244');
-    for (let i = 0; i < 300; i++) p(R() * 480, 187 + R() * 37, pick(R, ['#36312a', '#463f35']));
-    // трубы под потолком, провод
-    r(0, 26, 480, 3, '#4a5e6a'); r(0, 26, 480, 1, '#6a8090'); for (let x = 30; x < 480; x += 90) r(x, 25, 3, 5, '#3a4a54');
-    for (let x = 0; x < 480; x++) p(x, 33 + Math.round(Math.sin(x / 480 * Math.PI * 4) * 2), '#1a1d1b');
-    // бра и тёплый свет, объявления, щиток, почтовые ящики
-    for (const lx of [80, 320]) { r(lx - 3, 50, 7, 5, '#c9a95a'); r(lx - 2, 55, 5, 2, '#f4e6a8'); r(lx, 46, 1, 4, '#1a1d1b'); }
-    r(190, 64, 9, 12, '#d8d2bf'); r(191, 66, 6, 1, '#7a7466'); r(191, 69, 5, 1, '#7a7466'); r(203, 68, 8, 10, '#c9d6e6');
-    r(410, 60, 16, 22, '#3a4038'); r(411, 61, 14, 20, '#4a5248'); r(416, 66, 4, 4, '#b8443f');
-    r(250, 124, 30, 18, '#3a4a48'); for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) r(252 + i * 9, 126 + j * 8, 8, 7, '#55706a');
-    r(30, 150, 30, 14, '#7a6a58'); for (let x = 32; x < 58; x += 4) r(x, 151, 2, 12, '#5a4a3a');   // батарея
-  });
-  QZ.light = makeCanvas(60, 70, ({ g }) => { const gr = g.createRadialGradient(30, 10, 2, 30, 30, 40); gr.addColorStop(0, 'rgba(255,220,150,.28)'); gr.addColorStop(1, 'rgba(255,220,150,0)'); g.fillStyle = gr; g.fillRect(0, 0, 60, 70); });
-  DOOR_STYLES.forEach((L0, i) => { QZ.doors[i] = makeCanvas(34, 54, P => drawDoorPanel(P, 17, 53, L0)); });
-  QZ.doorOpen = makeCanvas(34, 54, ({ r }) => { r(1, 2, 32, 51, '#1a1d1b'); r(4, 5, 26, 48, '#0b0c10'); r(4, 5, 5, 48, '#2a2e2a'); r(26, 5, 4, 48, '#3a3530'); });
-  QZ.obs.bucket = makeCanvas(12, 12, ({ r }) => { r(1, 3, 10, 9, '#6a7480'); r(2, 3, 8, 1, '#8a96a2'); r(1, 2, 10, 1, '#4a525c'); r(3, 0, 6, 1, '#2a2e34'); r(2, 1, 1, 2, '#2a2e34'); r(9, 1, 1, 2, '#2a2e34'); r(2, 4, 8, 2, '#5a8ad0'); });
-  QZ.obs.boxes = makeCanvas(16, 15, ({ r }) => { r(0, 5, 16, 10, '#a87a4a'); r(0, 5, 16, 1, '#c89a6a'); r(7, 5, 2, 10, '#8a5a3a'); r(3, 0, 10, 6, '#b88a5a'); r(3, 0, 10, 1, '#d8aa7a'); r(7, 0, 2, 6, '#9a6a4a'); });
-  QZ.obs.wet = makeCanvas(12, 16, ({ r, p }) => { r(2, 2, 8, 12, '#f2c94c'); r(1, 14, 2, 2, '#b08a1e'); r(9, 14, 2, 2, '#b08a1e'); r(3, 1, 6, 1, '#f2c94c'); r(5, 4, 2, 5, '#1a1424'); r(5, 10, 2, 2, '#1a1424'); p(2, 2, '#fbe39a'); });
-  QZ.obs.rat0 = makeCanvas(14, 7, ({ r, p }) => { r(3, 2, 8, 4, '#5b5f66'); r(10, 3, 3, 2, '#6b6f76'); p(12, 3, '#1a1424'); p(13, 4, '#e98f8f'); r(0, 4, 3, 1, '#8a6a6a'); r(4, 6, 1, 1, '#3a3e46'); r(8, 6, 1, 1, '#3a3e46'); p(9, 1, '#7a7e86'); });
-  QZ.obs.rat1 = makeCanvas(14, 7, ({ r, p }) => { r(3, 2, 8, 4, '#5b5f66'); r(10, 3, 3, 2, '#6b6f76'); p(12, 3, '#1a1424'); p(13, 4, '#e98f8f'); r(0, 3, 3, 1, '#8a6a6a'); r(5, 6, 1, 1, '#3a3e46'); r(7, 6, 1, 1, '#3a3e46'); p(9, 1, '#7a7e86'); });
-  QZ.page = makeCanvas(9, 11, ({ r }) => { r(0, 0, 9, 11, '#1a1424'); r(1, 1, 7, 9, '#f4f3ee'); r(6, 1, 2, 2, '#c9c3b0'); for (let y = 3; y < 9; y += 2) r(2, y, 5, 1, '#8a8478'); });
-  QZ.goal = makeCanvas(120, 80, ({ r, g }) => {
-    r(10, 6, 40, 74, '#1a1d1b'); r(13, 9, 34, 71, '#2e6a5a'); r(16, 12, 28, 30, '#357a68'); r(16, 46, 28, 30, '#357a68'); r(40, 46, 3, 3, '#c9a95a');
-    r(14, -2 + 2, 32, 8, '#f4f3ee'); g.font = '8px ' + FONT; g.fillStyle = '#2e6a5a'; g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText('ОСИ', 30, 1);
-    r(64, 50, 50, 4, '#8a5a3a'); r(66, 54, 3, 26, '#6a4a2a'); r(108, 54, 3, 26, '#6a4a2a');                        // стол
-    r(78, 40, 22, 10, '#3f6f8c'); r(78, 40, 22, 1, '#6a9ab8'); r(80, 42, 18, 1, '#f4f3ee');                           // папка «Техпаспорт»
-  });
+  if (QZ.page) return;
+  // ведро со шваброй
+  QZ.obs.bucket = outlined(16, 22, ({ r, p }) => { r(10, 0, 1, 12, '#8a6a4a'); r(8, 1, 5, 1, '#6a5a4a');
+    r(2, 12, 11, 9, '#5f6b74'); r(2, 12, 11, 1, '#8a98a2'); r(3, 13, 1, 7, '#7a8892'); r(11, 13, 1, 7, '#4a545c'); r(3, 14, 9, 2, '#4a6a8a'); r(1, 11, 13, 1, '#3e464c');
+    r(8, 10, 5, 3, '#c9c3b0'); p(9, 12, '#a8a290'); r(2, 20, 11, 1, '#3e464c'); });
+  // коробки от переезда
+  QZ.obs.boxes = outlined(20, 18, ({ r, p }) => { r(1, 7, 18, 11, '#9a6e44'); r(1, 7, 18, 1, '#c09264'); r(1, 8, 1, 10, '#b0845a'); r(18, 8, 1, 10, '#7a5434'); r(9, 7, 2, 11, '#7a5434');
+    r(4, 0, 12, 7, '#a87a4e'); r(4, 0, 12, 1, '#c99c6c'); r(9, 0, 2, 7, '#86603c'); r(5, 3, 3, 2, '#d8d2bf'); r(12, 11, 4, 3, '#d8d2bf'); p(13, 12, '#7a7466'); });
+  // табличка «мокрый пол»
+  QZ.obs.wet = outlined(14, 20, ({ r, p }) => { r(3, 0, 8, 1, '#e8b830'); r(2, 1, 10, 15, '#f2c94c'); r(2, 1, 1, 15, '#fbe39a'); r(11, 1, 1, 15, '#c09a2a');
+    r(6, 4, 2, 6, '#1a1424'); r(6, 11, 2, 2, '#1a1424'); r(1, 16, 3, 4, '#b08a1e'); r(10, 16, 3, 4, '#b08a1e'); p(3, 3, '#ffffff'); });
+  // крыса (2 кадра)
+  const rat = (k) => outlined(16, 9, ({ r, p }) => { r(4, 2, 9, 5, '#5b5f66'); r(5, 2, 7, 1, '#7a7e86'); r(12, 3, 3, 3, '#6b6f76'); p(14, 4, '#e98f8f'); p(13, 3, '#0e1011');
+    r(0, k ? 4 : 5, 4, 1, '#8a6a6a'); r(5, 7, 1, 2, '#3a3e46'); r(k ? 9 : 10, 7, 1, 2, '#3a3e46'); p(10, 1, '#8a8e96'); });
+  QZ.obs.rat0 = rat(0); QZ.obs.rat1 = rat(1);
+  QZ.page = outlined(10, 12, ({ r }) => { r(1, 1, 8, 10, '#f4f3ee'); r(6, 1, 3, 3, '#c9c3b0'); for (let y = 4; y < 10; y += 2) r(2, y, 5, 1, '#8a8478'); });
+  QZ.folder = outlined(18, 14, ({ r }) => { r(1, 3, 16, 10, '#3f6f8c'); r(1, 1, 7, 3, '#3f6f8c'); r(1, 3, 16, 1, '#6a9ab8'); r(3, 6, 12, 1, '#f4f3ee'); r(3, 8, 9, 1, '#c9d6e6'); });
+}
+const QZ_SPEED = .115, QZ_JUMP = -.34, QZ_G = .0011, QZ_STOP = 300;
+// подъезд викторины: тот же, что в игре (13 этажей, по 4 квартиры с каждой стороны)
+function quizStairwell() {
+  const R = rng(4242), look = {}; for (let apt = 1; apt <= APTS; apt++) look[apt] = pick(R, DOOR_STYLES);
+  return { bg: drawStairwell(HOUSE.floors, apt => look[apt], new Set(HOUSE_STATE.fixed)), look };
 }
 
 /* ---------- сцена ---------- */
-const QZ_SPEED = .12, QZ_JUMP = -.3, QZ_G = .0012;
 scenes.quiz = {
   async enter() {
     buildQuizArt(); setTouch({ act: L(UI.qzJump) });
-    this.state = 'loading'; this.t = 0; this.coins = 0; this.first = 0; this.done = 0; this.wrong = 0; this.paused = false; this.result = null; this.sent = false;
+    this.state = 'loading'; this.t = 0; this.coins = 0; this.first = 0; this.done = 0; this.wrong = 0; this.paused = false; this.result = null;
     this.look = Object.assign({}, DEFAULT_LOOK, SAVE.look || {});
+    const S = quizStairwell(); this.bg = S.bg; this.doorLook = S.look;
     const d = await loadQuiz(); this.cfg = d;
-    const pool = shuffle(d.questions.filter(quizValidQ)), n = Math.min(d.questionsPerRun || 8, pool.length);
-    this.total = n; this.queue = pool.slice(0, n).map(prepQuestion);
-    // трасса: [бег, двери] × n, затем бег и финиш
-    this.segs = []; let x = 40;
-    for (const q of this.queue) { x = this.addRun(x, 260 + Math.random() * 80, 2); x = this.addDoors(x, q); }
-    x = this.addRun(x, 220, 1); this.segs.push({ type: 'goal', x0: x, len: 220 });
-    this.hx = 20; this.jy = 0; this.vy = 0; this.trip = 0; this.cam = 0; this.cur = null; this.pick = -1; this.fb = null;
+    const pool = shuffle(d.questions.filter(quizValidQ)); this.total = Math.min(d.questionsPerRun || 8, pool.length, HOUSE.floors - 1);
+    this.queue = pool.slice(0, this.total).map(prepQuestion);
+    this.startFloor = HOUSE.floors - this.total;                     // 8 вопросов — старт с 5 этажа, финиш на 13
+    this.floor = this.startFloor; this.floorsRun = 0; this.newStage(false);
     this.startedAt = Date.now(); this.state = 'intro';
   },
-  // участок бега с преградами (не ближе 110 px друг к другу — успеть приземлиться)
-  addRun(x, len, nObs) {
-    const obs = [], kinds = ['bucket', 'boxes', 'wet', 'rat'], slot = len / (nObs + 1);
-    for (let i = 1; i <= nObs; i++) obs.push({ x: x + Math.round(slot * i + (Math.random() - .5) * slot * .3), kind: pick(Math.random, kinds), hit: false, mx: 0 });
-    this.segs.push({ type: 'run', x0: x, len, obs }); return x + len;
+  // этаж: преграды на пути к дверям; на «повторном» этаже (после ошибки) их больше
+  newStage(detour) {
+    this.hx = 8; this.jy = 0; this.vy = 0; this.trip = 0; this.buffer = 0; this.pick = -1; this.fb = null; this.open = 0; this.floorsRun++;
+    const goal = this.done >= this.total || !this.queue.length;
+    this.stage = { floor: goal ? HOUSE.floors : this.floor, goal, q: goal ? null : this.queue.shift(), obs: [] };
+    const spots = detour ? [70, 140, 290] : pick(Math.random, [[90, 160], [120, 290], [80, 285]]);
+    for (const x of spots) this.stage.obs.push({ x: x + Math.round((Math.random() - .5) * 16), kind: pick(Math.random, ['bucket', 'boxes', 'wet', 'rat']), hit: false, mx: 0 });
+    if (this.stage.q) this.stage.doors = DOOR_X.slice(-this.stage.q.answers.length);
+    this.bx = 430; this.bRun = 0;                                      // Бумажкин на финальном этаже
+    this.cam = clamp(this.hx - 110, 0, SW - W);
   },
-  addDoors(x, q) {
-    const n = q.answers.length, gap = n === 4 ? 70 : 84, doors = q.answers.map((_, i) => x + 60 + i * gap);
-    this.segs.push({ type: 'door', x0: x, len: 60 + (n - 1) * gap + 70, q, doors, style: Math.floor(Math.random() * DOOR_STYLES.length), open: -1 });
-    return x + 60 + (n - 1) * gap + 70;
+  base() { return floorBase(this.stage.floor, HOUSE.floors); },
+  focus() { return { x: this.hx - this.cam + 9, y: QZ.GY - 12 }; },
+  jump() {
+    if (this.state !== 'run' || this.trip > 0) return;
+    if (this.jy < 0) { if (this.jy > -14 && this.vy > 0) this.buffer = 160; return; }     // нажал чуть раньше приземления — прыгнет сразу после
+    this.vy = QZ_JUMP; beep(520, .05, 'square', .03);
   },
-  // после ответа: всё, что ещё впереди, сдвигается — трасса перестраивается (игрок в это время «за дверью»)
-  relayout(fromIdx) { let x = this.segs[fromIdx].x0 + this.segs[fromIdx].len;
-    for (let i = fromIdx + 1; i < this.segs.length; i++) { const s = this.segs[i], dx = x - s.x0; s.x0 = x;
-      if (s.obs) for (const o of s.obs) o.x += dx; if (s.doors) s.doors = s.doors.map(v => v + dx); x += s.len; } },
-  totalLen() { const s = this.segs[this.segs.length - 1]; return s.x0 + 60; },
-  segAt(x) { return this.segs.find(s => x >= s.x0 && x < s.x0 + s.len); },
-  focus() { return { x: this.hx - this.cam + 8, y: QZ.GY - 12 }; },
-  jump() { if (this.jy === 0 && this.state === 'run' && !this.trip) { this.vy = QZ_JUMP; sfx.step && sfx.step(); beep(520, .05, 'square', .03); } },
   update(dt) {
     if (this.state === 'loading') return;
     this.t += dt;
     if (hit('back') && !['end', 'intro'].includes(this.state)) this.paused = !this.paused;
     if (this.paused) return;
     if (this.state === 'intro') { if (hit('act')) this.state = 'run'; return; }
-    // прыжок: пробел/стрелка вверх/кнопка; тап по коридору — тоже прыжок (во время бега)
-    if (this.state === 'run' && (hit('act') || hit('up'))) this.jump();
-    if (this.state === 'run') { const c = clicks.find(c => c.y > 24 && c.y < 200); if (c) { clicks.splice(clicks.indexOf(c), 1); this.jump(); } }
-    // физика прыжка
-    if (this.jy < 0 || this.vy < 0) { this.vy += QZ_G * dt; this.jy = Math.min(0, this.jy + this.vy * dt); if (this.jy === 0) this.vy = 0; }
-    if (this.trip > 0) { this.trip -= dt; }
-    if (this.state === 'run' && this.trip <= 0) {
-      const nx = this.hx + QZ_SPEED * dt;
-      // упёрлись в двери — вопрос
-      const ds = this.segs.find(s => s.type === 'door' && s.open < 0 && !s.done && nx >= s.x0 + 14 && this.hx < s.x0 + 14 + 1);
-      if (ds) { this.hx = ds.x0 + 14; this.cur = ds; this.state = 'ask'; this.pick = -1; setTouch({}); beep(660, .06, 'sine', .04); }
-      else this.hx = nx;
-      // преграды
-      for (const s of this.segs) if (s.obs) for (const o of s.obs) {
-        if (o.kind === 'rat' && !o.hit && o.x + o.mx - this.hx < 220 && o.mx > -60) o.mx -= .04 * dt;   // крыса, заметив героя, бежит навстречу
+    if (this.state === 'run') {
+      if (hit('act') || hit('up')) this.jump();
+      const c = clicks.find(c => c.y > 22); if (c) { clicks.splice(clicks.indexOf(c), 1); this.jump(); }
+    }
+    // прыжок
+    if (this.jy < 0 || this.vy < 0) { this.vy += QZ_G * dt; this.jy = Math.min(0, this.jy + this.vy * dt);
+      if (this.jy === 0) { this.vy = 0; if (this.buffer > 0) { this.buffer = 0; this.vy = QZ_JUMP; } } }
+    this.buffer = Math.max(0, this.buffer - dt); this.trip = Math.max(0, this.trip - dt);
+    const st = this.stage;
+    if (this.state === 'run' && this.trip === 0) {
+      this.hx += QZ_SPEED * dt;
+      if (!st.goal && this.hx >= QZ_STOP) { this.hx = QZ_STOP; this.state = 'ask'; this.pick = -1; setTouch({}); beep(660, .06, 'sine', .04); }
+      if (st.goal && this.hx >= this.bx - 30 && !this.bRun) { this.bRun = 1; beep(330, .1, 'square', .04); }
+      if (st.goal && this.hx >= 400) { this.hx = 400; this.finishRun(); }
+      // преграды: попадание — если ноги ниже верха преграды (с запасом в 4 px)
+      for (const o of st.obs) {
+        if (o.kind === 'rat' && !o.hit && o.x + o.mx - this.hx < 200 && o.mx > -50) o.mx -= .035 * dt;
         const img = QZ.obs[o.kind === 'rat' ? 'rat0' : o.kind], ox = o.x + o.mx;
-        if (o.hit || this.hx + 12 < ox || this.hx + 4 > ox + img.width) continue;
-        if (-this.jy < img.height - 2) { o.hit = true; this.trip = 520; this.coins = Math.max(0, this.coins - 2); beep(180, .12, 'sawtooth', .05); }
+        if (o.hit || this.hx + 13 < ox + 3 || this.hx + 5 > ox + img.width - 3) continue;
+        if (-this.jy < img.height - 4) { o.hit = true; this.trip = 480; this.coins = Math.max(0, this.coins - 2); beep(180, .12, 'sawtooth', .05); }
       }
-      const g = this.segs[this.segs.length - 1]; if (this.hx >= g.x0 + 60) this.finishRun();
     }
-    if (this.state === 'go') {                                                                    // бежит к выбранной двери
-      const tx = this.cur.doors[this.pick] - 8; this.hx = Math.min(tx, this.hx + QZ_SPEED * 1.3 * dt);
-      if (this.hx >= tx) { this.state = 'enter'; this.cur.open = this.pick; this.et = 0; beep(300, .08, 'square', .04); }
+    if (this.bRun) this.bx += .16 * dt;                               // Бумажкин убегает на крышу, бросив папку
+    if (this.state === 'go') {                                          // к выбранной двери
+      const tx = st.doors[this.pick] - 9; this.hx = Math.min(tx, this.hx + QZ_SPEED * 1.4 * dt);
+      if (this.hx >= tx) { this.state = 'enter'; this.et = 0; beep(300, .08, 'square', .04); }
     }
-    if (this.state === 'enter') { this.et += dt; if (this.et > 420 && !this.fb) this.answer(); }
-    this.cam = clamp(this.hx - 110, 0, Math.max(0, this.totalLen() - W + 40));
+    if (this.state === 'enter') { this.et += dt; this.open = Math.min(1, this.et / 280); if (this.et > 700 && !this.fb) this.answer(); }
+    this.cam = lerp(this.cam, clamp(this.hx - 110, 0, SW - W), Math.min(1, dt / 160));
   },
   choose(i) { if (this.state !== 'ask') return; this.pick = i; this.state = 'go'; },
   answer() {
-    const s = this.cur, q = s.q, ok = this.pick === q.correct;
-    q.tries = (q.tries || 0) + 1;
+    const q = this.stage.q, ok = this.pick === q.correct; q.tries = (q.tries || 0) + 1;
     if (ok) { const c = q.tries === 1 ? (this.cfg.coinsFirstTry ?? 20) : (this.cfg.coinsRetry ?? 5); this.coins += c; this.done++; if (q.tries === 1) this.first++;
       this.fb = { ok: true, text: L(UI.qzRight).replace('{c}', c).replace('{n}', this.done).replace('{t}', this.total) }; sfx.stamp && sfx.stamp(); }
-    else { this.wrong++;
+    else { this.wrong++; const q2 = prepQuestion(q.src); q2.tries = q.tries; this.queue.push(q2);
       this.fb = { ok: false, text: L(UI.qzWrong).replace('{a}', 'ABCD'[q.correct] + ' — ' + L(q.answers[q.correct])) + (q.explain ? ' ' + L(q.explain) : '') }; beep(160, .2, 'sawtooth', .05); }
     this.state = 'feedback'; setTouch({ act: L(UI.next) });
   },
   next() {
-    const s = this.cur, idx = this.segs.indexOf(s), ok = this.fb.ok; s.done = true; this.fb = null;
-    if (!ok) {
-      // путь удлиняется: лишний участок с преградами, а вопрос (с перемешанными ответами) — позже, перед финишем
-      const extra = { type: 'run', x0: 0, len: 340, obs: [] }; this.segs.splice(idx + 1, 0, extra);
-      const goal = this.segs.pop(); const q2 = prepQuestion(s.q.src); q2.tries = s.q.tries;
-      const at = this.segs.length; this.segs.push({ type: 'run', x0: 0, len: 260, obs: [] }); this.segs.push({ type: 'door', x0: 0, len: 0, q: q2, doors: [], style: Math.floor(Math.random() * DOOR_STYLES.length), open: -1 }); this.segs.push(goal);
-      // разложить новые участки: размеры и преграды
-      const fill = (seg, nObs) => { const slot = seg.len / (nObs + 1); seg.obs = []; for (let i = 1; i <= nObs; i++) seg.obs.push({ x: seg.x0 + Math.round(slot * i), kind: pick(Math.random, ['bucket', 'boxes', 'wet', 'rat']), hit: false, mx: 0 }); };
-      const dn = this.segs[at + 1], n = q2.answers.length, gap = n === 4 ? 70 : 84; dn.len = 60 + (n - 1) * gap + 70;
-      this.relayout(idx); fill(extra, 3); fill(this.segs[at], 2); dn.doors = q2.answers.map((_, i) => dn.x0 + 60 + i * gap);
-    } else this.relayout(idx);
-    // выходим из двери уже за блоком дверей
-    this.hx = s.x0 + s.len + 2; this.jy = 0; this.vy = 0; this.cur = null; this.pick = -1;
-    irisFrom(110 + 8, QZ.GY - 12); this.state = 'run'; setTouch({ act: L(UI.qzJump) });
+    if (this.state !== 'feedback') return;
+    const ok = this.fb.ok; this.state = 'trans';
+    // пиксельный переход: верно — этаж выше, неверно — тот же этаж ещё раз
+    irisTo(this.hx - this.cam + 9, QZ.GY - 12, () => { if (ok) this.floor = Math.min(HOUSE.floors - 1, this.startFloor + this.done); this.newStage(!ok);
+      irisFrom(this.hx - this.cam + 9, QZ.GY - 12); this.state = 'run'; setTouch({ act: L(UI.qzJump) }); });
   },
   async finishRun() {
-    this.state = 'end'; setTouch({});
-    const sec = Math.round((Date.now() - this.startedAt) / 1000), ratio = this.total ? this.first / this.total : 0;
-    const title = ratio >= (this.cfg.titleThreshold ?? .8);
+    if (this.state === 'end') return; this.state = 'end'; setTouch({});
+    const sec = Math.round((Date.now() - this.startedAt) / 1000), ratio = this.total ? this.first / this.total : 0, title = ratio >= (this.cfg.titleThreshold ?? .8);
     let res = { coins: this.coins, badge: title ? 'zhkh_expert' : null, offline: true };
     try { res = await API.quizFinish({ firstTry: this.first, total: this.total, wrong: this.wrong, coins: this.coins, seconds: sec }); HOUSE_STATE = await API.house(); } catch (e) {}
     this.result = { ...res, first: this.first, total: this.total, title, sec };
@@ -226,37 +208,49 @@ scenes.quiz = {
       finishedAt: new Date().toISOString(), lang: LANG, clientVersion: CLIENT_VERSION }); } catch (e) {}
   },
   draw(dt) {
-    if (this.state === 'loading') { rect(0, 0, W, H, '#0b0c10'); text('…', W / 2, H / 2, { align: 'center' }); return; }
-    const cx = Math.round(this.cam);
-    // коридор
-    for (let x = -(cx % 480); x < W; x += 480) ctx.drawImage(QZ.tile, x, 0);
-    for (let x = -(cx % 480); x < W; x += 480) for (const lx of [80, 320]) ctx.drawImage(QZ.light, x + lx - 30, 48);
-    // двери, таблички с буквами
-    for (const s of this.segs) {
-      if (s.type === 'door') s.doors.forEach((dx, i) => { const sx = dx - cx - 17; if (sx < -40 || sx > W + 10) return;
-        sprite(s.open === i ? QZ.doorOpen : QZ.doors[(s.style + i) % DOOR_STYLES.length], sx, QZ.GY - 53);
-        const lit = s === this.cur && (this.pick === i || this.state === 'ask');
-        rect(sx + 9, QZ.GY - 70, 16, 13, '#1a1424'); rect(sx + 10, QZ.GY - 69, 14, 11, lit ? '#f2c94c' : '#d8d2bf');
-        text('ABCD'[i], sx + 17, QZ.GY - 67, { align: 'center', col: '#1a1424' }); });
-      if (s.type === 'goal') { const sx = s.x0 - cx; if (sx < W) { sprite(QZ.goal, sx + 30, QZ.GY - 80); if (this.state !== 'end') sprite(chibiSprite(BUMAZHKIN, 'idle'), sx + 6, QZ.GY - 22, true); } }
-      if (s.obs) for (const o of s.obs) { const img = o.kind === 'rat' ? QZ.obs[(this.t / 120 | 0) % 2 ? 'rat0' : 'rat1'] : QZ.obs[o.kind], sx = o.x + o.mx - cx;
-        if (sx > -20 && sx < W + 20) sprite(img, sx, QZ.GY - img.height, o.kind === 'rat', o.hit ? .45 : 1); }
+    if (this.state === 'loading') { rect(0, 0, W, H, '#0b0c10'); return; }
+    const st = this.stage, cx = Math.round(this.cam), b = this.base(), cy = b - QZ.GY, t = performance.now();
+    ctx.save(); ctx.translate(-cx, 0);
+    ctx.drawImage(this.bg, 0, -cy);
+    // лампы этажа — как в игре: до ремонта света мигают
+    const fixedLight = HOUSE_STATE.fixed.includes('light');
+    for (const [li, lx] of [[0, 49], [1, 141], [2, 351], [3, 443]]) {
+      const on = fixedLight || Math.sin(t / 97 + st.floor * 13 + li * 5) > -.75, y = QZ.GY;
+      rect(lx, y - 94, 1, 6, '#0e1011'); rect(lx - 5, y - 88, 11, 4, '#1c1f24'); rect(lx - 3, y - 85, 7, 3, on ? '#fff1b8' : '#4b4f4c');
+      if (on) { if (!this.glow) this.glow = makeCanvas(220, 94, ({ g }) => { const gr = g.createRadialGradient(110, 10, 2, 110, 44, 110); gr.addColorStop(0, 'rgba(255,214,140,.30)'); gr.addColorStop(.5, 'rgba(255,190,110,.10)'); gr.addColorStop(1, 'rgba(255,190,110,0)'); g.fillStyle = gr; g.fillRect(0, 0, 220, 94); });
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = fixedLight ? 1 : .8; ctx.drawImage(this.glow, lx - 110, y - 94); ctx.restore(); }
     }
-    // герой-чиби
-    const fr = this.trip > 0 ? 'trip' : this.jy < 0 ? 'jump' : ['run', 'go'].includes(this.state) ? 'run' + ((this.t / 90 | 0) % 4) : 'idle';
-    const alpha = this.state === 'enter' ? Math.max(0, 1 - this.et / 400) : (this.trip > 0 && (this.t / 80 | 0) % 2 ? .5 : 1);
-    rect(this.hx - cx + 3, QZ.GY - 1, 12, 2, 'rgba(0,0,0,.35)');
-    if (this.state !== 'feedback') sprite(chibiSprite(this.look, fr), this.hx - cx, QZ.GY - 23 + Math.round(this.jy), false, alpha);
-    // HUD: страницы, монеты, путь
-    rect(0, 0, W, 20, 'rgba(11,12,16,.85)');
+    // двери-ответы: свет под дверью, табличка с буквой; выбранная открывается, как у жильцов в игре
+    if (st.doors) st.doors.forEach((x, i) => {
+      const apt = (st.floor - 1) * DOOR_X.length + DOOR_X.indexOf(x) + 1, y = QZ.GY, sel = this.pick === i && ['enter', 'feedback', 'trans'].includes(this.state);
+      if (sel) { const ow = Math.round(26 * this.open);
+        rect(x - 13, y - 48, 26, 48, '#2a2018'); ctx.fillStyle = 'rgba(242,198,106,.5)'; ctx.fillRect(x - 13, y - 48, 26, 48);
+        rect(x - 10, y - 40, 3, 12, '#5a3a2a'); rect(x - 11, y - 41, 5, 1, '#3a2a1a');                                // вешалка в прихожей
+        const dw = Math.max(3, 26 - ow); rect(x + 13 - dw, y - 48, dw, 48, this.doorLook[apt].col); rect(x + 13 - dw, y - 48, 1, 48, '#0e0f12');
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(242,198,106,.14)'; ctx.beginPath(); ctx.moveTo(x - 13, y); ctx.lineTo(x + 13, y); ctx.lineTo(x + 34, y + 1); ctx.lineTo(x - 34, y + 1); ctx.fill(); ctx.restore();
+      } else { rect(x - 11, y - 2, 22, 1, '#f2d27a'); ctx.fillStyle = 'rgba(242,210,122,.22)'; ctx.fillRect(x - 13, y - 1, 26, 1); }
+      const lit = this.state === 'ask' || this.pick === i;
+      rect(x - 7, y - 64, 14, 12, '#0e1011'); rect(x - 6, y - 63, 12, 10, lit ? '#f2c94c' : '#b8b2a0'); rect(x - 6, y - 63, 12, 1, lit ? '#fbe39a' : '#d8d2bf');
+      text('ABCD'[i], x, y - 62, { align: 'center', col: '#1a1424', size: 8 });
+    });
+    // преграды
+    for (const o of st.obs) { const img = o.kind === 'rat' ? QZ.obs[(this.t / 110 | 0) % 2 ? 'rat0' : 'rat1'] : QZ.obs[o.kind];
+      sprite(img, o.x + o.mx, QZ.GY - img.height + 1, o.kind === 'rat', o.hit ? .4 : 1); }
+    // финал: Бумажкин с папкой у выхода на крышу
+    if (st.goal) { if (!this.bRun) { sprite(chibiSprite(BUMAZHKIN, 'idle'), this.bx, QZ.GY - 23, true); sprite(QZ.folder, this.bx - 12, QZ.GY - 20); }
+      else { if (this.bx < SW + 20) sprite(chibiSprite(BUMAZHKIN, 'run' + ((this.t / 70 | 0) % 4)), this.bx, QZ.GY - 23); sprite(QZ.folder, 404, QZ.GY - 14); } }
+    // чиби
+    const fr = this.trip > 0 ? 'trip' : this.jy < 0 ? 'jump' : ['run', 'go'].includes(this.state) ? 'run' + ((this.t / 85 | 0) % 4) : 'idle';
+    const alpha = this.state === 'enter' ? clamp(1 - (this.et - 300) / 300, 0, 1) : ['feedback', 'trans'].includes(this.state) ? 0 : (this.trip > 0 && (this.t / 80 | 0) % 2 ? .5 : 1);
+    if (alpha > 0) { rect(this.hx + 3, QZ.GY - 1, 12, 2, 'rgba(0,0,0,.35)'); sprite(chibiSprite(this.look, fr), this.hx, QZ.GY - 23 + Math.round(this.jy), false, alpha); }
+    ctx.restore();
+    // HUD: страницы, монеты, этаж
+    rect(0, 0, W, 20, 'rgba(11,12,16,.88)');
     if (button('II', 0, 2, 'dark', { left: 2, w: 16 })) this.paused = true;
     for (let i = 0; i < this.total; i++) sprite(QZ.page, 24 + i * 11, 4, false, i < this.done ? 1 : .22);
     text(`₸${this.coins}`, 24 + this.total * 11 + 6, 6, { col: '#f2c94c', size: 6 });
-    const prog = clamp(this.hx / this.totalLen(), 0, 1), bx = 250, bw = 140;
-    rect(bx, 8, bw, 4, '#2b2a33'); rect(bx, 8, Math.round(bw * prog), 4, '#7fc4a8'); rect(bx + bw - 2, 5, 4, 10, '#2e6a5a');
-    text(L(UI.qzPath), bx - 4, 6, { col: '#9fb0cc', size: 6, align: 'right' });
-    // карточка вопроса / ответа
-    if (['ask', 'go', 'enter'].includes(this.state) && this.cur) this.drawCard(this.cur.q);
+    text(`${L(UI.qzFloor)} ${st.floor}/${HOUSE.floors}`, 392, 6, { col: '#cfd6e4', size: 6, align: 'right' });
+    if (['ask', 'go', 'enter'].includes(this.state) && st.q) this.drawCard(st.q);
     if (this.state === 'feedback') this.drawFeedback();
     if (this.state === 'intro') this.drawIntro();
     if (this.state === 'end' && this.result) this.drawEnd();
@@ -268,29 +262,31 @@ scenes.quiz = {
     lines.forEach((l, i) => text(l, 18, 30 + i * 11, { col: '#f4f3ee' }));
     q.answers.forEach((a, i) => { const y = 30 + lines.length * 11 + 3 + i * ah, sel = this.pick === i;
       rect(16, y, 368, ah - 2, sel ? '#3a4a3a' : '#1d2130'); rect(18, y + 2, 11, 9, sel ? '#f2c94c' : '#d8d2bf'); text('ABCD'[i], 23.5, y + 3, { col: '#1a1424', align: 'center', size: 6 });
-      let s = L(a), sz = 8; if (textW(s, 8) > 340) sz = 6; text(s, 34, y + (sz === 8 ? 2 : 4), { col: sel ? '#f2c94c' : '#cfd6e4', size: sz });
+      const s = L(a), sz = textW(s, 8) > 340 ? 6 : 8; text(s, 34, y + (sz === 8 ? 2 : 4), { col: sel ? '#f2c94c' : '#cfd6e4', size: sz });
       if (this.state === 'ask' && clickIn(16, y, 368, ah - 2)) this.choose(i); });
-    // тап по двери в коридоре
-    if (this.state === 'ask') { const c = clicks.find(c => c.y > 24 + h); if (c) { const wx = c.x + this.cam; const i = this.cur.doors.findIndex(d => Math.abs(d - wx) < 20); if (i >= 0) { clicks.splice(clicks.indexOf(c), 1); this.choose(i); } } }
-    if (this.state === 'ask') { for (let i = 0; i < q.answers.length; i++) if (hit('a' + i)) this.choose(i); if (hit('up')) this.pick = (this.pick + q.answers.length - 1) % q.answers.length; if (hit('down')) this.pick = (this.pick + 1) % q.answers.length; if (hit('act') && this.pick >= 0) this.choose(this.pick); }
+    if (this.state === 'ask') {
+      const c = clicks.find(c => c.y > 24 + h); if (c) { const wx = c.x + this.cam, i = this.stage.doors.findIndex(d => Math.abs(d - wx) < 18); if (i >= 0) { clicks.splice(clicks.indexOf(c), 1); this.choose(i); } }
+      const n = q.answers.length; if (hit('up') || hit('left')) this.pick = (this.pick + n - 1) % n; if (hit('down') || hit('right')) this.pick = (this.pick + 1) % n; if (hit('act') && this.pick >= 0) this.choose(this.pick);
+    }
   },
   drawFeedback() {
     const f = this.fb, lines = wrapText(f.text, 340, 6).slice(0, 6), h = 34 + lines.length * 9 + (f.ok ? 0 : 11) + 24;
     frameBox(24, 40, 352, h, .96);
     text(f.ok ? L(UI.qzOk) : L(UI.qzNo), W / 2, 48, { align: 'center', col: f.ok ? '#7fe08a' : '#e98f6f' });
-    if (f.ok) sprite(QZ.page, W / 2 - 4, 60);
+    if (f.ok) sprite(QZ.page, W / 2 - 5, 59);
     lines.forEach((l, i) => text(l, W / 2, 72 + i * 9, { align: 'center', col: '#f4f3ee', size: 6 }));
     if (!f.ok) text(L(UI.qzLonger), W / 2, 72 + lines.length * 9 + 1, { align: 'center', col: '#f2c94c', size: 6 });
     if (button(L(UI.next), W / 2, 40 + h - 20, 'primary') || hit('act')) this.next();
   },
   drawIntro() {
-    rect(0, 0, W, H, 'rgba(10,12,20,.6)'); frameBox(40, 34, 320, 150, .96);
-    ctx.save(); ctx.translate(58, 70); ctx.scale(3, 3); sprite(chibiSprite(BUMAZHKIN, 'idle'), 0, 0); ctx.restore();
-    // портфель Бумажкина и разлетающиеся страницы
-    rect(108, 118, 14, 10, '#5a3a2a'); rect(112, 115, 6, 3, '#3a2a1a');
-    for (let i = 0; i < 4; i++) sprite(QZ.page, 96 + i * 8 + Math.round(Math.sin(this.t / 300 + i) * 3), 96 - i * 11 + Math.round(Math.cos(this.t / 260 + i) * 2));
-    text(L(UI.qzTitle), 230, 44, { align: 'center', col: '#f2c94c' });
-    wrapText(L(UI.qzIntro).replace('{n}', this.total), 200, 6).slice(0, 9).forEach((l, i) => text(l, 140, 60 + i * 9, { col: '#f4f3ee', size: 6 }));
+    rect(0, 0, W, H, 'rgba(10,12,20,.62)'); frameBox(40, 34, 320, 150, .96);
+    // Бумажкин с папкой, вокруг кружат страницы
+    rect(56, 64, 70, 70, '#161a22'); rect(56, 128, 70, 6, '#2a2e36');
+    ctx.save(); ctx.translate(70, 76); ctx.scale(2, 2); sprite(chibiSprite(BUMAZHKIN, 'idle' ), 0, 0); ctx.restore();
+    sprite(QZ.folder, 92, 112);
+    for (let i = 0; i < 5; i++) { const a = this.t / 700 + i * 1.26; sprite(QZ.page, 86 + Math.round(Math.cos(a) * 26), 92 + Math.round(Math.sin(a) * 18)); }
+    text(L(UI.qzTitle), 240, 44, { align: 'center', col: '#f2c94c' });
+    wrapText(L(UI.qzIntro).replace('{n}', this.total), 200, 6).slice(0, 10).forEach((l, i) => text(l, 140, 60 + i * 9, { col: '#f4f3ee', size: 6 }));
     if (button(L(UI.qzGo), W / 2, 162, 'primary')) this.state = 'run';
   },
   drawEnd() {
