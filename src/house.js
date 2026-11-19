@@ -400,16 +400,22 @@ scenes.levels = {
     text(L(UI.meetings), W / 2, 15, { align: 'center', col: '#f4f3ee' });
     text(`₸${HOUSE_STATE.coins}`, 370, 15, { align: 'right', col: '#f2c94c', size: 6 });
     LEVELS.forEach((_, i) => {
-      const I = tourInfo(i), y = 28 + i * 26, x = 30;
-      rect(x, y, 340, 25, I.open ? '#1d2130' : '#151822'); rect(x, y + 24, 340, 1, '#0a0c12');
-      text(`${I.L.n}.`, x + 6, y + 9, { col: I.open ? '#f2c94c' : '#55607c', size: 6 });
-      text(L(I.L.title), x + 22, y + 3, { col: I.open ? '#f4f3ee' : '#55607c', size: 6 });
+      const I = tourInfo(i), y = 26 + i * 23, x = 30;
+      rect(x, y, 340, 22, I.open ? '#1d2130' : '#151822'); rect(x, y + 21, 340, 1, '#0a0c12');
+      text(`${I.L.n}.`, x + 6, y + 8, { col: I.open ? '#f2c94c' : '#55607c', size: 6 });
+      text(L(I.L.title), x + 22, y + 2, { col: I.open ? '#f4f3ee' : '#55607c', size: 6 });
       const short = I.L.rule === 'quorum' ? L(UI.lvQuorum).replace('{q}', I.L.quorum) : L(UI.lvYes).replace('{g}', I.L.goal);
-      text(`${short} · ${I.L.days} ${L(UI.daysWord)}`, x + 22, y + 11, { col: I.open ? '#cfd6e4' : '#55607c', size: 6 });
-      text(I.open ? `+₸${I.won ? I.L.reward.replay : I.L.reward.first}` : I.why, x + 22, y + 18, { col: I.open ? '#9fd9c2' : '#8a6a6a', size: 6 });
-      if (I.won) text('★', x + 266, y + 9, { col: '#f2c94c', size: 6, align: 'center' });
-      if (I.open && button(L(UI.play2), x + 306, y + 5, I.won ? 'alt' : 'primary', { w: 60 })) irisTo(W / 2, 120, () => go('tour', { tour: I.L.id }));
+      text(`${short} · ${I.L.days} ${L(UI.daysWord)}`, x + 22, y + 9, { col: I.open ? '#cfd6e4' : '#55607c', size: 6 });
+      text(I.open ? `+₸${I.won ? I.L.reward.replay : I.L.reward.first}` : I.why, x + 22, y + 16, { col: I.open ? '#9fd9c2' : '#8a6a6a', size: 6 });
+      if (I.won) text('★', x + 266, y + 8, { col: '#f2c94c', size: 6, align: 'center' });
+      if (I.open && button(L(UI.play2), x + 306, y + 3, I.won ? 'alt' : 'primary', { w: 60 })) irisTo(W / 2, 120, () => go('tour', { tour: I.L.id }));
     });
-    if (button(L(UI.back), W / 2, 200, 'alt')) irisTo(W / 2, 120, () => go('house'));
+    // викторина «Знаток ЖКХ» — открыта всегда
+    { const y = 26 + LEVELS.length * 23 + 2, x = 30;
+      rect(x, y, 340, 22, '#22303a'); rect(x, y, 2, 22, '#7fc4a8');
+      text('★', x + 9, y + 8, { col: '#7fc4a8', size: 6, align: 'center' });
+      text(L(UI.qzMenu), x + 22, y + 3, { col: '#f4f3ee', size: 6 }); text(L(UI.qzMenuSub), x + 22, y + 12, { col: '#9fd9c2', size: 6 });
+      if (button(L(UI.qzPlay), x + 306, y + 3, 'alt', { w: 60 })) irisTo(W / 2, 120, () => go('quiz')); }
+    if (button(L(UI.back), W / 2, 198, 'alt')) irisTo(W / 2, 120, () => go('house'));
   },
 };

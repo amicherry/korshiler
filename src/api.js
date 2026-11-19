@@ -99,6 +99,18 @@ const MockServer = (() => {
       return { runId, startedAt: db.runs[runId].startedAt, tour: { id: tour.id, goal: tour.goal, floors: tour.floors, perFloor: tour.perFloor } };
     },
     // итог: сервер сам считает подписи по журналу событий и проверяет, что всё правдоподобно
+    // викторина: монеты в бюджет ЖК и значок «Знаток ЖКХ» (80 % верных с первой попытки)
+    'POST /quiz/finish'({ session, body }) {
+      const u = me(session), total = clamp(body.total | 0, 0, 30), first = clamp(body.firstTry | 0, 0, total), sec = +body.seconds || 0;
+      const suspicious = total < 3 || sec < total * 4;                         // 8 вопросов быстрее 32 секунд не пробежать
+      const coins = suspicious ? 0 : clamp(body.coins | 0, 0, total * 20);
+      const prof = db.profiles[u.userId] || (db.profiles[u.userId] = {}); prof.coins = (prof.coins || 0) + coins;
+      let reward = null; db.rewards[u.userId] = db.rewards[u.userId] || [];
+      const expert = !suspicious && total >= 5 && first / total >= .8;
+      if (expert && !db.rewards[u.userId].some(r => r.badge === 'zhkh_expert')) {
+        reward = { tourId: 'quiz', points: 100, badge: 'zhkh_expert', status: u.guest ? 'needs_login' : 'sent', at: Date.now() }; db.rewards[u.userId].push(reward); }
+      commit(); return { coins, badge: expert ? 'zhkh_expert' : null, reward, suspicious, totalCoins: prof.coins };
+    },
     'POST /tours/finish'({ session, body }) {
       const u = me(session); const run = db.runs[body.runId];
       if (!run || run.userId !== u.userId) err(404, 'no_run');
@@ -242,6 +254,7 @@ const API = {
   async leaderboard(scope) { return request('GET', '/leaderboard', { query: { scope } }); },
   async rewards() { return request('GET', '/rewards'); },
   async house() { return request('GET', '/house'); },
+  async quizFinish(b) { return request('POST', '/quiz/finish', { body: b }, 4); },
   async buy(id) { return request('POST', '/house/buy', { body: { id } }); },
   async claim() { return request('POST', '/house/claim'); },
 };
