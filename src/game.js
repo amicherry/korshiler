@@ -136,8 +136,12 @@ scenes.title = {
     // панель меню в рамке
     let bw = Math.max(textW(L(UI.cont)), textW(L(UI.settings)), textW(L(UI.rating)), 96) + 16; const py = 104;
     let nm = SAVE && SAVE.name ? SAVE.name : ''; if (nm.length > 12) nm = nm.slice(0, 11) + '…';
-    const who = nm ? L(UI.hello) + nm + '!' : '', sub = USER.guest ? L(UI.guestMode) : USER.complex.name + ' · ' + USER.apartment;
-    bw = Math.min(W - 40, Math.max(bw, textW(who, 6) + 4, textW(sub, 6) + 4));
+    // имя и уровень — первой строкой, ЖК и звание — второй; длинное обрезаем, чтобы панель не закрывала дом
+    const fit = (s, w) => { if (textW(s, 6) <= w) return s; while (s.length > 1 && textW(s + '…', 6) > w) s = s.slice(0, -1); return s + '…'; };
+    const ttl = USER.title ? (TITLES[USER.title] ? L(TITLES[USER.title]) : USER.title) : '';
+    let who = nm ? L(UI.hello) + nm + '!' + (USER.level != null ? ' · ' + L(UI.lvShort) + USER.level : '') : '';
+    let sub = USER.guest ? L(UI.guestMode) : [USER.complex.name, USER.apartment ? L(UI.aptShort) + USER.apartment : '', ttl].filter(Boolean).join(' · ');
+    bw = Math.min(196, Math.max(bw, textW(who, 6) + 4, textW(sub, 6) + 4)); who = fit(who, bw - 2); sub = fit(sub, bw - 2);
     frameBox(12, py, bw + 12, 104);
     if (who) text(who, 18, py + 6, { col: '#cfd6e4', size: 6 });
     text(sub, 18, py + 16, { col: USER.guest ? '#8792ad' : '#9fd9c2', size: 6 });
@@ -150,8 +154,9 @@ scenes.title = {
     paper(70, 30, 260, 170, 2);
     text(L(UI.settings), W / 2, 42, { align: 'center', col: INK_RED });
     text(L(UI.lang), W / 2, 62, { align: 'center', col: INK });
-    if (button('ҚАЗАҚША', W / 2 - 56, 76, LANG === 'kz' ? 'primary' : 'off')) setLang('kz');
-    if (button('РУССКИЙ', W / 2 + 56, 76, LANG === 'ru' ? 'primary' : 'off')) setLang('ru');
+    if (button('ҚАЗ', W / 2 - 80, 76, LANG === 'kz' ? 'primary' : 'off', { w: 70 })) setLang('kz');
+    if (button('РУС', W / 2, 76, LANG === 'ru' ? 'primary' : 'off', { w: 70 })) setLang('ru');
+    if (button('ENG', W / 2 + 80, 76, LANG === 'en' ? 'primary' : 'off', { w: 70 })) setLang('en');
     text(L(UI.sound), W / 2, 100, { align: 'center', col: INK });
     if (button(SND.on ? L(UI.on) : L(UI.off), W / 2, 114, SND.on ? 'alt' : 'off')) { SND.on = !SND.on; saveStr('d67_sound', SND.on ? '1' : '0'); }
     if (button(this.done ? L(UI.resetDone) : this.sure ? L(UI.resetSure) : L(UI.reset), W / 2, 144, this.done ? 'off' : 'danger')) {
@@ -180,7 +185,7 @@ scenes.creator = {
   enter() {
     this.look = Object.assign({}, DEFAULT_LOOK, SAVE.look || {}); this.row = 0; this.t = 0;
     const box = document.getElementById('nameBox'), inp = document.getElementById('nameInput');
-    inp.value = SAVE.name || USER.name || ''; inp.placeholder = LANG === 'kz' ? 'Атың' : 'Имя'; box.hidden = false;
+    inp.value = SAVE.name || USER.name || ''; inp.placeholder = ['Атың', 'Имя', 'Name'][LI()]; box.hidden = false;
     setTouch({ act: L(UI.ready), up: true, down: true, move: true });
   },
   leave() { document.getElementById('nameBox').hidden = true; },
@@ -200,7 +205,7 @@ scenes.creator = {
     if (k === 'body') { const f = this.look.body === 'f'; this.look.bottom = f ? 'skirt' : 'pants';
       if (f && this.look.hair === 'short') this.look.hair = 'long'; if (!f && (this.look.hair === 'long' || this.look.hair === 'bun')) this.look.hair = 'short'; } },
   done() {
-    const name = (document.getElementById('nameInput').value || '').trim().slice(0, 12) || (LANG === 'kz' ? 'Төраға' : 'Председатель');
+    const name = (document.getElementById('nameInput').value || '').trim().slice(0, 12) || ['Төраға', 'Председатель', 'Chairman'][LI()];
     SAVE.name = name; SAVE.look = this.look; SAVE.created = true; persist(); this.leave();
     irisTo(100, 120, () => go('prologue'));
   },
@@ -222,8 +227,8 @@ scenes.creator = {
       if (button('▸', 0, y - 2, 'dark', { left: 372, w: 16 })) { this.row = i; this.change(k, 1); }
       const v = this.look[k] ?? null;
       if (k === 'skin' || k === 'hairCol' || k === 'topCol') { rect(322, y, 44, 12, OUT); rect(323, y + 1, 42, 10, v); }
-      else { const names = { short: 'Қысқа|Короткие', long: 'Ұзын|Длинные', bun: 'Түйін|Пучок', bald: 'Жоқ|Нет', curly: 'Бұйра|Кудри', leather: 'Күртеше|Куртка', hoodie: 'Худи|Худи', shirt: 'Көйлек|Рубашка', jacket: 'Пиджак|Пиджак', chapan: 'Шапан|Чапан', tyube: 'Тақия|Тюбетейка', cap: 'Кепка|Кепка', null: '—|—', m: 'Ер|Парень', f: 'Қыз|Девушка', pants: 'Шалбар|Брюки', skirt: 'Юбка|Юбка' };
-        const s = (names[v] || '—|—').split('|')[LANG === 'kz' ? 0 : 1]; text(s, 344, y + 2, { align: 'center', col: '#9fd9c2', size: s.length > 6 ? 6 : 8 }); }
+      else { const names = { short: 'Қысқа|Короткие|Short', long: 'Ұзын|Длинные|Long', bun: 'Түйін|Пучок|Bun', bald: 'Жоқ|Нет|None', curly: 'Бұйра|Кудри|Curly', leather: 'Күртеше|Куртка|Jacket', hoodie: 'Худи|Худи|Hoodie', shirt: 'Көйлек|Рубашка|Shirt', jacket: 'Пиджак|Пиджак|Blazer', chapan: 'Шапан|Чапан|Chapan', tyube: 'Тақия|Тюбетейка|Takiya', cap: 'Кепка|Кепка|Cap', null: '—|—|—', m: 'Ер|Парень|Guy', f: 'Қыз|Девушка|Girl', pants: 'Шалбар|Брюки|Trousers', skirt: 'Юбка|Юбка|Skirt' };
+        const s = (names[v] || '—|—|—').split('|')[LI()]; text(s, 344, y + 2, { align: 'center', col: '#9fd9c2', size: s.length > 6 ? 6 : 8 }); }
     });
     if (button(L(UI.ready), 296, 190, 'primary', { selected: this.row === OPT_ROWS.length })) this.done();
   },
@@ -312,6 +317,7 @@ scenes.tour = {
   enter(data) {
     const tour = this.tour = TOURS[data.tour || 'L1'];
     this.fixed = new Set(HOUSE_STATE.fixed); this.problem = tour.problem ? PROBLEMS.find(p => p.id === tour.problem) : null;
+    this.startedAt = Date.now();
     this.res = makeResidents(tour, hashStr(USER.userId + tour.id) + (SAVE.tours[tour.id]?.tries || 0));
     // каждый сделанный ремонт — доверие к председателю: соседи видят результат
     const repaired = Math.min(5, HOUSE_STATE.fixed.length); for (const r of Object.values(this.res)) r.mood += repaired * 4;
@@ -542,7 +548,7 @@ scenes.tour = {
     // встаём сбоку от двери, чтобы жилец вышел на порог, а не «в» героя
     let side = h.x <= DOOR_X[r.d] ? -1 : 1; if (DOOR_X[r.d] + side * 23 < WALK_MIN) side = 1; if (DOOR_X[r.d] + side * 23 > WALK_MAX) side = -1;
     await this.walkTo(DOOR_X[r.d] + side * 23); h.dir = -side;
-    h.knockT = 700; sfx.knock(); this.addTime(.5); pop(DOOR_X[r.d], this.base(r.floor) - 30, LANG === 'kz' ? 'тық-тық' : 'тук-тук', '#c9cdc8');
+    h.knockT = 700; sfx.knock(); this.addTime(.5); pop(DOOR_X[r.d], this.base(r.floor) - 30, ['тық-тық', 'тук-тук', 'knock-knock'][LI()], '#c9cdc8');
     await wait(750);
     const m = this.minute, A = r.A;
     if (r.status === 'online') { pop(DOOR_X[r.d], this.base(r.floor) - 70, L(UI.st.online), '#9fd9c2'); this.busy = false; return; }
@@ -700,6 +706,8 @@ scenes.tour = {
     SAVE.tours[T] = { tries: prev.tries + 1, best: Math.max(prev.best, result.signatures), done: prev.done || result.success };
     if (result.totalCoins != null) SAVE.coins = result.totalCoins; persist();
     if (result.first && !HOUSE_STATE.won.includes(this.tour.id)) HOUSE_STATE.won.push(this.tour.id);
+    // результат — в приложение E-KNOT (WebView) и на его сервер (docs/API.md)
+    try { const payload = buildResult(this, result); notifyApp('result', payload); sendResultToServer(payload); } catch (e) { console.warn(e); }
     const stats = { ...result, tourId: this.tour.id, goal: this.tour.goal, problem: this.problem, against: this.against(), thinking: Object.values(this.res).filter(r => r.status === 'thinking').length };
     setTimeout(() => irisTo(this.hero.x - this.camX, this.hero.y - this.camY - 14, () => go('result', stats)), timeUp ? 1200 : 200);
   },
@@ -786,7 +794,7 @@ scenes.tour = {
     }
     if (this.stampT > 0) { this.stampT -= dt; const s = 1 + Math.max(0, (this.stampT - 600) / 300) * 1.5; ctx.save(); ctx.globalAlpha = Math.min(1, this.stampT / 300);
       ctx.translate(W / 2, 92); ctx.rotate(-.18); ctx.scale(s, s); rect(-34, -12, 68, 24, 'rgba(76,175,110,.25)'); ctx.strokeStyle = '#4caf6e'; ctx.lineWidth = 2; ctx.strokeRect(-34, -12, 68, 24);
-      text(LANG === 'kz' ? 'ҚОЛ ҚОЙДЫ' : 'ПОДПИСАНО', 0, -4, { col: '#4caf6e', align: 'center' }); ctx.restore(); }
+      text(['ҚОЛ ҚОЙДЫ', 'ПОДПИСАНО', 'SIGNED'][LI()], 0, -4, { col: '#4caf6e', align: 'center' }); ctx.restore(); }
     this.drawHUD();
     dlgDraw();
     if (this.ballot) this.drawBallot();
@@ -849,9 +857,9 @@ scenes.tour = {
         const apt = (f - 1) * nd + d + 1, x = 66 + d * (cw + 3), r = this.res[apt];
         rect(x, y, cw, ch, '#e2d9c2'); rect(x, y + ch - 1, cw, 1, '#cfc3a5');
         const ty = y + Math.round(ch / 2) - 3;
-        text(String(apt), x + 3, ty, { col: INK, size: 6 });
+        text(String(apt), x + 2, ty, { col: INK, size: 6 });
         const st = apt === T.heroApt ? 'me' : r.status;
-        if (ICONS[st]) sprite(ICONS[st], x + cw - 10, y + Math.round((ch - 9) / 2));
+        if (ICONS[st]) sprite(ICONS[st], x + cw - 9, y + Math.round((ch - 9) / 2));
         const nm = apt === T.heroApt ? L(UI.st.me) : (r.status === 'unknown' ? '' : r.name.split(' ')[0]);
         if (cw > 60) text(nm.length > 6 ? nm.slice(0, 5) + '.' : nm, x + 28, ty, { col: INK_MUTED, size: 6 });
       }
@@ -909,7 +917,7 @@ scenes.result = {
       const rt = L(d.reward.status === 'sent' ? UI.rRewardSent : UI.rRewardGuest).replace('{n}', d.reward.points).replace('{b}', b);
       wrapText(rt, 250).slice(0, 2).forEach(l => { text(l, 200, ny + 1, { align: 'center', col: d.reward.status === 'sent' ? INK_TEAL : INK_GOLD, size: 6 }); ny += 9; }); }
     if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(304, 15); ctx.rotate(-.15); ctx.scale(s, s); ctx.globalAlpha = k;
-      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text(d.tourId === 'L1' ? 'ОСИ' : LANG === 'kz' ? 'ИӘ' : 'ЗА', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
+      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text(d.tourId === 'L1' ? ['ОСИ', 'ОСИ', 'OSI'][LI()] : ['ИӘ', 'ЗА', 'YES'][LI()], 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
     const bw = 84;
     if (button(L(UI.toHouse), 108, 186, 'primary', { w: bw })) irisTo(108, 194, () => go('house', { focus: d.success && d.first && d.problem ? d.problem.id : null }));
     if (button(L(UI.rating), 200, 186, 'alt', { w: bw })) irisTo(200, 194, () => go('leaderboard', { from: 'result' }));
@@ -966,6 +974,9 @@ scenes.leaderboard = {
     catch (e) { const m = document.getElementById('err'); m.textContent = 'E-KNOT: байланыс жоқ / нет связи… (' + (i + 1) + ')'; m.hidden = false; await wait(1500); }
   }
   document.getElementById('err').hidden = true; document.getElementById('err').textContent = '';
+  if (LAUNCH.lang) setLang(LAUNCH.lang);
+  flushResults();                                   // результаты, не дошедшие до сервера в прошлый раз
+  notifyApp('ready', { clientVersion: CLIENT_VERSION, guest: USER.guest });
   SAVE.tours = SAVE.tours || {}; SAVE.trust = SAVE.trust || {};
   SAVE.look = { ...DEFAULT_LOOK, ...(SAVE.look || {}) };
   try { HOUSE_STATE = await API.house(); SAVE.coins = HOUSE_STATE.coins; } catch (e) {}   // неполное сохранение не должно ломать отрисовку героя

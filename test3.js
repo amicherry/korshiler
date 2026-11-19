@@ -1,7 +1,7 @@
 const {chromium}=require('playwright'); const fs=require('fs');
 (async()=>{
  const b=await chromium.launch();
- for(const lang of ['kz','ru']){
+ for(const lang of ['kz','ru','en']){
  const pg=await b.newPage({viewport:{width:1200,height:675}});
  const errs=[]; pg.on('pageerror',e=>errs.push('PAGEERR '+e.message));
  await pg.route('**/fonts.googleapis.com/**', r=>r.abort());

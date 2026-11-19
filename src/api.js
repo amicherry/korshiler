@@ -7,6 +7,17 @@
    и все те же запросы пойдут через fetch. Игру менять не нужно.
    Описание запросов: docs/API.md
    ============================================================ */
+/* ---------- параметры запуска из приложения E-KNOT (docs/API.md, раздел 1) ----------
+   ?token=…&lang=kz|ru|en&name=…&level=3&tour=1&title=chairman&complex=ЖК%20Нұрлы
+   Всё, кроме token, — только для отображения: правду о прогрессе знает сервер. */
+const LAUNCH = (() => {
+  const q = new URLSearchParams(location.search), s = (k, n) => { const v = (q.get(k) || '').trim(); return v ? v.slice(0, n) : null; };
+  const int = (k, lo, hi) => { const v = parseInt(q.get(k), 10); return Number.isFinite(v) && v >= lo && v <= hi ? v : null; };
+  const token = s('token', 512) || (/^#[A-Za-z0-9-]+$/.test(location.hash) ? location.hash.slice(1) : null);
+  const lang = ['kz', 'ru', 'en'].includes(q.get('lang')) ? q.get('lang') : null;
+  return { token, lang, name: s('name', 16), level: int('level', 0, 999), tour: int('tour', -1, 5), title: s('title', 32), complex: s('complex', 28) };
+})();
+
 const API_CONFIG = {
   baseUrl: null,                 // например 'https://api.e-knot.kz/game/v1'
   latency: [150, 450],           // задержка ответа заглушки, мс
@@ -49,13 +60,21 @@ const MockServer = (() => {
   const routes = {
     // вход: токен из приложения или гость (без бонусов)
     'POST /auth'({ body }) {
-      const t = body.token && TOKENS[body.token];
+      const t = body.token && TOKENS[body.token], Lp = body.launch || {};
       let user;
       if (t) user = { ...t, guest: false };
+      else if (body.token) {
+        // любой другой токен — как будто его выдал сервер E-KNOT: имя и ЖК приходят параметрами запуска
+        const cid = 'c-' + hashStr(Lp.complex || 'eknot').toString(36);
+        user = { userId: 'app-' + hashStr(body.token).toString(36), name: Lp.name || null, complex: { id: cid, name: Lp.complex || 'E-KNOT', city: 'Астана' }, apartment: null, guest: false };
+      }
       else {
         const gid = body.deviceId || ('g-' + Math.floor(Math.random() * 1e9));
         user = { userId: gid, name: null, complex: { id: 'guest', name: null, city: 'Астана' }, apartment: null, guest: true };
       }
+      if (!user.guest) { user.level = Lp.level ?? null; user.title = Lp.title || null;
+        // прогресс из приложения: туры до tour включительно уже пройдены
+        if (Lp.tour != null && Lp.tour >= 0) { const H = house(user.userId); for (let i = 0; i <= Lp.tour; i++) if (!H.won.includes(LEVELS[i].id)) H.won.push(LEVELS[i].id); } }
       const session = 's-' + user.userId;
       db.users[session] = user; db.profiles[user.userId] = db.profiles[user.userId] || null; commit();
       return { session, user };
@@ -210,8 +229,8 @@ const API = {
     const q = new URLSearchParams(location.search);
     let deviceId = loadStr('kn_device', ''); if (!deviceId) { deviceId = 'g-' + Math.floor(Math.random() * 1e9); saveStr('kn_device', deviceId); }
     // токен из ссылки приложения: ?token=demo (или #demo — так работает и опубликованная страница)
-    const token = q.get('token') || (/^#[A-Za-z0-9-]+$/.test(location.hash) ? location.hash.slice(1) : null);
-    const r = await request('POST', '/auth', { body: { token, deviceId } });
+    const token = LAUNCH.token;
+    const r = await request('POST', '/auth', { body: { token, deviceId, launch: { name: LAUNCH.name, complex: LAUNCH.complex, level: LAUNCH.level, tour: LAUNCH.tour, title: LAUNCH.title } } });
     this.session = r.session; this.user = r.user;
     return { ...r.user, fromApp: !r.user.guest };
   },
@@ -232,4 +251,44 @@ async function migrateOldSave() {
   const old = loadStr('d67_save', '');
   if (!old) return null;
   try { const p = JSON.parse(old); await API.save(p); saveStr('d67_save', ''); return p; } catch (e) { return null; }
+}
+
+/* ---------- результат тура для приложения E-KNOT (docs/API.md, раздел 2) ---------- */
+const CLIENT_VERSION = '1.5.0';
+function buildResult(scene, r) {
+  const T = scene.tour, res = Object.values(scene.res);
+  const thinking = res.filter(x => x.status === 'thinking').length, notReached = res.filter(x => ['unknown', 'away', 'noanswer'].includes(x.status)).length;
+  return {
+    version: 1, game: 'korshiler', token: LAUNCH.token, runId: (scene.run && scene.run.runId) || ('local-' + Date.now()),
+    tour: T.n - 1, tourCode: T.code, success: !!r.success, rule: T.rule === 'quorum' ? 'quorum_half_plus_one' : T.goal === PCT.twoThirds ? 'two_thirds_of_all' : T.goal === PCT.half ? 'half_plus_one_of_all' : 'tenth_of_all',
+    apartments: APTS, votes: { yes: r.signatures, no: r.against ?? scene.against(), undecided: thinking, notReached, turnout: r.turnout ?? (r.signatures + scene.against()) },
+    required: { yes: r.need || T.goal, turnout: T.quorum || null }, daysUsed: scene.day(), daysLimit: T.days,
+    score: r.score ?? null, firstWin: !!r.first, badges: r.badges || [], startedAt: new Date(scene.startedAt).toISOString(), finishedAt: new Date().toISOString(),
+    lang: LANG, clientVersion: CLIENT_VERSION, offline: !!r.offline, events: scene.events.map(e => ({ t: e.t, apt: e.apt, via: e.via || 'door' })),
+  };
+}
+// в приложение (WebView) — сразу; ошибок моста не бывает «наружу», игра продолжает работать
+function notifyApp(type, payload) {
+  const msg = JSON.stringify({ type, payload });
+  const tries = [() => window.ReactNativeWebView.postMessage(msg), () => window.webkit.messageHandlers.eknot.postMessage(msg), () => window.EKnot.postMessage(msg)];
+  let sent = false; for (const f of tries) { try { f(); sent = true; break; } catch (e) {} }
+  try { if (window.parent && window.parent !== window) { window.parent.postMessage({ type: 'korshiler:' + type, payload }, '*'); sent = true; } } catch (e) {}
+  window.KORSHILER_LAST = { type, payload, sent };
+  return sent;
+}
+const inApp = () => !!(window.ReactNativeWebView || (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.eknot) || window.EKnot);
+// на настоящий сервер — с повтором при следующем запуске, если связь оборвалась (по runId сервер засчитает один раз)
+async function sendResultToServer(payload) {
+  if (!API_CONFIG.baseUrl || !payload.token) return;
+  const q = JSON.parse(loadStr('kn_pending', '[]')).filter(p => p.runId !== payload.runId); q.push(payload); saveStr('kn_pending', JSON.stringify(q.slice(-20)));
+  await flushResults();
+}
+async function flushResults() {
+  if (!API_CONFIG.baseUrl) return;
+  let q = JSON.parse(loadStr('kn_pending', '[]'));
+  for (const p of [...q]) {
+    try { await fetch(API_CONFIG.baseUrl + '/game/korshiler/result', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + p.token }, body: JSON.stringify(p) }).then(r => { if (!r.ok) throw new Error(r.status); });
+      q = q.filter(x => x.runId !== p.runId); } catch (e) { break; }
+  }
+  saveStr('kn_pending', JSON.stringify(q));
 }

@@ -247,7 +247,7 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
         r(dx - 9, dt, 18, 30, '#4a5260'); r(dx - 9, dt, 18, 1, '#6a7480'); r(dx - 9, dt, 1, 30, '#5a6270'); r(dx + 8, dt, 1, 30, '#2e343c');
         for (let yy = dt + 3; yy < mid - 2; yy += 7) r(dx - 7, yy, 14, 1, '#3a4250');                      // рёбра жёсткости
         r(dx - 8, dt + 13, 16, 2, '#2a2e30'); r(dx + 3, dt + 12, 4, 6, '#8a6a2a'); r(dx + 4, dt + 14, 2, 2, '#c9a95a');   // засов и замок
-        r(dx - 8, dt - 9, 16, 6, '#d8d2bf'); g.fillStyle = '#7a3b28'; g.font = '8px ' + FONT; g.textAlign = 'center'; g.fillText(LANG === 'kz' ? 'ШАТЫР' : 'КРЫША', dx, dt - 10, 16); g.textAlign = 'left';
+        r(dx - 8, dt - 9, 16, 6, '#d8d2bf'); g.fillStyle = '#7a3b28'; g.font = '8px ' + FONT; g.textAlign = 'center'; g.fillText(['ШАТЫР', 'КРЫША', 'ROOF'][LI()], dx, dt - 10, 16); g.textAlign = 'left';
         for (let k = 0; k < 4; k++) p(dx - 12 - k, dt + 6 + k * 2, '#f2c94c');                              // стрелка вверх на стене
       }
     }
@@ -266,7 +266,7 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
       for (let xx = gx - 9; xx <= gx + 8; xx += 3) r(xx, bb - 33, 1, 33, '#4a5048');
       for (const yy of [bb - 30, bb - 17, bb - 4]) r(gx - 10, yy, 20, 2, '#3a403a');
       r(gx + 5, bb - 18, 3, 4, '#8a6a2a'); r(gx - 8, bb - 42, 16, 6, '#d8d2bf');
-      g.fillStyle = '#2a2a2a'; g.font = '8px ' + FONT; g.textAlign = 'center'; g.fillText(LANG === 'kz' ? 'ЖЕРТӨЛЕ' : 'ПОДВАЛ', gx, bb - 43, 16); g.textAlign = 'left';
+      g.fillStyle = '#2a2a2a'; g.font = '8px ' + FONT; g.textAlign = 'center'; g.fillText(['ЖЕРТӨЛЕ', 'ПОДВАЛ', 'BASEMENT'][LI()], gx, bb - 43, 16); g.textAlign = 'left';
       r(gx - 1, bb - 46, 3, 3, fixed.has('basement') ? '#fff1b8' : '#3a3a30');
     };
     r(0, 0, SW, 34, '#0c0e0c'); r(0, 30, SW, 4, '#1e231d');

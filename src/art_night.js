@@ -26,7 +26,7 @@ function FF(u, v) { const T = lerp2(BLD.TL, BLD.TR, u), B = lerp2(BLD.BL, BLD.BR
 function SF(u, v) { const T = lerp2(BLD.STL, BLD.TL, u), B = lerp2(BLD.SBL, BLD.BL, u); return lerp2(T, B, persp(v)); }
 
 const NIGHT = { lang: null, t: 0, next: 0, windows: [], stars: [], snow: [], blinkers: [] };
-function signText() { return LANG === 'kz' ? 'БӘРІ ЖАҚСЫ БОЛАДЫ!' : 'ВСЁ БУДЕТ ХОРОШО!'; }
+function signText() { return ['БӘРІ ЖАҚСЫ БОЛАДЫ!', 'ВСЁ БУДЕТ ХОРОШО!', 'ALL WILL BE WELL!'][LI()]; }
 
 function buildNight() {
   const R = rng(7);
