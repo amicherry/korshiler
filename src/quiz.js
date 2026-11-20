@@ -302,7 +302,7 @@ scenes.quiz = {
   choose(i) { if (this.state !== 'ask') return; this.pick = i; this.state = 'go'; },
   answer() {
     const s = this.cur, q = s.q, ok = this.pick === q.correct; q.tries = (q.tries || 0) + 1;
-    if (ok) { const c = q.tries === 1 ? (this.cfg.coinsFirstTry ?? 20) : (this.cfg.coinsRetry ?? 5); this.coins += c; this.done++; if (q.tries === 1) this.first++;
+    if (ok) { const c = q.tries === 1 ? (this.cfg.coinsFirstTry ?? 10) : (this.cfg.coinsRetry ?? 3); this.coins += c; this.done++; if (q.tries === 1) this.first++;
       this.fb = { ok: true, text: L(UI.qzRight).replace('{c}', c).replace('{n}', this.done).replace('{t}', this.total) }; sfx.stamp && sfx.stamp(); }
     else { this.wrong++;
       this.fb = { ok: false, text: L(UI.qzWrong).replace('{a}', 'ABCD'[q.correct] + ' — ' + L(q.answers[q.correct])) + (q.explain ? ' ' + L(q.explain) : '') }; beep(160, .2, 'sawtooth', .05); }
@@ -452,6 +452,7 @@ scenes.quiz = {
     text(L(UI.qzDone), W / 2, 34, { align: 'center', col: '#2e6a5a' });
     const rows = [[L(UI.qzFirst), `${r.first}/${r.total}`], [L(UI.qzWrongN), String(this.wrong)], [L(UI.rBudget), '+₸' + (r.coins ?? this.coins)]];
     rows.forEach(([a, b], i) => { text(a, 86, 54 + i * 13, { col: INK }); text(b, 314, 54 + i * 13, { col: INK, align: 'right' }); rect(86, 63 + i * 13, 228, 1, '#e2d9c2'); });
+    if (r.limit) text(L(UI.qzLimit), W / 2, 90, { align: 'center', col: INK_MUTED, size: 6 });
     const note = r.title ? L(UI.qzTitleGot) : L(UI.qzTitleNeed).replace('{p}', Math.round((this.cfg.titleThreshold ?? .8) * 100));
     wrapText(note, 220, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, 98 + i * 9, { align: 'center', col: r.title ? INK_TEAL : INK, size: 6 }));
     if (r.title) { ctx.save(); ctx.translate(W / 2, 138); ctx.rotate(-.08); ctx.strokeStyle = '#2e6a5a'; ctx.lineWidth = 2; ctx.strokeRect(-62, -10, 124, 20); text(L(TITLES.zhkh_expert).toUpperCase(), 0, -4, { col: '#2e6a5a', align: 'center' }); ctx.restore(); }

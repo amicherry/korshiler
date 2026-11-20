@@ -29,12 +29,12 @@ const {chromium}=require('playwright'); const fs=require('fs');
  check('L4: 52 «за» мало, 53 — тариф', [(await play('L4',52)).ok, (await play('L4',53)).ok], [false,true]);
  check('L5: 69 мало, 70 = 2/3', [(await play('L5',69)).ok, (await play('L5',70)).ok], [false,true]);
  check('L6 до антенны нельзя', await tryStart('L6'), 'locked');
- let ant='no_money'; for(let k=0;k<6&&ant==='no_money';k++){ ant=await buy('antenna'); if(ant==='no_money') await play('L5',80); } check('антенна', ant, 'OK');
+ let ant='no_money'; for(let k=0;k<20&&ant==='no_money';k++){ ant=await buy('antenna'); if(ant==='no_money') await play('L5',80); } check('антенна', ant, 'OK');
  const r6=await play('L6',70); check('L6: лифт', [r6.ok, r6.badges], [true,['all_tours']]);
  await pg.evaluate(async()=>{ HOUSE_STATE=await API.house(); }); await pg.evaluate(()=>go('house')); await pg.waitForTimeout(1400);
  await pg.screenshot({path:'shots/h_hub.png'});
  // накопим денег повторами и починим всё
- for (const id of ['lift','basement','playground','sign','bench','flowers','trees','lamps','parking']) { let r='no_money'; for(let k=0;k<8&&r==='no_money';k++){ r=await buy(id); if(r==='no_money') await play('L6',90); } if(r!=='OK') console.log('✗ FAIL buy', id, r); }
+ for (const id of ['lift','basement','playground','sign','bench','flowers','trees','lamps','parking']) { let r='no_money'; for(let k=0;k<30&&r==='no_money';k++){ r=await buy(id); if(r==='no_money') await play('L6',90); } if(r!=='OK') console.log('✗ FAIL buy', id, r); }
  await pg.evaluate(async()=>{ HOUSE_STATE=await API.house(); });
  console.log('final', JSON.stringify(await pg.evaluate(()=>[HOUSE_STATE.fixed.length, HOUSE_STATE.decor.length, HOUSE_STATE.won])));
  await pg.evaluate(()=>go('house')); await pg.waitForTimeout(1200); await pg.screenshot({path:'shots/h_full.png'});

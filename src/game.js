@@ -262,12 +262,9 @@ function makeResidents(tour, seed) {
   for (let apt = 1; apt <= tour.floors * tour.perFloor; apt++) {
     if (apt === tour.heroApt) continue;
     const a = mix[k++], A = ARCH[a];
-    let name = pick(R, NAMES[a]); let tries = 0; while (used.has(name) && tries++ < 5) name = pick(R, NAMES[a]); used.add(name);
-    const look = Object.assign({}, A.look);
-    if (a !== 'apa') look.skin = pick(R, ['#f1c7a3', '#e3ad86', '#d9a77c', '#c98e66']);
-    if (!['apa', 'grump'].includes(a)) look.topCol = pick(R, ['#3f6f8c', '#b8443f', '#c79a3b', '#5d6b5a', '#7d4f8a', '#2f8577', '#9aa0a5']);
-    if (a === 'mom' || a === 'renter') look.hair = pick(R, ['bun', 'long']);
-    if (a === 'apa') look.scarfCol = pick(R, ['#c8414a', '#3f6f8c', '#4f7a4a', '#7d4f8a']);
+    // у каждого жильца своя внешность и имя по полу и возрасту — не «одна моделька на всех»
+    const look = varyLook(a, R), pool = namePool(a, look);
+    let name = pick(R, pool); let tries = 0; while (used.has(name) && tries++ < 8) name = pick(R, pool); used.add(name);
     const away = !A.renter && a !== 'apa' && !A.sleeper && R() < tour.awayShare;
     const trust = (SAVE.trust && SAVE.trust[apt]) || 0;
     res[apt] = { apt, arch: a, A, name, look, mood: A.mood + trust + Math.round((R() - .5) * 8), status: A.renter ? 'unknown' : 'unknown',
@@ -886,7 +883,45 @@ scenes.tour = {
     if (button(L(UI.close), W / 2, T.remote ? 190 : 188, 'alt')) this.ballot = false;
   },
 };
-const REFUSE = { grump: .4, business: .15, night: .1, student: .06, mom: .04, apa: .04 };
+const REFUSE = { grump: .4, business: .15, night: .1, student: .06, mom: .04, apa: .04, ata: .03, teacher: .05, dad: .06, it: .08 };
+// внешность жильца: пол, возраст, причёска, седина, очки, борода, головной убор, одежда и цвета
+const SKINS = ['#f1c7a3', '#e8b892', '#e3ad86', '#d9a77c', '#c98e66', '#b07a56'];
+const HAIR_Y = ['#2b2420', '#1b1a21', '#4a2e22', '#6a4028', '#a5503c', '#3a2a20', '#2b2420'], HAIR_O = ['#c9c6c0', '#9c9a96', '#8f8a84', '#6e6a66', '#b8b4ac'];
+const TOPS_C = ['#3f6f8c', '#b8443f', '#c79a3b', '#5d6b5a', '#7d4f8a', '#2f8577', '#9aa0a5', '#4a5a7a', '#8a5a3a', '#3a4a3a', '#6a3a4a', '#a86a7a', '#2b2a33'];
+const PANTS_C = ['#3d5277', '#2b2a33', '#4a4a52', '#3a4a3a', '#5a4a3a', '#46506a'], SKIRT_C = ['#4a3a52', '#3a3a4a', '#5a4a6e', '#6a3a3a', '#3a4a5a', '#5a5a4a'];
+function varyLook(a, R) {
+  const A = ARCH[a], ch = p => R() < p, any = arr => pick(R, arr);
+  const L = { skin: any(SKINS), topCol: any(TOPS_C), pants: any(PANTS_C) };
+  const youngF = () => Object.assign(L, { body: 'f', hair: any(['long', 'bun', 'curly', 'long']), hairCol: any(HAIR_Y), bottom: ch(.45) ? 'skirt' : 'pants', skirtCol: any(SKIRT_C) });
+  const youngM = () => Object.assign(L, { body: 'm', hair: any(['short', 'short', 'curly']), hairCol: any(HAIR_Y) });
+  switch (a) {
+    case 'apa': Object.assign(L, { body: 'f', old: true, bottom: 'skirt', skirtCol: any(SKIRT_C), top: ch(.25) ? 'chapan' : 'shirt', glasses: ch(.3) });
+      if (ch(.7)) Object.assign(L, { hair: 'scarf', hat: 'scarf', hairCol: any(HAIR_O), scarfCol: any(['#c8414a', '#3f6f8c', '#4f7a4a', '#7d4f8a', '#c79a3b', '#2f6f62']) });
+      else Object.assign(L, { hair: 'bun', hairCol: any(HAIR_O) }); break;
+    case 'ata': Object.assign(L, { body: 'm', old: true, hair: ch(.6) ? 'bald' : 'short', hairCol: any(HAIR_O), beard: ch(.6), glasses: ch(.3), top: any(['chapan', 'chapan', 'jacket', 'shirt']), topCol: any(['#4a3a5a', '#3a4a5a', '#5a4a3a', '#2b2a33', '#4a5a4a']) });
+      const h = R(); L.hat = h < .5 ? 'tyube' : h < .65 ? 'cap' : null; if (L.hat === 'cap') L.capCol = any(['#4a4a52', '#5a4a3a']); break;
+    case 'grump': Object.assign(L, { body: 'm', old: true, hair: ch(.5) ? 'bald' : 'short', hairCol: any(HAIR_O), glasses: ch(.5), beard: ch(.4), top: ch(.35) ? 'leather' : 'shirt', topCol: any(['#5d6b5a', '#4a4a52', '#5a4a3a', '#3a4a5a', '#6a5a4a']) });
+      if (ch(.2)) Object.assign(L, { hat: 'cap', capCol: any(['#3a3a42', '#4a3a2a']) }); break;
+    case 'teacher': Object.assign(L, { body: 'f', old: true, hair: any(['bun', 'bun', 'short', 'curly']), hairCol: ch(.6) ? any(HAIR_O) : any(['#6a2a2a', '#4a2e22', '#8a4a3a']), glasses: ch(.75), top: ch(.6) ? 'jacket' : 'shirt', bottom: ch(.7) ? 'skirt' : 'pants', skirtCol: any(SKIRT_C) }); break;
+    case 'mom': youngF(); L.top = any(['shirt', 'hoodie', 'shirt', 'jacket']); break;
+    case 'dad': youngM(); Object.assign(L, { beard: ch(.4), top: any(['hoodie', 'shirt', 'leather']) }); if (ch(.25)) Object.assign(L, { hat: 'cap', capCol: any(['#b8443f', '#3f6f8c', '#2b2a33']) }); break;
+    case 'student': ch(.5) ? youngF() : youngM(); Object.assign(L, { top: ch(.65) ? 'hoodie' : 'shirt', headphones: ch(.4), glasses: ch(.2) });
+      if (L.body === 'm' && ch(.25)) Object.assign(L, { hat: 'cap', capCol: any(['#b8443f', '#3f6f8c', '#c79a3b', '#2b2a33']) }); break;
+    case 'business': if (ch(.7)) youngM(); else { youngF(); L.hair = any(['bun', 'long']); L.bottom = 'skirt'; }
+      Object.assign(L, { top: ch(.8) ? 'jacket' : 'leather', topCol: any(['#2b2a33', '#3a4a5a', '#4a4a52', '#5a3a3a']), glasses: ch(.25), beard: L.body === 'm' && ch(.15) }); break;
+    case 'it': if (ch(.7)) youngM(); else youngF(); Object.assign(L, { top: 'hoodie', topCol: any(['#2b2a33', '#3a4a5a', '#4a3a5a', '#2f8577', '#5d6b5a']), glasses: ch(.55), headphones: ch(.4) }); break;
+    case 'night': if (ch(.85)) youngM(); else youngF(); Object.assign(L, { beard: L.body === 'm' && ch(.5), top: any(['shirt', 'leather', 'hoodie']), topCol: any(['#9aa0a5', '#4a4a52', '#3a4a3a', '#5a4a3a', '#2b2a33']) });
+      if (L.body === 'm' && ch(.15)) L.hair = 'bald'; if (ch(.35)) Object.assign(L, { hat: 'cap', capCol: any(['#2b2a33', '#4a4a52', '#3f6f8c']) }); break;
+    default: ch(.5) ? youngF() : youngM(); L.top = any(['hoodie', 'shirt', 'leather']); L.headphones = ch(.2);
+  }
+  if (!L.top) L.top = 'shirt';
+  return L;
+}
+function namePool(a, look) {
+  if (a === 'apa') return NAMES.apa; if (a === 'grump') return NAMES.grump; if (a === 'ata') return NAME_POOL.ata; if (a === 'teacher') return NAME_POOL.teacher;
+  const young = ['student', 'renter', 'it'].includes(a);
+  return look.body === 'f' ? (young ? NAME_POOL.youngF : NAME_POOL.adultF) : (young ? NAME_POOL.youngM : NAME_POOL.adultM);
+}
 const ONLINE_HUD_X = 208;
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 function tweenDoor(r, to) { return new Promise(res => { const from = r.door, t0 = performance.now(); (function step() { const k = Math.min(1, (performance.now() - t0) / 260); r.door = lerp(from, to, k); if (k < 1) requestAnimationFrame(step); else res(); })(); }); }

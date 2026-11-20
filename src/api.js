@@ -103,13 +103,16 @@ const MockServer = (() => {
     'POST /quiz/finish'({ session, body }) {
       const u = me(session), total = clamp(body.total | 0, 0, 30), first = clamp(body.firstTry | 0, 0, total), sec = +body.seconds || 0;
       const suspicious = total < 3 || sec < total * 4;                         // 8 вопросов быстрее 32 секунд не пробежать
-      const coins = suspicious ? 0 : clamp(body.coins | 0, 0, total * 20);
+      // викторину можно проходить сколько угодно, но монеты — только за первые три прохождения в день
+      const qd = today(); const profQ = db.profiles[u.userId] || (db.profiles[u.userId] = {}); if (profQ.quizDay !== qd) { profQ.quizDay = qd; profQ.quizRuns = 0; }
+      profQ.quizRuns = (profQ.quizRuns || 0) + 1;
+      const coins = suspicious || profQ.quizRuns > 3 ? 0 : clamp(body.coins | 0, 0, total * 10);
       const prof = db.profiles[u.userId] || (db.profiles[u.userId] = {}); prof.coins = (prof.coins || 0) + coins;
       let reward = null; db.rewards[u.userId] = db.rewards[u.userId] || [];
       const expert = !suspicious && total >= 5 && first / total >= .8;
       if (expert && !db.rewards[u.userId].some(r => r.badge === 'zhkh_expert')) {
         reward = { tourId: 'quiz', points: 100, badge: 'zhkh_expert', status: u.guest ? 'needs_login' : 'sent', at: Date.now() }; db.rewards[u.userId].push(reward); }
-      commit(); return { coins, badge: expert ? 'zhkh_expert' : null, reward, suspicious, totalCoins: prof.coins };
+      commit(); return { coins, badge: expert ? 'zhkh_expert' : null, reward, suspicious, totalCoins: prof.coins, limit: !suspicious && profQ.quizRuns > 3 };
     },
     'POST /tours/finish'({ session, body }) {
       const u = me(session); const run = db.runs[body.runId];
