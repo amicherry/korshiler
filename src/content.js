@@ -540,6 +540,7 @@ const PRO = {
   door:     { kz: 'Домофон тағы бұзылған — есік мүлде жабылмайды.', ru: 'Домофон снова сломан — дверь вообще не закрывается.', en: 'The intercom is broken again — the door doesn\'t even close.' },
   rat:      { kz: 'Ай! Егеуқұйрық! Жертөледен тағы шығып жатыр...', ru: 'Ай! Крыса! Опять из подвала лезут...', en: 'Eek! A rat! They\'re crawling out of the basement again...' },
   slip:     { kz: 'Ойбай... Төбеден тағы су тамып тұр. Мұнда тұтас шалшық жиналыпты.', ru: 'Ой-ой... С потолка опять капает. Тут уже целая лужа.', en: 'Ow... The ceiling is dripping again. There\'s a whole puddle here now.' },
+  smell:    { kz: 'Пф... Жертөледен ылғал мен шірік иіс шығып тұр. Құбырлар тағы ағып жатқан сияқты.', ru: 'Фу... Из подвала тянет сыростью и чем-то тухлым. Похоже, там опять текут трубы.', en: 'Ugh... The basement reeks of damp and rot. Looks like the pipes are leaking again.' },
   lift:     { kz: 'Лифт істемейді. Әрине. Демек, жетінші қабатқа жаяу.', ru: 'Лифт не работает. Конечно. Значит, на седьмой пешком.', en: 'The lift is broken. Of course. Stairs to the seventh floor, then.' },
   dark:     { kz: 'Мұнда шам да жанбайды...', ru: 'Тут ещё и свет не горит...', en: 'And the light\'s out here too...' },
   apa1:     { kz: 'Ой, балам, абайла — мұндағы шам екі айдан бері жанбайды. Кеше баспалдақтан құлап қала жаздадым.', ru: 'Ой, балам, осторожно — тут лампочка второй месяц не горит. Я вчера чуть со ступенек не упала.', en: 'Oh, dear, careful — this bulb has been out for two months. Yesterday I nearly fell down the stairs.' },

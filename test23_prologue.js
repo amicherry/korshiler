@@ -12,18 +12,20 @@ const LANG = process.env.QLANG || 'ru';
  for (let i=0; i<900; i++) {
    const s = await pg.evaluate(()=>{ const P=scenes.prologue, h=P.h||{};
      for (const k of ['left','right','up','down']) keys[k]=false;
-     return { scene: scene===scenes.prologue?'prologue':Object.keys(scenes).find(k=>scenes[k]===scene), phase:P.phase, busy:P.busy, dlg:DLG.open, ch:!!DLG.choices, x:Math.round(h.x||P.hx), floor:h.floor, climb:!!h.climb, slip:h.slip, jump:h.jump, rat:!!P.rat, lift:P.done.lift, trans:trans.phase, name:DLG.name, text:DLG.text, mom:P.npcs.find(n=>n.id==='mom').done }; });
+     return { scene: scene===scenes.prologue?'prologue':Object.keys(scenes).find(k=>scenes[k]===scene), phase:P.phase, busy:P.busy, dlg:DLG.open, ch:!!DLG.choices, x:Math.round(h.x||P.hx), floor:h.floor, climb:!!h.climb, anim:h.anim&&h.anim.kind, at:h.anim&&h.anim.t, rat:!!P.rat, lift:P.done.lift, trans:trans.phase, name:DLG.name, text:DLG.text, mom:P.npcs.find(n=>n.id==='mom').done }; });
    if (s.scene !== 'prologue') { log.push('scene '+s.scene); break; }
    if (s.trans) { await pg.waitForTimeout(100); continue; }
-   if (s.jump && !seen.jump) { seen.jump=1; await shot('rat'); }
-   if (s.slip > 500 && !seen.slip) { seen.slip=1; await shot('slip'); }
+   if (s.anim==='scare' && s.at>200 && !seen.jump) { seen.jump=1; await shot('rat'); }
+   if (s.anim==='slip' && s.at>220 && !seen.slip) { seen.slip=1; await shot('slip'); }
+   if (s.anim==='slip' && s.at>1100 && !seen.lie) { seen.lie=1; await shot('lie'); }
+   if (s.anim==='smell' && !seen.smell) { seen.smell=1; await pg.waitForTimeout(300); await shot('smell'); }
    if (s.dlg) { const key = s.name+'|'+s.text.slice(0,20);
      if (!seen[key]) { seen[key]=1; log.push(s.name+': '+s.text.slice(0,60));
        if (s.phase==='street') await shot('street'); if (/Сара|Бекет|Ерлан/.test(s.name) && !seen[s.name]) { seen[s.name]=1; await pg.waitForTimeout(600); await shot('npc_'+s.name.split(' ')[0]); }
        if (s.name==='Әсел' && !seen.mom) { seen.mom=1; await pg.waitForTimeout(600); await shot('mom'); }
        if (s.phase==='flat' && !seen.flat) { seen.flat=1; await pg.waitForTimeout(700); await shot('flat'); } }
      await pg.waitForTimeout(80); await pg.evaluate(()=>{ DLG.shown = DLG.text.length; pressed.act = true; }); await pg.waitForTimeout(60); continue; }
-   if (s.busy || s.climb || s.slip || s.jump || s.rat) { await pg.waitForTimeout(100); continue; }
+   if (s.busy || s.climb || s.anim || s.rat) { await pg.waitForTimeout(100); continue; }
    await pg.evaluate(s=>{ const P=scenes.prologue;
      if (P.phase==='street') { if (Math.abs(P.hx-STREET_DOOR_X)<8) pressed.act=true; else keys.right=true; return; }
      if (P.phase!=='stairs') return; const h=P.h;
@@ -41,7 +43,7 @@ const LANG = process.env.QLANG || 'ru';
  const st = await pg.evaluate(()=>({ scene: Object.keys(scenes).find(k=>scenes[k]===scene), tour: scene.tour && scene.tour.id, seen: SAVE.seenIntro, mom: SAVE.helpedMom, trust: SAVE.trust[65] }));
  check('после квартиры — тур 1', st.scene==='tour' && st.tour==='L1', JSON.stringify(st));
  check('пролог отмечен', st.seen===true);
- check('крыса, лужа, лифт', !!(seen.jump && seen.slip), JSON.stringify(Object.keys(seen).filter(k=>!k.includes('|'))));
+ check('крыса, лужа, вонь, лифт', !!(seen.jump && seen.slip && seen.lie && seen.smell), JSON.stringify(Object.keys(seen).filter(k=>!k.includes('|'))));
  check('помогли маме → соседи 9-го этажа доверяют', st.mom===true && st.trust===5);
  await pg.waitForTimeout(1500); await shot('tour1');
  const hud = await pg.evaluate(()=>({ app: scene.app, rac: scene.raccoon, menuOnline: false }));

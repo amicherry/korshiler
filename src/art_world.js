@@ -7,10 +7,33 @@
    ============================================================ */
 const tones = c => [shade(c, 24), c, shade(c, -28), shade(c, -50)];
 const PERSON_CACHE = new Map();
+/* позы для сценок (испуг от крысы, падение на луже): углы в градусах — 0 вниз, 90 вперёд, 180 вверх.
+   ноги [бедро, сгиб колена], руки [плечо, сгиб локтя]; lean — наклон корпуса (минус — назад), dy — сдвиг вниз.
+   Холст позы шире (34×46), человек сдвинут на POSE_OX, POSE_OY */
+const POSE_OX = 8, POSE_OY = 2;
+const POSES = {
+  scare0: { lf: [-10, 12], ln: [70, 100], af: [-160, 10], an: [155, -10], lean: -3, dy: 0 },
+  scare1: { lf: [45, 105], ln: [80, 115], af: [-170, 0], an: [165, -15], lean: -2, dy: -1 },
+  land:   { lf: [28, 62], ln: [40, 72], af: [-45, 0], an: [50, 0], lean: 2, dy: 3 },
+  slip0:  { lf: [-22, 8], ln: [78, 0], af: [-155, 0], an: [150, 30], lean: -4, dy: 0 },
+  slip1:  { lf: [72, 30], ln: [100, 10], af: [-150, 20], an: [172, 0], lean: -9, dy: -2 },
+  sit:    { lf: [86, 6], ln: [90, 0], af: [-32, 0], an: [70, 30], lean: -3, dy: 14 },
+  smell:  { lf: [-5, 5], ln: [6, 8], af: [10, 10], an: [100, 75], lean: -2, dy: 0 },
+  lieUp:  { lf: [0, 0], ln: [0, 0], af: [180, 0], an: [176, 0], lean: 0, dy: 0 },
+};
 function personSprite(look, frame) {
   const key = JSON.stringify(look) + '|' + frame;
   if (PERSON_CACHE.has(key)) return PERSON_CACHE.get(key);
-  const c = makeCanvas(18, 42, ({ r, p }) => {
+  const PO = frame.startsWith('pose_') ? POSES[frame.slice(5)] : null, ox = PO ? POSE_OX : 0, oy = PO ? POSE_OY : 0;
+  const CW = PO ? 34 : 18, CHh = PO ? 46 : 42;
+  // в позе ноги и верх рисуются на разных слоях: верх потом наклоняется построчно (без размытия пикселей)
+  let legsL = null, upL = null;
+  const c = makeCanvas(CW, CHh, (P0) => {
+    let cur = P0;
+    if (PO) { legsL = {}; upL = {}; makeCanvas(CW, CHh, Q => Object.assign(legsL, Q)); makeCanvas(CW, CHh, Q => Object.assign(upL, Q)); }
+    const r = (x, y, w, h, col) => cur.r(x + ox, y + oy, w, h, col), p = (x, y, col) => cur.p(x + ox, y + oy, col);
+    const toLegs = () => { if (PO) cur = legsL; }, toUp = () => { if (PO) cur = upL; };
+    const lean = 0, tilt = PO ? PO.lean : 0, pdy = PO ? PO.dy : 0;
     const fem = look.body ? look.body === 'f' : (look.hair === 'long' || look.hair === 'bun' || look.hat === 'scarf');
     const [skL, sk, skD] = tones(look.skin), hair = tones(look.hairCol), top = tones(look.topCol);
     const pants = tones(look.pants || (look.top === 'jacket' ? '#3a3d48' : '#3d5277')), shoe = '#241f1d', shoeL = '#3a322d';
@@ -21,55 +44,60 @@ function personSprite(look, frame) {
     if (frame.startsWith('climb')) { ph = (+frame.slice(5) % 4) / 4 * Math.PI * 2; climb = true; }
     const moving = ph >= 0, breath = frame === 'idle1' ? 1 : 0;
     const bob = moving && Math.abs(Math.sin(ph)) > .7 ? 1 : 0;           // на широком шаге корпус ниже
-    const hipX = 9, hipY = 24 + bob, D = Math.PI / 180;
+    const hipX = 9, hipY = 24 + bob + pdy, D = Math.PI / 180;
     // конечность: отрезок толщиной w пикселей, тень на заднем крае
     const seg = (x0, y0, ang, len, w, col, colD) => {
       for (let i = 0; i <= len; i++) { const x = x0 + Math.sin(ang) * i, y = y0 + Math.cos(ang) * i;
-        r(Math.round(x - w / 2), Math.round(y), w, 1, col); p(Math.round(x - w / 2), Math.round(y), colD); }
+        // в позах конечность может лечь горизонтально — рисуем квадратиком, чтобы не стала тонкой
+        r(Math.round(x - w / 2), Math.round(y - (PO ? (w - 1) / 2 : 0)), w, PO ? w : 1, col); p(Math.round(x - w / 2), Math.round(y), colD); }
       return [x0 + Math.sin(ang) * len, y0 + Math.cos(ang) * len];
     };
     const leg = (phase, near) => {
-      const a = (moving ? 24 * Math.sin(phase) : 0) * D, bend = (moving ? 38 * Math.max(0, Math.cos(phase)) + 6 * Math.max(0, -Math.sin(phase)) : 0) * D;
+      let a = (moving ? 24 * Math.sin(phase) : 0) * D, bend = (moving ? 38 * Math.max(0, Math.cos(phase)) + 6 * Math.max(0, -Math.sin(phase)) : 0) * D;
+      if (PO) { const L = near ? PO.ln : PO.lf; a = L[0] * D; bend = L[1] * D; }
       const lift = climb ? 3 * Math.max(0, Math.sin(phase)) : 0;
       // в юбке ноги в тёмных колготках и тоньше
       const col = skirt ? (near ? '#3b3742' : '#2a2730') : near ? pants[1] : pants[2], colD = skirt ? '#1d1b22' : near ? pants[2] : pants[3];
       const [kx, ky] = seg(hipX + (near ? 0 : -1), hipY, a, 8, skirt ? 2 : 3, col, colD);
       const [fx, fy] = seg(kx, ky - lift, a - bend, 8, skirt ? 2 : 3, col, colD);
-      const X = Math.round(fx), Y = Math.min(41, Math.round(fy));
+      const X = Math.round(fx), Y = PO ? Math.round(fy) : Math.min(41, Math.round(fy));
       r(X - 1, Y - 1, 5, 2, near ? shoe : '#1a1615'); p(X + 3, Y - 1, near ? shoeL : shoe);
     };
     const arm = (phase, near) => {
-      const a = (moving ? -22 * Math.sin(phase) : 0) * D, elbow = (moving ? 12 + 14 * Math.max(0, -Math.sin(phase)) : 6) * D;
+      let a = (moving ? -22 * Math.sin(phase) : 0) * D, elbow = (moving ? 12 + 14 * Math.max(0, -Math.sin(phase)) : 6) * D;
+      if (PO) { const A = near ? PO.an : PO.af; a = A[0] * D; elbow = A[1] * D; }
       const col = near ? top[1] : top[2], colD = near ? top[2] : top[3];
-      const sy = 13 + bob + breath;
-      const [ex, ey] = seg(9 + (near ? 1 : -1), sy, a, 6, 2, col, colD);
+      const sy = 13 + bob + breath + pdy;
+      const [ex, ey] = seg(9 + lean + (near ? 1 : -1), sy, a, 6, 2, col, colD);
       const [hx, hy] = seg(ex, ey, a + elbow, 5, 2, col, colD);
       r(Math.round(hx - 1), Math.round(hy), 2, 2, near ? sk : skD);
     };
     const longTop = look.top === 'chapan';
     // дальние рука и нога — темнее, за корпусом
-    if (frame !== 'knock') arm(ph < 0 ? 0 : ph + Math.PI, false);
-    leg(ph < 0 ? Math.PI : ph + Math.PI, false);
+    toUp(); if (frame !== 'knock') arm(ph < 0 ? 0 : ph + Math.PI, false);
+    toLegs(); leg(ph < 0 ? Math.PI : ph + Math.PI, false); toUp();
     // корпус в профиль: грудь спереди (справа), спина слева
-    const ty = 12 + bob + breath, th = longTop ? 21 : 13 - breath, tw = fem ? 6 : 7, tx = fem ? 6 : 5;
+    const ty = 12 + bob + breath + pdy, th = longTop ? 21 : 13 - breath, tw = fem ? 6 : 7, tx = (fem ? 6 : 5) + lean;
     r(tx, ty, tw, th, top[1]); r(tx, ty, 1, th, top[2]); r(tx + tw - 1, ty + 1, 1, th - 2, top[0]);
     r(tx + 1, ty - 1, tw - 2, 1, top[1]);                                          // плечо
     if (fem && !longTop) { r(tx + tw, ty + 3, 1, 3, top[1]); r(tx - 1 + 1, ty + 9, 1, 3, top[2]); }   // силуэт: грудь, талия
-    if (!longTop && !skirt) { r(tx, 24 + bob, tw, 1, '#2a2422'); p(tx + tw - 2, 24 + bob, '#9a8a6a'); }   // ремень
+    if (!longTop && !skirt) { r(tx, 24 + bob + pdy, tw, 1, '#2a2422'); p(tx + tw - 2, 24 + bob + pdy, '#9a8a6a'); }   // ремень
     if (look.top === 'hoodie') { r(tx - 1, ty - 1, 3, 4, top[2]); r(tx + tw - 2, ty + 6, 2, 3, top[2]); p(tx + tw - 1, ty + 1, '#f4f3ee'); }
     if (look.top === 'shirt') { r(tx + tw - 2, ty - 1, 2, 2, '#f4f3ee'); for (let y = ty + 3; y < ty + th - 1; y += 3) p(tx + tw - 1, y, top[3]); }
     if (look.top === 'jacket') { r(tx + tw - 2, ty, 2, 8, '#e9eef5'); r(tx + tw - 1, ty + 1, 1, 7, '#2b2a33'); r(tx + tw - 3, ty, 1, 9, top[2]); }   // рубашка и галстук
     if (look.top === 'leather') { r(tx + tw - 2, ty, 2, 10, '#e6dcc4'); r(tx + tw - 3, ty, 1, 11, top[3]); p(tx + 1, ty + 2, top[0]); }
-    if (longTop) { r(tx + tw - 1, ty, 1, th, '#d9b43a'); r(tx, ty + th - 1, tw, 1, '#d9b43a'); r(tx, 23 + bob, tw, 1, '#8a6a1e'); }
-    leg(ph < 0 ? Math.PI : ph, true);
+    if (longTop) { r(tx + tw - 1, ty, 1, th, '#d9b43a'); r(tx, ty + th - 1, tw, 1, '#d9b43a'); r(tx, 23 + bob + pdy, tw, 1, '#8a6a1e'); }
+    toLegs(); leg(ph < 0 ? Math.PI : ph, true);
     // юбка — поверх бёдер, расширяется книзу и чуть качается на шаге
     if (skirt) { const sw = moving ? Math.round(Math.sin(ph)) : 0, kc = tones(look.skirtCol || '#5a4a6e');
-      for (let i = 0; i < 8; i++) { const ww = tw + Math.floor(i / 2), x0 = tx - Math.floor(i / 4) + (i > 4 ? sw : 0); r(x0, 23 + bob + i, ww, 1, i === 7 ? kc[2] : kc[1]); p(x0, 23 + bob + i, kc[2]); if (i % 3 === 1) p(x0 + 2, 23 + bob + i, kc[0]); } }
+      const sk0 = PO && PO.dy > 8 ? 4 : 8;   // сидя юбка короче — ноги вытянуты вперёд
+      for (let i = 0; i < sk0; i++) { const ww = tw + Math.floor(i / 2) + (sk0 < 8 ? i : 0), x0 = tx - lean - Math.floor(i / 4) + (i > 4 ? sw : 0); r(x0, 23 + bob + pdy + i, ww, 1, i === sk0 - 1 ? kc[2] : kc[1]); p(x0, 23 + bob + pdy + i, kc[2]); if (i % 3 === 1) p(x0 + 2, 23 + bob + pdy + i, kc[0]); } }
+    toUp();
     // ближняя рука (стук — рука вперёд и вверх)
     if (frame === 'knock') { seg(10, ty + 1, 80 * D, 5, 2, top[1], top[2]); seg(15, ty + 2, 160 * D, 4, 2, top[1], top[2]); r(15, ty - 3, 2, 2, sk); }
     else arm(ph < 0 ? 0 : ph, true);
     // шея и голова в профиль — голова меньше (6×7), пропорции ближе к взрослому человеку
-    const hy = bob + breath, hx = fem ? 8 : 8;
+    const hy = bob + breath + pdy, hx = 8 + lean;
     r(hx + 2, 10 + hy, 2, 2, skD);
     r(hx, 3 + hy, 6, 7, sk); r(hx + 6, 5 + hy, 1, 3, sk);                              // лицо, нос
     r(hx, 4 + hy, 1, 5, skD); r(hx + 1, 9 + hy, 4, 1, skD); p(hx + 5, 9 + hy, skD);    // затылок, подбородок
@@ -90,10 +118,27 @@ function personSprite(look, frame) {
     if (look.hat === 'tyube') { r(hx, 1 + hy, 6, 2, '#1b1a21'); p(hx + 1, 1 + hy, '#f4f3ee'); p(hx + 3, 2 + hy, '#f4f3ee'); }
     if (look.hat === 'cap') { const cc = look.capCol || '#b8443f'; r(hx, 1 + hy, 6, 2, cc); r(hx + 5, 3 + hy, 3, 1, shade(cc, -30)); p(hx + 1, 1 + hy, shade(cc, 25)); }
     if (look.hat === 'scarf') { const sc = tones(look.scarfCol || '#c8414a'); r(hx - 1, 1 + hy, 7, 3, sc[1]); r(hx - 2, 3 + hy, 3, 8, sc[1]); r(hx + 1, 9 + hy, 4, 3, sc[2]); p(hx + 2, 2 + hy, sc[0]); p(hx + 5, 3 + hy, sc[2]); }
+    if (PO) {
+      // сборка: ноги как есть, верх — со сдвигом строк: у бёдер 0, у макушки tilt
+      const g = P0.g, hipRow = 24 + pdy + oy, topRow = 1 + pdy + oy;
+      g.drawImage(legsL.g.canvas, 0, 0);
+      const U = upL.g.canvas;
+      for (let y = 0; y < CHh; y++) { const k = clamp((hipRow - y) / (hipRow - topRow), 0, 1.3); g.drawImage(U, 0, y, CW, 1, Math.round(tilt * k), y, CW, 1); }
+    }
   });
   PERSON_CACHE.set(key, c); return c;
 }
 const PW = 18, PH = 42;
+// лёжа на спине (после падения): поза «руки вверх», повёрнутая ровно на 90° — пиксели не ломаются.
+// bottom — нижний непрозрачный ряд, hip — где бёдра по x
+function lyingSprite(look) {
+  const key = JSON.stringify(look) + '|lie';
+  if (PERSON_CACHE.has(key)) return PERSON_CACHE.get(key);
+  const src = personSprite(look, 'pose_lieUp'), c = makeCanvas(src.height, src.width, ({ g }) => { g.translate(0, src.width); g.rotate(-Math.PI / 2); g.drawImage(src, 0, 0); });
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let bottom = 0;
+  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 0) bottom = y;
+  c.bottom = bottom; c.hip = 24 + POSE_OY; PERSON_CACHE.set(key, c); return c;
+}
 
 /* ============================================================
    ПОДЪЕЗД В РАЗРЕЗЕ — по референсу: тёмные зелёно-серые стены,
