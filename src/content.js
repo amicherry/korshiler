@@ -534,7 +534,7 @@ const PRO = {
   objHome:  { kz: 'Үйге бар: {a}-пәтер, {f}-қабат', ru: 'Иди домой: кв. {a}, {f} этаж', en: 'Go home: flat {a}, floor {f}' },
   objUp:    { kz: 'Баспалдақпен {f}-қабатқа көтеріл', ru: 'Поднимись по лестнице на {f} этаж', en: 'Take the stairs up to floor {f}' },
   objDoor:  { kz: 'Өз есігіңе бар: {a}-пәтер', ru: 'Подойди к своей двери: кв. {a}', en: 'Go to your door: flat {a}' },
-  skip:     { kz: 'Өткізу ▸▸', ru: 'Пропустить ▸▸', en: 'Skip ▸▸' },
+  skip:     { kz: 'Өткізіп жіберу ▸▸', ru: 'Пропустить ▸▸', en: 'Skip ▸▸' },
   home:     { kz: 'Үйге', ru: 'Домой', en: 'Home' },
   enter:    { kz: 'Кіру', ru: 'Войти', en: 'Enter' },
   door:     { kz: 'Домофон тағы бұзылған — есік мүлде жабылмайды.', ru: 'Домофон снова сломан — дверь вообще не закрывается.', en: 'The intercom is broken again — the door doesn\'t even close.' },

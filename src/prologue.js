@@ -10,11 +10,22 @@ const PRO_NPC = [
   { id: 'grump', floor: 5, x: 166, name: 'Бекет ата', arch: 'grump',    lines: ['grump1', 'grump2'] },
   { id: 'mom',   floor: 6, x: 236, name: 'Әсел',      arch: 'mom',      lines: ['mom1', 'mom2'], auto: true, pram: true },
 ];
-// детская коляска: 20×18, смотрит влево (ручка справа)
-const PRAM = makeCanvas(22, 18, ({ r, p }) => {
-  r(2, 2, 14, 8, '#3f5e7a'); r(2, 2, 14, 1, '#5a7c98'); r(2, 2, 6, 6, '#2e4a62'); r(3, 3, 4, 4, '#4a6c88');   // капюшон и люлька
-  r(1, 9, 17, 3, '#2b2a33'); r(16, 2, 1, 8, '#2b2a33'); r(16, 1, 5, 1, '#2b2a33'); r(20, 0, 2, 2, '#2b2a33'); // ручка
-  for (const x of [4, 14]) { r(x - 3, 12, 6, 6, '#1b1a21'); r(x - 2, 13, 4, 4, '#55595f'); p(x - 1, 14, '#8a8e96'); }
+// детская коляска (вид сбоку, ручка справа — со стороны мамы): глубокая люлька, капюшон, рессора, большие колёса
+const PRAM = makeCanvas(30, 28, ({ r, p, ell }) => {
+  const O = '#141a1e', B = '#3f5e78', BL = '#5a7c96', BD = '#2c465c', T = '#c8d4da';
+  // ручка
+  r(22, 4, 1, 1, O); for (let i = 0; i < 6; i++) { r(22 + i, 9 - i, 2, 1, O); } r(26, 2, 4, 2, O); r(27, 2, 2, 1, '#3a4248');
+  // люлька: округлое дно
+  for (let y = 9; y <= 18; y++) { const k = (y - 9) / 9, inset = Math.round(Math.pow(k, 2.2) * 6); r(2 + inset, y, 21 - inset * 2, 1, y > 15 ? BD : B); p(1 + inset, y, O); p(23 - inset, y, O); }
+  r(4, 19, 17, 1, O); r(4, 11, 17, 1, BL); r(3, 13, 2, 3, BL);
+  // кант по краю и капюшон над изголовьем (справа)
+  r(1, 8, 23, 2, T); r(1, 8, 23, 1, '#e8eef0'); p(0, 8, O); p(24, 8, O);
+  for (let y = 0; y <= 8; y++) { const w = Math.round(Math.sqrt(1 - Math.pow((8 - y) / 8.5, 2)) * 11); r(23 - w, y, w, 1, y < 2 ? BD : B); p(22 - w, y, O); }
+  for (const k of [3, 6]) for (let y = 1; y < 8; y++) { const w = Math.round(Math.sqrt(1 - Math.pow((8 - y) / 8.5, 2)) * 11); if (w > k) p(23 - k - Math.round((w - k) * .0), y, BD); }
+  r(13, 1, 10, 1, O);
+  // рессора и колёса
+  r(6, 20, 13, 1, '#2a3238'); p(5, 21, '#2a3238'); p(19, 21, '#2a3238');
+  for (const cx of [6, 19]) { ell(cx, 23, 4, 4, O); ell(cx, 23, 3, 3, '#4a565e'); ell(cx, 23, 2, 2, '#22292e'); p(cx, 23, '#9aa6ae'); p(cx - 2, 23, '#6a767e'); p(cx + 2, 23, '#6a767e'); p(cx, 21, '#6a767e'); p(cx, 25, '#6a767e'); }
 });
 
 const RAT_PAL = { k: '#1e1d24', r: '#5e6470', d: '#474c57', l: '#8a909a', n: '#d98a96', e: '#e04848' };
@@ -100,13 +111,13 @@ function buildRoom() {
 scenes.prologue = {
   enter() {
     this.t = 0; this.phase = 'street'; this.done = {}; this.busy = false; this.plan = null;
-    this.hx = 70; this.dir = 1; this.moving = false; this.walkT = 0; this.stepAcc = 0;
+    this.hx = 110; this.dir = 1; this.scx = 0; this.moving = false; this.walkT = 0; this.stepAcc = 0;
     this.floors = HOUSE.floors; this.heroApt = HOUSE.heroApt;
     this.homeFloor = Math.ceil(this.heroApt / HOUSE.perFloor); this.homeX = DOOR_X[(this.heroApt - 1) % HOUSE.perFloor];
     this.npcs = PRO_NPC.map(n => ({ ...n, look: Object.assign({}, ARCH[n.arch].look), done: false, gone: 0 }));
     setTouch({ move: true });
   },
-  focus() { return this.phase === 'stairs' ? { x: this.h.x - this.camX, y: this.h.y - this.camY - 14 } : { x: (this.phase === 'flat' ? this.fx * 2 : this.hx), y: 150 }; },
+  focus() { return this.phase === 'stairs' ? { x: this.h.x - this.camX, y: this.h.y - this.camY - 14 } : this.phase === 'flat' ? { x: this.fx * 2, y: 150 } : { x: this.hx - this.scx, y: STREET_GROUND - 20 }; },
   base(f) { return floorBase(f, this.floors); },
   // реплика героя / соседа
   async talk(name, look, keys, expr = 'neutral', voice = 420) {
@@ -127,16 +138,18 @@ scenes.prologue = {
     if (dir) this.plan = null;
     if (!dir && this.plan != null) { if (Math.abs(this.plan - this.hx) > 1) dir = Math.sign(this.plan - this.hx); else this.plan = null; }
     this.moving = !!dir;
-    if (dir) { this.dir = dir; this.hx = clamp(this.hx + dir * dt * .07, -12, W - 10); this.walkT += dt; this.stepAcc += dt; if (this.stepAcc > 240) { this.stepAcc = 0; sfx.step(); } }
+    if (dir) { this.dir = dir; this.hx = clamp(this.hx + dir * dt * .07, 8, SWS - 10); this.walkT += dt; this.stepAcc += dt; if (this.stepAcc > 240) { this.stepAcc = 0; sfx.step(); } }
+    const sx = this.hx - this.scx; let tx = this.scx; if (sx < 140) tx = this.hx - 140; else if (sx > 260) tx = this.hx - 260;
+    this.scx = lerp(this.scx, clamp(tx, 0, SWS - W), Math.min(1, dt / 200));
     const atDoor = Math.abs(this.hx - STREET_DOOR_X) < 10;
     setTouch({ act: atDoor ? L(PRO.enter) : null, move: true });
     if (atDoor && (hit('act') || (this.plan == null && this.tapDoor))) this.enterHouse();
-    const c = clicks.find(c => c.y > 16); if (c) { clicks.splice(clicks.indexOf(c), 1); this.plan = clamp(c.x, -12, W - 10); this.tapDoor = Math.abs(c.x - STREET_DOOR_X) < 14; sfx.select(); }
+    const c = clicks.find(c => c.y > 16); if (c) { clicks.splice(clicks.indexOf(c), 1); this.plan = clamp(c.x + this.scx, 8, SWS - 10); this.tapDoor = Math.abs(c.x + this.scx - STREET_DOOR_X) < 16; sfx.select(); }
   },
   async enterHouse() {
     if (this.busy) return; this.busy = true; this.moving = false; this.plan = null;
     await this.think('door', 'angry');
-    irisTo(STREET_DOOR_X, 150, () => this.toStairs());
+    irisTo(STREET_DOOR_X - this.scx, 110, () => this.toStairs());
   },
   toStairs() {
     this.phase = 'stairs'; this.busy = false;
@@ -302,10 +315,12 @@ scenes.prologue = {
   },
   heroFrame(moving, walkT) { return moving ? 'walk' + (Math.floor(walkT / 95) % 8) : 'idle' + (Math.floor(this.t / 500) % 2); },
   drawStreetPhase(dt) {
-    drawStreet(dt, this.t);
-    sprite(personSprite(SAVE.look, this.heroFrame(this.moving, this.walkT)), Math.round(this.hx) - 9, STREET_GROUND - PH, this.dir < 0);
-    drawStreetFront();
-    if (!this.busy && Math.abs(this.hx - STREET_DOOR_X) < 10 && Math.floor(this.t / 400) % 2) text(isTouch ? '▼' : 'E', STREET_DOOR_X, STREET_GROUND - PH - 14, { col: '#f2c94c', align: 'center', shadow: '#0b0c10' });
+    const cx = Math.round(this.scx);
+    drawStreet(dt, this.t, cx);
+    ctx.fillStyle = 'rgba(4,10,12,.4)'; ctx.fillRect(Math.round(this.hx) - 7 - cx, STREET_GROUND - 1, 14, 2);
+    sprite(personSprite(SAVE.look, this.heroFrame(this.moving, this.walkT)), Math.round(this.hx) - 9 - cx, STREET_GROUND - PH, this.dir < 0);
+    drawStreetFront(cx);
+    if (!this.busy && Math.abs(this.hx - STREET_DOOR_X) < 10 && Math.floor(this.t / 400) % 2) text(isTouch ? '▼' : 'E', STREET_DOOR_X - cx, STREET_GROUND - PH - 14, { col: '#f2c94c', align: 'center', shadow: '#0b0c10' });
   },
   drawStairs(dt) {
     const h = this.h, cy = Math.round(this.camY), cx = Math.round(this.camX), t = this.t;
@@ -345,7 +360,7 @@ scenes.prologue = {
       if (n.gone > 1400) continue;
       const nb = this.base(n.floor) - cy; if (nb < -60 || nb > H + 60) continue;
       const leaving = n.gone > 0, nx = n.x + (leaving ? -n.gone * .05 : 0);
-      if (n.pram) sprite(PRAM, Math.round(nx - 30 + (leaving ? 0 : 0)), nb - 18);
+      if (n.pram) sprite(PRAM, Math.round(nx - 36), nb - 27);
       const fr = leaving ? 'walk' + (Math.floor(n.gone / 95) % 8) : 'idle' + (Math.floor(t / 600) % 2);
       ctx.globalAlpha = leaving ? clamp(1 - (n.gone - 900) / 500, 0, 1) : 1;
       sprite(personSprite(n.look, fr), Math.round(nx) - 9, nb - PH, leaving || h.x < n.x);

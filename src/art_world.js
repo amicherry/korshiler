@@ -129,15 +129,15 @@ function personSprite(look, frame) {
   PERSON_CACHE.set(key, c); return c;
 }
 const PW = 18, PH = 42;
-// лёжа на спине (после падения): поза «руки вверх», повёрнутая ровно на 90° — пиксели не ломаются.
+// лёжа ничком, головой вперёд (после падения, как в референсе): поза «руки вверх», повёрнутая ровно на 90° — пиксели не ломаются.
 // bottom — нижний непрозрачный ряд, hip — где бёдра по x
 function lyingSprite(look) {
   const key = JSON.stringify(look) + '|lie';
   if (PERSON_CACHE.has(key)) return PERSON_CACHE.get(key);
-  const src = personSprite(look, 'pose_lieUp'), c = makeCanvas(src.height, src.width, ({ g }) => { g.translate(0, src.width); g.rotate(-Math.PI / 2); g.drawImage(src, 0, 0); });
+  const src = personSprite(look, 'pose_lieUp'), c = makeCanvas(src.height, src.width, ({ g }) => { g.translate(src.height, 0); g.rotate(Math.PI / 2); g.drawImage(src, 0, 0); });
   const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let bottom = 0;
   for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 0) bottom = y;
-  c.bottom = bottom; c.hip = 24 + POSE_OY; PERSON_CACHE.set(key, c); return c;
+  c.bottom = bottom; c.hip = c.width - 1 - (24 + POSE_OY); PERSON_CACHE.set(key, c); return c;
 }
 
 /* ============================================================

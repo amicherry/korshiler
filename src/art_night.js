@@ -185,113 +185,142 @@ function drawNight(dt) {
 }
 
 /* ============================================================
-   ДВОР У ПОДЪЕЗДА — пролог. Низ той же панельки, козырёк,
-   фонарь, лавочка, машина под снегом, соседние дома
+   ДВОР У ПОДЪЕЗДА — пролог. Низ нашей панельки ночью, в той же холодной
+   бирюзово-серой гамме, что подъезд и квартира. По 4 окна с каждой стороны
+   от входа (как 4 квартиры на этаже), приоткрытая дверь светится подъездом.
+   Сцена шире экрана — камера едет за героем.
    ============================================================ */
-const STREET = { built: false, windows: [], snow: [] };
-const STREET_DOOR_X = 214, STREET_UP = 62, STREET_GROUND = 196 - STREET_UP;
+const STREET = { built: false, windows: [], leaves: [], vapor: [] };
+const SWS = 600, STREET_DOOR_X = 300, STREET_GROUND = 132;
+const ST_WIN = [85, 135, 185, 235, 365, 415, 465, 515];
 function buildStreet() {
   const R = rng(19); STREET.windows = [];
-  STREET.bg = makeCanvas(W, H + STREET_UP, ({ r, p, g }) => {
-    // небо: те же сиреневые сумерки, что на карте ЖК, с облаками
-    for (let y = 0; y < H; y++) { const k = y / H; r(0, y, W, 1, `rgb(${28 + k * 90 | 0},${23 + k * 60 | 0},${52 + k * 70 | 0})`); }
-    for (let i = 0; i < 40; i++) p(R() * W, R() * 70, R() < .3 ? '#f4f3ee' : '#a99fc8');
-    pxCloud(r, R, 150, 30, 50); pxCloud(r, R, 300, 18, 40);
-    // соседние дома ЖК по бокам — в дымке
-    for (const [x0, x1, top] of [[-30, 22, 64], [398, 440, 56]]) {
-      r(x0, top, x1 - x0, 186 - top, '#3d3560'); r(x0, top - 3, x1 - x0, 3, '#564c7a');
-      for (let y = top + 6; y < 180; y += 11) { r(x0, y + 8, x1 - x0, 1, '#4a4170'); for (let x = x0 + 3; x < x1 - 5; x += 9) r(x, y, 5, 6, R() < .3 ? pick(R, ['#b8885a', '#a87a52']) : '#2a2444'); }
-      for (let y = top - 3; y < 186; y++) r(x0, y, x1 - x0, 1, 'rgba(40,30,70,.3)');
-    }
-    // фасад нашего дома: сиреневый бетон, швы панелей, потёки
-    const fx = 40, fw = 344;
-    r(fx, 0, fw, 186, '#6d6488'); r(fx, 0, 2, 186, '#857ca0'); r(fx + fw - 2, 0, 2, 186, '#544b70');
-    for (let x = fx; x <= fx + fw; x += 34) r(x, 0, 1, 186, '#5b5378');
-    for (let i = 0; i < 70; i++) { const x = fx + R() * fw, y = R() * 160; r(x, y, 1, 4 + R() * 18, '#5b5378'); }
-    for (let i = 0; i < 400; i++) p(fx + R() * fw, R() * 186, R() < .5 ? '#746b90' : '#655c80');
-    // закатный свет справа
-    for (let y = 0; y < 186; y++) r(fx + fw - 30, y, 28, 1, 'rgba(240,140,70,.12)');
-    // межэтажные плиты с балконами
-    for (const y of [-16, 46, 108]) { r(fx, y + 58, fw, 4, '#8f86a8'); r(fx, y + 58, fw, 1, '#b0a8c8'); r(fx, y + 62, fw, 1, '#3a3356'); }
-    r(fx, 170, fw, 16, '#463d5e'); r(fx, 170, fw, 1, '#6a6090'); for (let x = fx; x < fx + fw; x += 17) r(x, 171, 1, 15, '#3d3554');                        // цоколь
-    for (const x of [70, 128, 290, 342]) { r(x, 176, 10, 5, '#120e1c'); for (let i = 0; i < 5; i++) r(x + 1 + i * 2, 176, 1, 5, '#3a3356'); }
-    // водосток и жёлтая газовая труба
-    r(fx + 4, 0, 3, 186, '#8a80a8'); r(fx + 4, 0, 1, 186, '#a198bd'); for (let y = 10; y < 186; y += 31) r(fx + 3, y, 5, 1, '#4e4569');
-    { const gx = fx + fw - 10;
-      r(gx - 3, 150, 11, 14, '#c9a83a'); r(gx - 3, 150, 11, 1, '#e8c85a'); r(gx - 2, 152, 9, 1, '#8a7a3a'); r(gx + 5, 156, 1, 3, '#3a3020');   // шкаф-регулятор
-      r(gx, 164, 3, 22, '#d9b43a'); r(gx, 164, 1, 22, '#f2d26a'); r(gx - 1, 184, 5, 2, '#5a4a2a');                                     // из земли в шкаф
-      r(gx, 111, 3, 39, '#d9b43a'); r(gx, 111, 1, 39, '#f2d26a');                                                                    // вверх
-      r(fx + 22, 111, gx - fx - 19, 3, '#d9b43a'); r(fx + 22, 111, gx - fx - 19, 1, '#f2d26a');
-      for (let x = fx + 30; x < gx; x += 24) r(x, 114, 1, 2, '#6a5a2a');
-      for (const ix of [fx + 22, STREET_DOOR_X + 22]) { r(ix, 111, 3, 7, '#d9b43a'); r(ix - 1, 117, 5, 2, '#8a7a3a'); r(ix, 119, 3, 2, '#2a2238'); }   // ввод в стену
-    }
-    // окна квартир: рамы, подоконники; у некоторых балкон с бельём или цветами, кондиционер
-    for (const fy of [-16, 46, 108]) for (const x of [58, 100, 142, 262, 304, 346]) {
-      r(x - 4, fy + 10, 30, 34, '#4a3f62'); r(x - 5, fy + 43, 32, 2, '#8f86a8');
-      const w = { x: x - 2, y: fy + 12, w: 26, h: 30, on: R() < .45, warm: pick(R, ['#f2b84a', '#f5c96a', '#e8913a', '#ec9d8f', '#9a6ad0']), curtain: R() < .4, ac: R() < .2, plants: R() < .3 };
+  const C = { sky0: '#0a141c', sky1: '#1a3240', con: '#3a474b', conL: '#46545a', conD: '#2c373a', seam: '#283235', frame: '#8e9894', frameD: '#5e6866', glass: '#0f181e', sill: '#6e787c',
+    plinth: '#283234', walk: '#2a3438', walkL: '#323e42', curb: '#56626a', road: '#182024', door: '#2c4a3c', doorL: '#3a5e4c', doorD: '#1e3428', rust: '#6a4a32', gas: '#a8903a', gasL: '#c8ac4a' };
+  STREET.bg = makeCanvas(SWS, H, ({ r, p, g, line, ell }) => {
+    // небо и дальние дома ЖК в дымке
+    for (let y = 0; y < 130; y++) { const k = y / 130; r(0, y, SWS, 1, `rgb(${10 + k * 16 | 0},${20 + k * 30 | 0},${28 + k * 36 | 0})`); }
+    for (let i = 0; i < 50; i++) p(R() * SWS, R() * 60, R() < .3 ? '#c8dce0' : '#5a7480');
+    for (const [x0, x1, top] of [[-10, 46, 30], [556, 612, 22]]) { r(x0, top, x1 - x0, 112 - top, '#14232b'); r(x0, top, x1 - x0, 1, '#22343e');
+      for (let y = top + 5; y < 108; y += 9) for (let x = x0 + 4; x < x1 - 4; x += 8) if (R() < .25) r(x, y, 4, 4, R() < .5 ? '#a8804a' : '#4a6a78'); }
+    // фасад: бетонные панели со швами и потёками
+    const fx = 40, fw = 520;
+    r(fx, 0, fw, 112, C.con);
+    for (let i = 0; i < 1400; i++) p(fx + R() * fw, R() * 112, R() < .5 ? C.conL : C.conD);
+    for (const y of [-26, 44]) { r(fx, y, fw, 2, C.seam); r(fx, y + 2, fw, 1, C.conL); }
+    for (let x = fx; x <= fx + fw; x += 50) { if (x > 255 && x < 345) continue; r(x, 0, 1, 112, C.seam); p(x + 1, 0, C.conL); }
+    // выступ лестничной клетки — чуть светлее, с тенями по краям
+    r(262, 0, 76, 112, '#3f4d51'); r(262, 0, 2, 112, '#2a3438'); r(336, 0, 2, 112, '#4c5a5e');
+    for (let i = 0; i < 300; i++) p(262 + R() * 76, R() * 112, R() < .5 ? '#4a585c' : '#343f43');
+    // окна квартир: 1-й этаж целиком, 2-й снизу; решётки, шторы, кондиционер, балконы
+    const win = (cx, y0, h, row) => {
+      const x = cx - 15, w0 = 30;
+      r(x - 1, y0 - 1, w0 + 2, h + 2, C.seam); r(x, y0, w0, h, C.frame); r(x + 2, y0 + 2, w0 - 4, h - 4, C.glass);
+      const w = { x: x + 2, y: y0 + 2, w: w0 - 4, h: h - 4, on: R() < .5, warm: pick(R, ['#e8b860', '#f2c870', '#d89a50', '#e8a868', '#7aa8c0']), curtain: R() < .5 };
       STREET.windows.push(w);
-      if (w.ac && fy === 46 && x > 120) { r(x + 2, fy + 46, 17, 10, '#cfcbd8'); r(x + 2, fy + 46, 17, 1, '#e8e4f0'); for (let i = 0; i < 4; i++) r(x + 4, fy + 48 + i * 2, 9, 1, '#8a849a'); r(x + 14, fy + 49, 4, 4, '#8a849a'); }
-      if (w.plants) { r(x - 1, fy + 40, 5, 3, '#9a4a3a'); r(x, fy + 37, 3, 3, '#4a8a52'); p(x + 1, fy + 36, '#e05a7a'); }
-    }
-    // окна лестницы над входом
-    for (const y of [-10, 52]) { r(STREET_DOOR_X - 7, y - 1, 15, 22, '#4a3f62'); r(STREET_DOOR_X - 5, y + 1, 11, 18, '#3a3450'); r(STREET_DOOR_X - 5, y + 9, 11, 1, '#4a3f62'); }
-    // вход: козырёк, табличка с номером подъезда, старая дверь (до ремонта), сломанный домофон, ступени
-    const dx = STREET_DOOR_X;
-    r(dx - 32, 126, 64, 6, '#8f86a8'); r(dx - 32, 126, 64, 1, '#b0a8c8'); r(dx - 32, 132, 64, 2, '#2c2540');
-    r(dx - 4, 117, 9, 7, '#2e64ad'); r(dx - 4, 117, 9, 1, '#5a8ad0'); g.fillStyle = '#f4f3ee'; g.font = '8px ' + FONT; g.textBaseline = 'top'; g.textAlign = 'center'; g.fillText('1', dx + 1, 117); g.textAlign = 'left';
-    r(dx - 15, 138, 30, 48, '#1b1626'); r(dx - 13, 140, 13, 46, '#6a4a3a'); r(dx + 1, 141, 12, 45, '#5a3e30');
-    r(dx - 11, 143, 9, 14, '#1a1424'); r(dx + 3, 143, 8, 14, '#2a2a3a'); p(dx + 5, 146, '#8a849a'); p(dx + 8, 150, '#8a849a');
-    for (let y = 160; y < 186; y += 4) r(dx - 13, y, 13, 1, '#5a3e30'); r(dx - 4, 165, 3, 3, '#c9a95a');
-    r(dx - 10, 172, 6, 1, '#b8443f'); r(dx - 9, 174, 4, 1, '#b8443f');                     // граффити на двери
-    r(dx + 18, 152, 5, 9, '#1b1f27'); r(dx + 19, 153, 3, 2, '#2a3030'); for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) p(dx + 19 + j * 2, 156 + i * 2, '#5a6270');
-    r(dx - 20, 186, 40, 3, '#8a809e'); r(dx - 24, 189, 48, 3, '#7a7090'); r(dx - 20, 186, 40, 1, '#a59cbc');
-    // объявления у двери
-    r(dx - 26, 148, 5, 7, '#d8d2bf'); r(dx - 25, 150, 3, 1, '#7a7466'); r(dx - 25, 152, 3, 1, '#7a7466'); r(dx - 26, 158, 5, 7, '#c9d6e6'); r(dx - 25, 147, 3, 1, 'rgba(220,206,150,.8)');
-    // земля: тротуар, бордюр, асфальт с трещинами и лужами, опавшие листья
-    r(0, 186, W, 26, '#55466a'); for (let i = 0; i < 180; i++) p(R() * W, 188 + R() * 22, pick(R, ['#4e4064', '#5e4e74', '#46395a']));
-    r(0, 186, W, 1, '#8a78a0');
-    r(0, 210, W, 2, '#8a809e'); r(0, 212, W, H + STREET_UP - 212, '#3b3049');
-    for (let i = 0; i < 60; i++) r(R() * W, 214 + R() * 70, 4 + R() * 10, 1, '#332a42');
-    for (const [px, py, pw] of [[120, 200, 26], [250, 220, 30]]) { r(px, py, pw, 3, '#2c2a4a'); r(px + 3, py + 1, pw / 3, 1, '#6a5f8e'); }
-    for (let i = 0; i < 40; i++) p(R() * W, 188 + R() * 26, pick(R, ['#c4622f', '#e8913a', '#b8562e']));
+      w.mx = x + 14; w.my = y0 + Math.round(h / 3);
+      // потёки под окном
+      for (let k = 0; k < 4; k++) { const sx = x + 4 + R() * 22, l = 6 + R() * 14; for (let j = 0; j < l; j++) if (R() < .8) p(sx, y0 + h + 3 + j, 'rgba(24,32,36,.55)'); }
+      r(x - 2, y0 + h, w0 + 4, 2, C.sill); r(x - 2, y0 + h, w0 + 4, 1, '#8e989c');
+      return w;
+    };
+    for (const cx of ST_WIN) { const w = win(cx, 54, 36, 1); w.grille = R() < .45; }
+    for (const cx of ST_WIN) win(cx, -14, 36, 2);
+    // балконы 2-го этажа: ограждение из профлиста
+    for (const cx of [135, 415, 515]) { r(cx - 22, 6, 44, 18, '#3e4c50'); for (let x = cx - 21; x < cx + 22; x += 3) r(x, 7, 1, 16, '#344246'); r(cx - 23, 5, 46, 2, '#56646a'); r(cx - 24, 24, 48, 3, '#2a3438'); r(cx - 24, 24, 48, 1, '#4a585c'); }
+    // окна лестницы над козырьком
+    for (const y of [-26, 10]) { r(291, y - 1, 18, 34, C.seam); r(292, y, 16, 32, C.frame); r(294, y + 2, 12, 28, '#2a3424'); r(299, y + 2, 1, 28, C.frameD); r(294, y + 15, 12, 1, C.frameD); }
+    // газовая труба вдоль фасада и вводы в стену
+    r(fx + 6, 46, fw - 12, 3, C.gas); r(fx + 6, 46, fw - 12, 1, C.gasL); for (let x = fx + 20; x < fx + fw; x += 40) r(x, 49, 1, 2, '#5a4a20');
+    for (const ix of [fx + 6, 252, 548]) { r(ix, 46, 3, ix === 548 ? 66 : 8, C.gas); r(ix, 46, 1, ix === 548 ? 66 : 8, C.gasL); }
+    r(545, 86, 10, 14, '#8a7a3a'); r(545, 86, 10, 1, '#a8963a'); r(552, 92, 1, 3, '#3a3020');
+    // водосток
+    r(48, 0, 3, 112, '#56626a'); r(48, 0, 1, 112, '#6e7c84'); for (let y = 8; y < 112; y += 26) r(47, y, 5, 1, '#2a3438'); r(46, 108, 7, 4, '#56626a');
+    // козырёк над входом и лампочка под ним
+    r(264, 60, 72, 6, '#56646a'); r(264, 60, 72, 1, '#76848a'); r(264, 66, 72, 2, '#1e282b'); for (let x = 268; x < 334; x += 9) p(x, 67, C.rust);
+    r(298, 68, 4, 3, '#2a3034'); r(299, 71, 2, 2, '#fff1c4');
+    // табличка подъезда
+    r(315, 50, 14, 8, '#2e5a8a'); r(315, 50, 14, 1, '#4a7aaa'); g.fillStyle = '#e8eef4'; g.font = '8px ' + FONT; g.textBaseline = 'top'; g.textAlign = 'center'; g.fillText('1', 322, 50); g.textAlign = 'left';
+    // дверь: крашеная зелёная сталь с ржавчиной, приоткрыта — изнутри свет подъезда
+    r(282, 72, 36, 42, '#1a2226'); r(284, 74, 32, 40, '#2a3424');
+    r(286, 76, 4, 38, '#7a8a4a');
+    r(290, 74, 26, 40, C.door); r(290, 74, 26, 1, C.doorL); r(290, 74, 1, 40, C.doorL); r(315, 74, 1, 40, C.doorD);
+    r(293, 78, 20, 14, C.doorD); r(294, 79, 18, 12, C.door); r(293, 96, 20, 15, C.doorD); r(294, 97, 18, 13, C.door);
+    for (let i = 0; i < 26; i++) p(291 + R() * 24, 76 + R() * 37, R() < .6 ? C.rust : '#4a3a2a');
+    r(292, 92, 3, 5, '#8a9094'); r(292, 92, 3, 1, '#b8bcc0');
+    r(296, 82, 6, 8, '#c8c2b0'); r(297, 84, 4, 1, '#7a7466'); r(297, 86, 3, 1, '#7a7466'); r(304, 99, 7, 9, '#b8c8d4'); r(305, 101, 5, 1, '#6a7a86'); r(305, 103, 4, 1, '#6a7a86');
+    r(300, 108, 6, 1, '#a84a3a'); r(301, 110, 4, 1, '#a84a3a');
+    // домофон с оборванным проводом
+    r(321, 86, 7, 12, '#1a2024'); r(322, 87, 5, 3, '#2a3a40'); for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) p(322 + j * 2 + 1, 91 + i * 2, '#5a6870');
+    line(324, 98, 326, 104, '#1a2024'); line(326, 104, 323, 108, '#1a2024'); p(323, 109, '#c84a3a');
+    // объявления на стене
+    for (const [ax, ay, c] of [[268, 84, '#c8c2b0'], [272, 94, '#b8c8d4'], [266, 99, '#d0c8b4'], [330, 76, '#c8c2b0']]) { r(ax, ay, 6, 8, c); r(ax + 1, ay + 2, 4, 1, '#7a7466'); r(ax + 1, ay + 4, 3, 1, '#7a7466'); }
+    // цоколь с продухами подвала
+    r(fx, 112, fw, 14, C.plinth); r(fx, 112, fw, 1, '#3a4448');
+    for (let i = 0; i < 160; i++) p(fx + R() * fw, 113 + R() * 12, R() < .5 ? '#2e383b' : '#222b2e');
+    STREET.vents = [];
+    for (const vx of [110, 210, 390, 490]) { r(vx, 116, 12, 6, '#0b1012'); for (let k = 0; k < 4; k++) r(vx + 1 + k * 3, 116, 1, 6, '#2a3436'); STREET.vents.push(vx + 6); }
+    // крыльцо: две ступени
+    r(276, 114, 48, 6, '#56626a'); r(276, 114, 48, 1, '#6e7c84'); r(272, 120, 56, 6, '#4a565c'); r(272, 120, 56, 1, '#64727a');
+    // тротуар из плитки, бордюр, асфальт двора с лужами и листьями
+    r(0, 126, SWS, 26, C.walk); for (let y = 126; y < 152; y += 8) r(0, y, SWS, 1, '#232c30'); for (let x = 0; x < SWS; x += 16) for (let y = 126; y < 152; y += 8) r(x + ((y / 8) % 2) * 8, y, 1, 8, '#232c30');
+    for (let i = 0; i < 260; i++) p(R() * SWS, 127 + R() * 24, R() < .5 ? C.walkL : '#262f33');
+    for (let i = 0; i < 6; i++) { let cx = R() * SWS, cy = 128 + R() * 20; for (let k = 0; k < 10; k++) { p(cx | 0, cy | 0, '#1c2428'); cx += R() < .6 ? 1 : 0; cy += R() < .5 ? 1 : 0; } }
+    r(0, 152, SWS, 3, C.curb); r(0, 152, SWS, 1, '#76848c'); r(0, 155, SWS, H - 155, C.road);
+    for (let i = 0; i < 90; i++) r(R() * SWS, 158 + R() * 66, 3 + R() * 9, 1, '#141a1e');
+    STREET.puddles = [[150, 168, 46], [380, 186, 60], [520, 162, 30]];
+    for (const [px, py, pw] of STREET.puddles) { ell(px, py, pw / 2, 3, '#101a20'); ell(px, py, pw / 2 - 3, 2, '#14222a'); }
+    for (let i = 0; i < 70; i++) p(R() * SWS, 128 + R() * 90, pick(R, ['#8a4a26', '#a85a2a', '#6a3a22']));
   });
-  // передний план: фонарь у бордюра (столб между окнами, плафон под плитой второго этажа) и дерево
-  STREET.front = makeCanvas(W, H + STREET_UP, ({ r, g }) => {
-    // осеннее дерево слева
-    r(12, 120, 4, 90, '#3a2420'); r(13, 120, 1, 90, '#4a3028'); r(16, 140, 6, 2, '#3a2420'); r(8, 132, 4, 2, '#3a2420');
-    pxCrown(r, R, 20, 112, 16, 12); pxCrown(r, R, 6, 102, 11, 9); pxCrown(r, R, 26, 98, 10, 8); pxCrown(r, R, 14, 92, 9, 7);
-    for (let i = 0; i < 10; i++) r(2 + R() * 30, 206 + R() * 6, 2, 1, pick(R, AUTUMN));
-    r(89, 92, 2, 118, '#1a1424'); r(90, 92, 1, 118, '#2a2238'); r(87, 205, 6, 5, '#1a1424'); r(89, 92, 15, 2, '#1a1424'); r(99, 94, 9, 3, '#2a2238'); r(100, 94, 7, 1, '#3a3450');
+  // передний план: фонарь на тротуаре и осеннее дерево
+  STREET.front = makeCanvas(SWS, H, ({ r, p }) => {
+    r(20, 40, 5, 112, '#141a1c'); r(21, 40, 1, 112, '#202a2c'); r(24, 70, 8, 2, '#141a1c'); r(14, 62, 6, 2, '#141a1c');
+    const crown = [['#4a2e22', 0], ['#6a3a24', 1], ['#8a4a2a', 2], ['#a85e30', 3]];
+    for (const [cx, cy, rx, ry] of [[24, 34, 22, 16], [6, 46, 12, 10], [40, 44, 13, 10], [22, 18, 14, 10]]) for (const [col, l] of crown)
+      for (let i = 0; i < rx * ry * .9; i++) { const a = R() * Math.PI * 2, d = Math.sqrt(R()), x = cx + Math.cos(a) * rx * d * (1 - l * .12) - l, y = cy + Math.sin(a) * ry * d * (1 - l * .12) - l; r(x | 0, y | 0, 2, 2, col); }
+    // фонарь: столб, кронштейн, плафон
+    r(169, 14, 2, 140, '#12181a'); r(170, 14, 1, 140, '#222c2e'); r(166, 150, 8, 4, '#12181a'); r(169, 12, 18, 2, '#12181a'); r(182, 13, 8, 3, '#222c2e'); r(183, 16, 6, 1, '#fff0c0');
   });
-  STREET.car = makeCanvas(102, 34, ({ r, p }) => {
-    r(4, 14, 96, 13, '#6a2e3a'); r(22, 3, 52, 12, '#6a2e3a'); r(25, 5, 22, 9, '#2a2238'); r(50, 5, 21, 9, '#2a2238'); r(48, 5, 2, 9, '#6a2e3a');
-    r(26, 6, 6, 1, '#4a4060'); r(51, 6, 6, 1, '#4a4060');
-    r(4, 14, 96, 1, '#8a4a52'); r(22, 3, 52, 1, '#8a4a52'); r(4, 20, 96, 1, '#5a2430'); r(48, 15, 1, 11, '#5a2430'); r(40, 18, 4, 1, '#c9cdd6'); r(64, 18, 4, 1, '#c9cdd6');
-    r(96, 16, 4, 4, '#f2d27a'); r(4, 16, 3, 4, '#b8443f'); r(2, 23, 100, 4, '#3a1a24');
-    for (const x of [14, 74]) { r(x - 2, 20, 17, 8, '#3a1a24'); r(x, 21, 13, 13, '#120e1c'); r(x + 4, 25, 5, 5, '#6a6478'); p(x + 6, 27, '#a9a2b8'); }
+  STREET.car = makeCanvas(96, 30, ({ r, p }) => {
+    r(4, 12, 90, 12, '#3a4a5a'); r(22, 3, 48, 10, '#3a4a5a'); r(25, 5, 20, 7, '#16222a'); r(48, 5, 19, 7, '#16222a'); r(46, 5, 2, 8, '#3a4a5a');
+    r(4, 12, 90, 1, '#56687a'); r(22, 3, 48, 1, '#56687a'); r(4, 18, 90, 1, '#2a3846'); r(46, 13, 1, 10, '#2a3846'); r(38, 16, 4, 1, '#8a98a4'); r(60, 16, 4, 1, '#8a98a4');
+    r(90, 14, 4, 3, '#e8d090'); r(4, 14, 3, 3, '#a83a3a'); r(2, 21, 92, 3, '#1a242c');
+    for (const x of [14, 70]) { r(x - 2, 18, 16, 7, '#1a242c'); ell(x + 6, 24, 6, 6, '#0a0e10'); ell(x + 6, 24, 3, 3, '#4a5660'); p(x + 6, 24, '#8a98a4'); }
+    function ell(cx, cy, rx, ry, col) { for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) if (x * x / (rx * rx + .5) + y * y / (ry * ry + .5) <= 1) r(cx + x, cy + y, 1, 1, col); }
   });
-  // вместо снега — падающие листья
-  STREET.snow = Array.from({ length: 26 }, () => ({ x: R() * W, y: R() * H, v: .01 + R() * .015, dx: (R() - .3) * .02, c: pick(R, ['#c4622f', '#e8913a', '#b8562e']) }));
+  STREET.leaves = Array.from({ length: 22 }, () => ({ x: R() * SWS, y: R() * H, v: .008 + R() * .012, dx: (R() - .3) * .02, c: pick(R, ['#8a4a26', '#a85a2a', '#b8642e']) }));
   STREET.built = true;
 }
-function drawStreetFront() {
-  ctx.save(); ctx.translate(0, -STREET_UP); sprite(STREET.front, 0, 0); rect(100, 97, 7, 1, '#fff1b8'); ctx.restore();
-}
-function drawStreet(dt, t) {
+function drawStreetFront(cx = 0) { ctx.save(); ctx.translate(-cx, 0); sprite(STREET.front, 0, 0); ctx.restore(); }
+function drawStreet(dt, t, cx = 0) {
   if (!STREET.built) buildStreet();
-  ctx.save(); ctx.translate(0, -STREET_UP);
+  ctx.save(); ctx.translate(-cx, 0);
   sprite(STREET.bg, 0, 0);
-  if (Math.random() < dt / 700) { const w = pick(Math.random, STREET.windows); w.on = !w.on; }
-  for (const w of STREET.windows) { rect(w.x, w.y, w.w, w.h, w.on ? w.warm : '#2a2440'); if (w.on && w.curtain) rect(w.x, w.y, 5, w.h, shade(w.warm, -35)); rect(w.x + 12, w.y, 2, w.h, '#4a3f62'); rect(w.x, w.y + 11, w.w, 2, '#4a3f62');
-    if (w.on) { ctx.fillStyle = 'rgba(242,198,106,.07)'; ctx.fillRect(w.x - 3, w.y - 3, w.w + 6, w.h + 6); } }
-  sprite(STREET.car, 292, 187);
-  // свет над подъездом и фонарь: тёплые пятна на снегу
+  if (Math.random() < dt / 900) { const w = pick(Math.random, STREET.windows); w.on = !w.on; }
+  for (const w of STREET.windows) {
+    rect(w.x, w.y, w.w, w.h, w.on ? w.warm : '#0f181e');
+    if (w.on) { if (w.curtain) { rect(w.x, w.y, 6, w.h, shade(w.warm, -40)); rect(w.x + w.w - 5, w.y, 5, w.h, shade(w.warm, -40)); } rect(w.x, w.y, w.w, 1, shade(w.warm, -25)); }
+    else { rect(w.x + 2, w.y + 2, 4, 1, '#22323a'); rect(w.x + 2, w.y + 3, 1, 3, '#22323a'); }
+    rect(w.mx, w.y, 2, w.h, '#8e9894'); rect(w.x, w.my, w.w, 2, '#8e9894');
+    if (w.grille) { for (let x = w.x; x < w.x + w.w; x += 4) rect(x, w.y - 1, 1, w.h + 2, '#151c20'); rect(w.x - 1, w.y + 6, w.w + 2, 1, '#151c20'); rect(w.x - 1, w.y + w.h - 6, w.w + 2, 1, '#151c20'); }
+  }
+  // окна лестницы светятся тем же оливковым светом, что внутри подъезда (лампы мигают)
+  const sf = Math.sin(t / 97) > -.8 ? 1 : .3;
+  for (const y of [-24, 12]) { rect(294, y, 12, 28, sf > .5 ? '#8a9258' : '#3a4430'); rect(299, y, 1, 28, '#5e6866'); rect(294, y + 13, 12, 1, '#5e6866'); }
+  sprite(STREET.car, 470, 158);
+  // свет: лампа над дверью, фонарь, окна; отражения в лужах
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
-  const lamp = (x, y, rad, a) => { const gr = ctx.createRadialGradient(x, y, 1, x, y, rad); gr.addColorStop(0, `rgba(255,214,140,${a})`); gr.addColorStop(1, 'rgba(255,190,110,0)'); ctx.fillStyle = gr; ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2); };
-  const flick = Math.sin(t / 53) > -.9 ? 1 : .4;
-  lamp(STREET_DOOR_X, 136, 46, .32 * flick); lamp(STREET_DOOR_X, 196, 40, .16 * flick); lamp(103, 99, 28, .32); lamp(103, 204, 44, .14);
+  const glow = (x, y, rad, a, c = '255,200,120') => { const gr = ctx.createRadialGradient(x, y, 1, x, y, rad); gr.addColorStop(0, `rgba(${c},${a})`); gr.addColorStop(1, `rgba(${c},0)`); ctx.fillStyle = gr; ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2); };
+  const fl = Math.sin(t / 53) > -.88 ? 1 : .35;
+  glow(300, 72, 42, .30 * fl); glow(300, 130, 40, .14 * fl); glow(288, 96, 16, .16, '170,190,110');
+  glow(186, 18, 26, .38); glow(186, 140, 70, .16);
+  for (const w of STREET.windows) if (w.on && w.y > 40) glow(w.x + w.w / 2, w.y + w.h + 6, 22, .07);
+  for (const [px, py, pw] of STREET.puddles) { ctx.fillStyle = 'rgba(255,200,120,.10)'; ctx.fillRect(px - pw / 2 + 6, py - 1, pw - 12, 1); ctx.fillStyle = 'rgba(140,190,210,.08)'; ctx.fillRect(px - pw / 2 + 3, py + 1, pw - 6, 1); }
   ctx.restore();
-  rect(STREET_DOOR_X - 3, 135, 6, 2, flick > .5 ? '#fff1b8' : '#6b6a5a'); 
+  rect(299, 71, 2, 2, fl > .5 ? '#fff1c4' : '#6b6a5a');
+  // из продухов подвала поднимается сырой пар
+  for (const vx of STREET.vents) for (let i = 0; i < 3; i++) { const k = (t / 2600 + i / 3 + vx * .01) % 1; ctx.globalAlpha = Math.sin(k * Math.PI) * .22; rect(Math.round(vx - 3 + Math.sin(t / 500 + i + vx) * 3), Math.round(116 - k * 22), 6, 2, '#9ab0a0'); }
+  ctx.globalAlpha = 1;
   ctx.restore();
-  for (const s of STREET.snow) { s.y += s.v * dt; s.x += s.dx * dt + Math.sin(t / 400 + s.y / 20) * .15; if (s.y > H) { s.y = -2; s.x = Math.random() * W; } rect(Math.round(s.x), Math.round(s.y), 2, 1, s.c); }
+  for (const s of STREET.leaves) { s.y += s.v * dt; s.x += s.dx * dt + Math.sin(t / 400 + s.y / 20) * .15; if (s.y > H) { s.y = -2; s.x = Math.random() * SWS; } rect(Math.round(s.x - cx * .2) % W, Math.round(s.y), 2, 1, s.c); }
 }
