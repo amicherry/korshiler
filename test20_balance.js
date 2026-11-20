@@ -3,7 +3,7 @@
 const {chromium}=require('playwright'); const fs=require('fs');
 (async()=>{ const b=await chromium.launch(); const pg=await b.newPage({viewport:{width:1200,height:675}}); const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
  await pg.route('**/fonts.googleapis.com/**', r=>r.abort());
- await pg.addInitScript({content: fs.readFileSync('widefont.js','utf8')+`;localStorage.setItem('d67_lang','ru');localStorage.setItem('d67_save', JSON.stringify({created:true,seenIntro:true,name:'Bot',look:{},coins:0,tours:{},trust:{}}));`});
+ await pg.addInitScript({content: fs.readFileSync('widefont.js','utf8')+`;localStorage.setItem('d67_lang','ru');localStorage.setItem('d67_save', JSON.stringify({created:true,seenIntro:true,racIntro:true,name:'Bot',look:{},coins:0,tours:{},trust:{}}));`});
  await pg.goto('file://'+process.cwd()+'/index.html?stable'); await pg.waitForTimeout(1600);
  const NOISE=+(process.env.NOISE||0), WALK=+(process.env.WALK||1), RUNS=+(process.env.RUNS||24);
  const res = await pg.evaluate(async([NOISE,WALK,RUNS])=>{
@@ -30,7 +30,7 @@ const {chromium}=require('playwright'); const fs=require('fs');
              if (['yes','no','online','renter'].includes(r.status)) continue;
              if (sc.minute >= sc.end || sc.goalMet()) break;
              walk(sc.hero.x, DOOR_X[r.d], fl - sc.hero.floor); sc.hero.floor = fl; sc.hero.y = sc.base(fl); sc.hero.x = DOOR_X[r.d] - 23;
-             R0 = r; sc.walkTo = async x => { sc.hero.x = x; }; await sc.visit(r); sc.busy = false; DLG.open = false; sc.tickCouncil();
+             R0 = r; sc.walkTo = async x => { sc.hero.x = x; }; await sc.visit(r); sc.busy = false; DLG.open = false; sc.tickCouncil(); sc.tickOnline();
            }
          }
          pass++; if (rac > 0) { rac--; sc.busy = false; sc.useRaccoon(); }

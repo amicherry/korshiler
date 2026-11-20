@@ -235,42 +235,6 @@ scenes.creator = {
 };
 
 /* ============================================================
-   СЦЕНА: пролог
-   ============================================================ */
-scenes.prologue = {
-  enter() {
-    this.t = 0; this.hx = -20; this.goal = 150; this.dir = 1; setTouch({ act: L(UI.next) });
-    this.run();
-  },
-  focus() { return { x: W / 2, y: 150 }; },
-  async run() {
-    await new Promise(r => { this.arrived = r; });
-    dlgOpen('E-KNOT', () => EKNOT_PORT, 900);
-    await say(L(UI.pushOSI));
-    dlgOpen(SAVE.name, e => portrait(SAVE.look, e), 420);
-    await say(L(UI.heroIntro1), 'sad');
-    await say(L(UI.heroIntro2).replace('{g}', TOURS.L1.goal).replace('{n}', APTS), 'happy');
-    dlgClose();
-    SAVE.seenIntro = true; persist();
-    this.goal = STREET_DOOR_X; await new Promise(r => { this.arrived = r; });
-    irisTo(STREET_DOOR_X, 160, () => go('tour', { tour: 'L1' }));
-  },
-  update(dt) {
-    this.t += dt; dlgUpdate(dt);
-    const d = this.goal - this.hx;
-    if (Math.abs(d) > .5) { this.hx += Math.sign(d) * Math.min(Math.abs(d), dt * .07); this.moving = true; }
-    else if (this.moving) { this.moving = false; const a = this.arrived; this.arrived = null; a && a(); }
-  },
-  draw(dt) {
-    drawStreet(dt, this.t);
-    const fr = this.moving ? 'walk' + (Math.floor(this.t / 95) % 8) : 'idle' + (Math.floor(this.t / 500) % 2);
-    sprite(personSprite(SAVE.look, fr), Math.round(this.hx) - 9, STREET_GROUND - PH);
-    drawStreetFront();
-    dlgDraw();
-  },
-};
-
-/* ============================================================
    СЦЕНА: ТУР — обход подъезда
    ============================================================ */
 function hashStr(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
@@ -321,6 +285,14 @@ scenes.tour = {
     this.res = makeResidents(tour, hashStr(USER.userId + tour.id) + (SAVE.tours[tour.id]?.tries || 0));
     // каждый сделанный ремонт — доверие к председателю: соседи видят результат
     const repaired = Math.min(5, HOUSE_STATE.fixed.length); for (const r of Object.values(this.res)) r.mood += repaired * 4;
+    // кто-то откажет сразу на пороге (ворчуны — чаще); ремонты делают отказников реже
+    // с собрания 2 (есть E-KNOT) часть соседей сама голосует в приложении — «за» или «против»
+    const RR = rng(hashStr(USER.userId + tour.id) + 77 + (SAVE.tours[tour.id]?.tries || 0)), app = tour.n >= 2;
+    for (const r of Object.values(this.res)) {
+      if (!r.A.renter && RR() < (REFUSE[r.arch] || 0) * (1 - repaired * .1)) r.refuser = true;
+      if (app && r.A.onlineOk && RR() < .16) r.selfAt = tour.start + tour.duration * (.08 + RR() * .8);
+    }
+    this.app = app && !!SAVE.racIntro; this.onYes = 0; this.onNo = 0; this.onFlash = 0;
     const R = rng(hashStr(USER.userId) + 9);
     this.doorLook = {}; for (let apt = 1; apt <= tour.floors * tour.perFloor; apt++) this.doorLook[apt] = pick(R, DOOR_STYLES);
     this.doorLook[tour.heroApt] = { col: '#2f6f62', kind: 'metal' };
@@ -329,7 +301,7 @@ scenes.tour = {
     const hf = Math.ceil(tour.heroApt / tour.perFloor);
     this.hero = { x: DOOR_X[(tour.heroApt - 1) % tour.perFloor] + 20, floor: hf, y: floorBase(hf, tour.floors), dir: -1, walkT: 0, moving: false, climb: null, knockT: 0 };
     this.minute = tour.start; this.end = tour.start + tour.duration;
-    this.events = []; this.raccoon = tour.raccoon; this.broadcasts = 0; this.remoteShown = 0; this.busy = false; this.ballot = false; this.goalShown = false; this.over = false;
+    this.events = []; this.raccoon = SAVE.racIntro ? tour.raccoon : 0; this.broadcasts = 0; this.remoteShown = 0; this.busy = false; this.ballot = false; this.goalShown = false; this.over = false;
     this.camY = clamp(this.hero.y - 165, 0, this.WH - H); this.camX = clamp(this.hero.x - W / 2, 0, SW - W);
     this.talker = { floor: tour.talkerFloor, x: 95, done: false, look: { skin: '#d6a07a', hair: 'short', hairCol: '#3a2a20', top: 'hoodie', topCol: '#3b3f55', pants: '#2b2a33', hat: 'cap', capCol: '#3f6f8c', beard: true } };
     this.helper = { state: 'hidden', floor: 2, x: 397, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
@@ -341,7 +313,8 @@ scenes.tour = {
     // повестка собрания: какая жалоба и сколько подписей нужно
     const runId = this.runId = (this.runId || 0) + 1, here = () => scene === scenes.tour && this.runId === runId && !this.over;
     setTimeout(() => { if (!here()) return; toast(L(UI.meetingT).replace('{n}', tour.n), L(UI.meetingB).replace('{t}', L(tour.title)).replace('{r}', ruleText(tour)), 5200);
-      if (tour.n === 1) setTimeout(() => here() && toast('E-KNOT', L(UI.tutTap)), 4600); }, 500);
+      if (tour.n === 1) setTimeout(() => here() && toast('E-KNOT', L(UI.tutTap)), 4600);
+      if (tour.n >= 2 && !SAVE.racIntro) setTimeout(() => here() && this.racIntro(), 5400); }, 500);
   },
   focus() { return { x: this.hero.x - this.camX, y: this.hero.y - this.camY - 14 }; },
   signatures() { return Object.values(this.res).filter(r => r.status === 'yes').length; },
@@ -355,11 +328,36 @@ scenes.tour = {
   goalLikely() { const pend = Object.values(this.res).filter(r => r.status === 'online').length; return voteOutcome(this.tour, this.votes() + pend, this.against()).ok; },
   // игровой день 1…60: время тура растянуто на 60 дней
   day() { const T = this.tour; return clamp(Math.floor((this.minute - T.start) / T.duration * T.days) + 1, 1, T.days); },
-  async intro2() {
-    this.busy = true; await wait(500);
-    dlgOpen('E-KNOT', () => EKNOT_PORT, 900);
-    await say(L(UI.t2intro1)); await say(L(UI.t2intro2)); await say(L(UI.t2intro3));
-    dlgClose(); this.busy = false;
+  // после первого собрания сосед рассказывает про приложение E-KNOT и енота
+  async racIntro() {
+    if (this.busy || DLG.open) return setTimeout(() => scene === this && !this.over && !SAVE.racIntro && this.racIntro(), 1500);
+    this.busy = true; this.plan = null;
+    const look = ARCH.student.look, h = this.hero, side = h.x + 26 < WALK_MAX ? 1 : -1;
+    this.racNpc = { x: h.x + side * 26, floor: h.floor, look }; h.dir = side;
+    dlgOpen('Данияр', e => portrait(look, e), ARCH.student.voice);
+    await say(L(PRO.rac1), 'happy'); await say(L(PRO.rac2)); await say(L(PRO.rac3), 'think');
+    dlgOpen('E-KNOT', () => RACCOON_PORT, 900); await say(L(PRO.racGot), 'happy'); dlgClose();
+    SAVE.racIntro = true; persist(); this.app = true; this.raccoon = this.tour.raccoon; this.busy = false; this.racNpc.leaving = 1;
+  },
+  // обещал проголосовать онлайн: голос придёт позже, через несколько игровых дней
+  goOnline(r, via) { r.status = 'online'; r.onlineAt = this.minute + 4 + Math.random() * this.tour.duration * .25; this.events.push({ t: 'online', apt: r.apt, via }); },
+  onlineVote(r, yes) {
+    r.status = yes ? 'yes' : 'no'; r.viaApp = true; this.onFlash = 700;
+    this.events.push({ t: yes ? 'yes' : 'no', apt: r.apt, via: 'online' });
+    if (yes) this.onYes++; else this.onNo++;
+    if (this.hero.floor === r.floor) pop(DOOR_X[r.d], this.base(r.floor) - 70, yes ? '+1 E-KNOT' : '−1 E-KNOT', yes ? '#7fc4a8' : '#e88a7a');
+    if (yes) this.checkGoal(300);
+  },
+  // онлайн-голоса приходят по ходу собрания — счётчик в HUD меняется
+  tickOnline() {
+    const m = this.minute;
+    for (const r of Object.values(this.res)) {
+      if (r.status === 'online' && m >= r.onlineAt) { const k = Math.random(), py = r.arch === 'night' ? .9 : .82;
+        if (k < py) this.onlineVote(r, true); else if (k < py + .06) this.onlineVote(r, false); else { r.status = 'thinking'; r.onlineAt = null; } }
+      else if (this.app && r.selfAt && m >= r.selfAt) { r.selfAt = null;
+        if (!['unknown', 'away', 'noanswer', 'thinking'].includes(r.status)) continue;
+        if (r.mood >= 40 && !r.refuser) this.onlineVote(r, true); else if (r.mood < 28 || r.refuser) this.onlineVote(r, false); }
+    }
   },
   addTime(m) { this.minute += m; },
   base(f) { return floorBase(f, this.tour.floors); },
@@ -393,7 +391,7 @@ scenes.tour = {
       const now = Math.floor(this.remoteShown); if (now > before && now % 5 === 0) pop(this.hero.x, this.hero.y - 62, '+5 E-KNOT', '#7fc4a8');
       this.checkGoal(); }
     if (this.minute >= this.end && !this.busy) { this.finish(true); return; }
-    this.tickCouncil();
+    this.tickCouncil(); this.tickOnline(); if (this.onFlash > 0) this.onFlash -= dt;
     // помощница возвращается с результатом
     if (this.helper.state === 'busy' && this.minute >= this.helper.doneAt) this.helperDone();
     if (this.helper.state === 'hidden' && this.signatures() >= T.helperAfter) this.helper.state = 'shown';
@@ -571,11 +569,12 @@ scenes.tour = {
     if (A.renter) { await say(Ln('greet')); r.status = 'renter'; return this.endVisit(r); }
     if (r.status === 'yes') { await say(L(GENERIC.already), 'happy'); return this.endVisit(r); }
     if (r.status === 'no') { await say(L(GENERIC.againNo), 'angry'); return this.endVisit(r); }
+    if (r.refuser) { const v = PRO.refuse[(r.apt + r.v) % PRO.refuse.length]; sfx.no(); await say(L(v), 'angry'); r.status = 'no'; this.events.push({ t: 'no', apt: r.apt, via: 'door' }); return this.endVisit(r); }
     if (r.status === 'thinking') { r.mood += 4; await say(Ln('again')); } else await say(Ln('greet'), r.mood < 30 ? 'angry' : 'neutral');
     const hero = e => portrait(SAVE.look, e);
     for (let round = 0; round < 3; round++) {
       const menu = [{ label: L(UI.cExplain), k: 'explain' }, { label: L(UI.aFacts), k: 'facts' }, { label: L(UI.aBenefit), k: 'benefit' }, { label: L(UI.aNeighbors), k: 'neighbors' },
-        { label: L(UI.aOnline), k: 'online' }, { label: L(UI.cListen), k: 'listen', dim: r.listened }, { label: L(UI.cLater), k: 'later' }];
+        { label: L(UI.aOnline), k: 'online' }, { label: L(UI.cListen), k: 'listen', dim: r.listened }, { label: L(UI.cLater), k: 'later' }].filter(m => m.k !== 'online' || this.app);
       const c = menu[await ask(menu)].k;
       if (c === 'later') { await say(L(GENERIC.bye)); if (r.status !== 'yes') r.status = 'thinking'; return this.endVisit(r); }
       // реплика героя
@@ -586,7 +585,7 @@ scenes.tour = {
       DLG.port = swap; DLG.name = swapName; DLG.voice = A.voice; DLG.mood = swapMood;
       if (c === 'online') {
         this.addTime(.5);
-        if (A.onlineOk) { r.status = 'online'; await say(Ln('online'), 'happy'); this.events.push({ t: 'online', apt: r.apt }); return this.endVisit(r); }
+        if (A.onlineOk) { this.goOnline(r, 'door'); await say(Ln('online'), 'happy'); return this.endVisit(r); }
         r.mood += A.likes.online; await say(Ln('noOnline'), 'angry');
       } else if (c === 'listen') {
         this.addTime(3);
@@ -667,20 +666,21 @@ scenes.tour = {
   },
   /* ---- енот: рассылка в E-KNOT ---- */
   useRaccoon() {
-    if (this.busy) return;
+    if (this.busy || !this.app) return;
     if (this.raccoon <= 0) { toast(L(UI.raccoon), L(UI.noRaccoon), 2400); return; }
     this.raccoon--; this.racAnim = { t: 0 }; beep(988, .06, 'square', .04); beep(1318, .1, 'square', .04, .08);
     let n = 0;
     // уведомление доходит до всех, но откликаются те, кто уже пользуется приложением и не против
     const R = rng(hashStr(USER.userId) + Math.floor(this.minute));
     for (const r of Object.values(this.res)) {
-      if (r.A.renter) { if (!['online', 'yes'].includes(r.status) && !r.ownerAsked && R() < .55) { r.ownerAsked = true; r.status = 'online'; this.events.push({ t: 'online', apt: r.apt, via: 'owner' }); n++; } continue; }
-      if (!r.A.onlineOk) continue;
+      const fatigue = Math.pow(.6, this.broadcasts) * (r.pinged ? .4 : 1); r.pinged = true;
+      if (r.A.renter) { if (!['online', 'yes'].includes(r.status) && !r.ownerAsked && R() < .5 * fatigue) { r.ownerAsked = true; this.goOnline(r, 'owner'); n++; } continue; }
+      if (!r.A.onlineOk || r.refuser) continue;
       // чем больше соседей уже проголосовало, тем охотнее откликаются на рассылку («уже 30 соседей за»)
-      const social = Math.min(.35, this.signatures() / APTS * .8);
-      const chance = { away: .75, noanswer: .75, thinking: r.mood >= 35 ? .7 : .2, unknown: .4 + social }[r.status] || 0;
+      const social = Math.min(.3, this.signatures() / APTS * .7);
+      const chance = ({ away: .6, noanswer: .6, thinking: r.mood >= 35 ? .6 : .15, unknown: .25 + social }[r.status] || 0) * fatigue;
       if (R() >= chance) continue;
-      r.status = 'online'; this.events.push({ t: 'online', apt: r.apt, via: 'raccoon' }); n++;
+      this.goOnline(r, 'raccoon'); n++;
     }
     this.events.push({ t: 'broadcast' }); this.broadcasts++;
     setTimeout(() => toast(L(UI.raccoonT), L(UI.raccoonB) + ' (+' + n + ')'), 900);
@@ -692,7 +692,8 @@ scenes.tour = {
     if (timeUp) toast('E-KNOT', L(UI.timeUp), 2000);
     // онлайн-подписи приходят к концу тура
     for (const r of Object.values(this.res)) if (r.status === 'online') {
-      if (Math.random() < (r.arch === 'night' ? .9 : .82)) { r.status = 'yes'; this.events.push({ t: 'yes', apt: r.apt, via: 'online' }); } else r.status = 'thinking';
+      const k = Math.random(), py = r.arch === 'night' ? .9 : .82;
+      if (k < py) { r.status = 'yes'; this.events.push({ t: 'yes', apt: r.apt, via: 'online' }); } else if (k < py + .06) { r.status = 'no'; this.events.push({ t: 'no', apt: r.apt, via: 'online' }); } else r.status = 'thinking';
     }
     let result;
     try { result = await API.tourFinish(this.run, this.events); }
@@ -764,6 +765,12 @@ scenes.tour = {
       const x = tk.x + (tk.leaving ? tk.leaving * .05 : 0);
       if (!tk.leaving || tk.leaving < 1400) sprite(personSprite(tk.look, tk.leaving ? 'walk' + (Math.floor(tk.leaving / 95) % 8) : ['idle0', 'idle1'][Math.floor(t / 600) % 2]), x - 9, this.base(tk.floor) - PH - cy, !tk.leaving && h.x < x);
     }
+    // Данияр рассказывает про E-KNOT и уходит
+    if (this.racNpc) { const n = this.racNpc; if (n.leaving) n.leaving += dt;
+      if (n.leaving > 1600) this.racNpc = null;
+      else { ctx.globalAlpha = n.leaving ? clamp(1 - (n.leaving - 1000) / 600, 0, 1) : 1;
+        sprite(personSprite(n.look, n.leaving ? 'walk' + (Math.floor(n.leaving / 95) % 8) : 'idle' + (Math.floor(t / 600) % 2)), n.x + (n.leaving ? n.leaving * .05 : 0) - 9, this.base(n.floor) - PH - cy, !n.leaving && h.x < n.x);
+        ctx.globalAlpha = 1; } }
     // помощница
     if (this.helper.state === 'shown') {
       const hb = this.base(this.helper.floor) - cy;
@@ -838,8 +845,12 @@ scenes.tour = {
     // обещали подписать онлайн в E-KNOT — придут к концу собрания, показываем отдельно, чтобы итог не был сюрпризом
     const pend = Object.values(this.res).filter(r => r.status === 'online').length;
     if (pend) text(L(UI.hudOnline).replace('{n}', pend), 132, 22, { col: '#7fc4a8', size: 6, shadow: '#0b0c10' });
+    // онлайн-голоса из E-KNOT: «за» и «против», пришедшие в приложении — меняются по ходу собрания
+    if (this.app) { const ox = ONLINE_HUD_X, fl = this.onFlash > 0 && Math.floor(this.onFlash / 120) % 2;
+      rect(ox, 4, 6, 11, fl ? '#f4f3ee' : '#7fc4a8'); rect(ox + 1, 5, 4, 7, '#0e111c'); rect(ox + 2, 13, 2, 1, '#0e111c');
+      text('+' + this.onYes, ox + 9, 3, { col: '#4caf6e', size: 6 }); text('−' + this.onNo, ox + 9, 11, { col: this.onNo ? '#e88a7a' : '#8792ad', size: 6 }); }
     if (button(L(UI.ballot), 0, 1, 'dark', { left: 244 }) && !this.busy && !DLG.open) this.ballot = !this.ballot;
-    if (button(`${L(UI.raccoon)}×${this.raccoon}`, 0, 1, this.raccoon ? 'alt' : 'off', { left: 330 })) this.useRaccoon();
+    if (this.app) { if (button(`${L(UI.raccoon)}×${this.raccoon}`, 0, 1, this.raccoon ? 'alt' : 'off', { left: 330 })) this.useRaccoon(); }
     text(`${this.hero.floor}${L(UI.floor)}`, 8, 22, { col: '#f4f3ee', shadow: '#0b0c10', size: 6 });
     if ((this.goalMet() || this.goalLikely()) && !this.busy && !DLG.open) { if (button(L(UI.finish), W / 2, 30, 'primary')) this.finish(false); }
   },
@@ -875,6 +886,8 @@ scenes.tour = {
     if (button(L(UI.close), W / 2, T.remote ? 190 : 188, 'alt')) this.ballot = false;
   },
 };
+const REFUSE = { grump: .4, business: .15, night: .1, student: .06, mom: .04, apa: .04 };
+const ONLINE_HUD_X = 208;
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 function tweenDoor(r, to) { return new Promise(res => { const from = r.door, t0 = performance.now(); (function step() { const k = Math.min(1, (performance.now() - t0) / 260); r.door = lerp(from, to, k); if (k < 1) requestAnimationFrame(step); else res(); })(); }); }
 

@@ -13,7 +13,7 @@ const {chromium}=require('playwright'); const fs=require('fs');
  await pg.mouse.click(600+186, 610+12); await pg.waitForTimeout(400); await shot('b_settings'); await key('Escape');
  await key('Enter'); await pg.waitForTimeout(1200); await pg.fill('#nameInput','Әмина'); await shot('c_creator');
  await pg.evaluate(()=>scenes.creator.done()); await pg.waitForTimeout(1300); await pg.waitForTimeout(1500); await shot('d_prologue');
- for(let i=0;i<40;i++){ await key('Enter'); await pg.waitForTimeout(300); if(await pg.evaluate(()=>scene===scenes.tour)) break; } await pg.waitForTimeout(900);
+ await pg.evaluate(()=>scenes.prologue.finish()); for(let i=0;i<40;i++){ await pg.waitForTimeout(300); if(await pg.evaluate(()=>scene===scenes.tour)) break; } await pg.waitForTimeout(900);
  await pg.evaluate(()=>{ scene.talker.done=true; for(const r of Object.values(scene.res)){ r.status=['yes','no','thinking','away','noanswer','online','unknown'][r.apt%7]; if(r.A.renter) r.status='renter'; } });
  await key('KeyB'); await pg.waitForTimeout(300); await shot('e_ballot'); await key('KeyB');
  await pg.evaluate(()=>{ const r=Object.values(scene.res).find(r=>!r.A.renter); r.status='unknown'; r.away=false; r.knocks=5; scene.hero.floor=r.floor; scene.hero.y=scene.base(r.floor); scene.hero.x=DOOR_X[r.d]-8; });

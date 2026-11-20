@@ -130,7 +130,9 @@ const MockServer = (() => {
       const score = signatures * 100 + online * 20 + (success ? 300 + Math.max(0, Math.round(600 - seconds) * 2) : 0);
       // бюджет: за первую победу на собрании — больше, за повтор — меньше; сверх нормы — доплата за подпись
       const H = house(u.userId), first = success && !H.won.includes(tour.id);
-      const coins = success ? (first ? tour.reward.first : tour.reward.replay) + Math.max(0, own - tour.goal) * tour.reward.perExtra : own * 4;
+      // доплата сверх нормы — только за голоса, собранные лично у дверей, и не больше 10; онлайн и рассылка енота денег не дают
+      const doorYes = [...via.entries()].filter(([a, v]) => vote.get(a) === 'yes' && ['door', 'helper', 'council'].includes(v)).length;
+      const coins = success ? (first ? tour.reward.first : tour.reward.replay) + clamp(doorYes - tour.goal, 0, 10) * tour.reward.perExtra : Math.min(own, tour.goal) * 4;
       if (success && first) H.won.push(tour.id);
       const prof = db.profiles[u.userId] || (db.profiles[u.userId] = {});
       prof.coins = (prof.coins || 0) + coins;
