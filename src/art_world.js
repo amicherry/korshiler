@@ -256,8 +256,9 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
       // двери квартир с номерами и звонками
       for (let d = 0; d < perFloor; d++) {
         const x = DOOR_X[d], apt = (f - 1) * perFloor + d + 1;
-        drawDoorPanel(P, x, b, doorLook(apt));
-        r(x - 7, b - 62, 14, 9, '#1a1d1b'); r(x - 6, b - 61, 12, 7, '#2a302a'); g.fillStyle = '#d8dad6'; g.font = '8px ' + FONT; g.textAlign = 'center'; g.fillText(String(apt), x, b - 61); g.textAlign = 'left';
+        drawDoorPanel(P, x, b, isStorage(apt) ? { col: '#4a4e50', kind: 'metal' } : doorLook(apt));
+        r(x - 7, b - 62, 14, 9, '#1a1d1b'); r(x - 6, b - 61, 12, 7, isStorage(apt) ? '#3a3226' : '#2a302a'); g.fillStyle = isStorage(apt) ? '#d8b878' : '#d8dad6'; g.font = '8px ' + FONT; g.textAlign = 'center'; g.fillText(aptNo(apt), x, b - 61); g.textAlign = 'left';
+        if (isStorage(apt)) { r(x - 5, b - 40, 10, 2, '#2a2c2e'); r(x - 2, b - 42, 4, 6, '#6a6e70'); p(x - 1, b - 40, '#2a2c2e'); }   // навесной замок
         r(x + 16, b - 32, 3, 4, '#d8d2bf'); p(x + 17, b - 31, '#3a3a3a');
       }
       // первый этаж: почтовые ящики и норы крыс (пока подвал не отремонтирован)

@@ -19,7 +19,7 @@ const {chromium}=require('playwright'); const fs=require('fs');
  const r=p && p.payload; console.log(JSON.stringify({...r, events: r && r.events.length}));
  check('результат ушёл в приложение', !!r, true);
  check('поля результата', r && Object.keys(r).filter(k=>k!=='events').sort(), ['apartments','badges','clientVersion','daysLimit','daysUsed','finishedAt','firstWin','game','lang','offline','required','rule','runId','score','startedAt','success','token','tour','tourCode','version','votes'].sort());
- check('тур 2 (повтор) → tour=1, chairman, кворум', r && [r.tour, r.tourCode, r.rule, r.apartments, r.required.turnout], [1,'chairman','quorum_half_plus_one',104,53]);
+ check('тур 2 (повтор) → tour=1, chairman, кворум', r && [r.tour, r.tourCode, r.rule, r.apartments, r.required.turnout], [1,'chairman','quorum_half_plus_one',100,51]);
  check('голоса: 40 за, 19 против, явка 59 → победа, значок уже был', r && [r.votes.yes, r.votes.no, r.votes.turnout, r.success, r.badges], [40,19,59,true,[]]);
  check('токен передан обратно', r && r.token, 'eyJ-test-123');
  // английский

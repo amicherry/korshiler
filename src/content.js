@@ -174,6 +174,7 @@ const UI = {
   rDoor:      { kz: 'Есік алдында қол қойды', ru: 'Подписали у дверей', en: 'Signed at the door' },
   rTotal:     { kz: 'Барлық дауыс', ru: 'Всего голосов', en: 'Total votes' },
   qzLimit:    { kz: 'Викторина үшін монета — күніне 3 рет қана', ru: 'Монеты за викторину — только 3 раза в день', en: 'Quiz coins — only 3 times a day' },
+  storage:   { kz: 'Қойма — ол дауыс бермейді', ru: 'Кладовая — она не голосует', en: 'A storeroom — it doesn\'t vote' },
   hudOnline:  { kz: '+{n} онлайн күтілуде', ru: '+{n} ждём онлайн', en: '+{n} expected online' },
   rAgainst:   { kz: 'Қарсы', ru: 'Против', en: 'Against' },
   rThinking:  { kz: 'Ойланып жүр', ru: 'Думают', en: 'Thinking' },
@@ -374,7 +375,10 @@ const NAMES = {
    Каждый уровень — собрание жильцов по очередной жалобе. Победа на собрании даёт бюджет
    и одобрение ремонта; сам ремонт покупается на карте ЖК. Следующее собрание открывается,
    только когда предыдущая проблема исправлена — перепрыгнуть нельзя. */
-const HOUSE = { floors: 13, perFloor: 8, heroApt: 53 };   // 104 квартиры; герой — 7 этаж
+const HOUSE = { floors: 13, perFloor: 8, heroApt: 53, storage: [5, 6, 7, 8] };   // 104 помещения: 100 квартир + 4 кладовые на 1-м этаже; герой — 7 этаж
+// внутри игры дверь — это «место» 1..104 (этаж и позиция); на табличках — номер квартиры 1..100 или кладовая К1..К4
+const isStorage = slot => HOUSE.storage.includes(slot);
+const aptNo = slot => isStorage(slot) ? 'К' + (HOUSE.storage.indexOf(slot) + 1) : String(slot - HOUSE.storage.filter(s => s < slot).length);
 const TITLES = {
   resident: { kz: 'Тұрғын', ru: 'Житель', en: 'Resident' }, activist: { kz: 'Белсенді', ru: 'Активист', en: 'Activist' },
   chairman: { kz: 'ОСИ төрағасы', ru: 'Председатель ОСИ', en: 'Chairman' }, council: { kz: 'Кеңес мүшесі', ru: 'Член совета', en: 'Council member' },
@@ -467,13 +471,13 @@ const DECOR = [
 ];
 
 /* ---------- туры: решения ОСИ по правилам голосования ----------
-   Дом в игре — 104 квартиры (13 этажей × 8). Пороги — от всех квартир дома:
+   Дом в игре — 104 помещения (13 этажей × 8): 100 квартир и 4 кладовые на 1-м этаже. Кладовые не голосуют, пороги — от 100 квартир:
    0 инициативная группа — 10 % «за»; 1 председатель и 2 совет — явка 50 %+1, из голосовавших 50 %+1 «за»;
    3 тариф — 50 %+1 «за» от всех; 4–5 изменение конструкции — 2/3 «за» от всех.
    Обычный ремонт (свет, дверь, крыша…) голосования не требует — решает председатель.
    Время тура — 60 игровых дней. */
-const APTS = HOUSE.floors * HOUSE.perFloor;                                // 104
-const PCT = { tenth: Math.ceil(APTS * .1), half: Math.floor(APTS / 2) + 1, twoThirds: Math.ceil(APTS * 2 / 3) };   // 11, 53, 70
+const APTS = HOUSE.floors * HOUSE.perFloor - HOUSE.storage.length;          // 100 квартир голосуют, кладовые — нет
+const PCT = { tenth: Math.ceil(APTS * .1), half: Math.floor(APTS / 2) + 1, twoThirds: Math.ceil(APTS * 2 / 3) };   // 10, 51, 67
 const TOUR_DEFS = [
   { code: 'initiative',   rule: 'yes',    goal: PCT.tenth,     duration: 90,  raccoon: 0, hard: 0,   badge: 'initiative_group',
     title: { kz: 'Бастамашыл топ', ru: 'Инициативная группа', en: 'Initiative group' },

@@ -243,7 +243,7 @@ function makeResidents(tour, seed) {
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   // раскладываем по этажам так, чтобы на одном этаже не было двух одинаковых жильцов,
   // а одинаковые типы не скапливались на соседних этажах
-  const apts = []; for (let apt = 1; apt <= tour.floors * tour.perFloor; apt++) if (apt !== tour.heroApt) apts.push(apt);
+  const apts = []; for (let apt = 1; apt <= tour.floors * tour.perFloor; apt++) if (apt !== tour.heroApt && !isStorage(apt)) apts.push(apt);
   const fl = apt => Math.ceil(apt / tour.perFloor);
   let mix = null, bestCost = 1e9;
   for (let attempt = 0; attempt < 40 && bestCost > 0; attempt++) {
@@ -260,7 +260,7 @@ function makeResidents(tour, seed) {
   const seen = {}, vOff = Math.floor(R() * 4);
   const res = {}; let k = 0; const used = new Set();
   for (let apt = 1; apt <= tour.floors * tour.perFloor; apt++) {
-    if (apt === tour.heroApt) continue;
+    if (apt === tour.heroApt || isStorage(apt)) continue;
     const a = mix[k++], A = ARCH[a];
     // у каждого жильца своя внешность и имя по полу и возрасту — не «одна моделька на всех»
     const look = varyLook(a, R), pool = namePool(a, look);
@@ -434,7 +434,7 @@ scenes.tour = {
       } else if (Math.abs(h.x - P.x) > 1.5) dir = Math.sign(P.x - h.x);
       else {
         this.plan = null; h.moving = false;
-        if (P.door) { if (P.door === T.heroApt) toast('E-KNOT', L(UI.yourDoor), 2400); else this.visit(this.res[P.door]); this.updateCam(dt); return; }
+        if (P.door) { if (P.door === T.heroApt) toast('E-KNOT', L(UI.yourDoor), 2400); else if (isStorage(P.door)) toast(aptNo(P.door), L(UI.storage), 2200); else this.visit(this.res[P.door]); this.updateCam(dt); return; }
         if (P.npc) { this.runHelper(); this.updateCam(dt); return; }
         if (P.lift) { this.useLift(); this.updateCam(dt); return; }
       }
@@ -453,6 +453,7 @@ scenes.tour = {
     if (hit('act')) {
       if (npc === 'helper') this.runHelper();
       else if (door === T.heroApt) toast('E-KNOT', L(UI.yourDoor), 2400);
+      else if (door && isStorage(door)) toast(aptNo(door), L(UI.storage), 2200);
       else if (door) this.visit(this.res[door]);
       else if (lift) this.useLift();
     }
@@ -865,7 +866,8 @@ scenes.tour = {
         const apt = (f - 1) * nd + d + 1, x = 66 + d * (cw + 3), r = this.res[apt];
         rect(x, y, cw, ch, '#e2d9c2'); rect(x, y + ch - 1, cw, 1, '#cfc3a5');
         const ty = y + Math.round(ch / 2) - 3;
-        text(String(apt), x + 2, ty, { col: INK, size: 6 });
+        text(aptNo(apt), x + 2, ty, { col: isStorage(apt) ? INK_MUTED : INK, size: 6 });
+        if (isStorage(apt)) { rect(x, y, cw, ch, 'rgba(120,110,90,.18)'); continue; }
         const st = apt === T.heroApt ? 'me' : r.status;
         if (ICONS[st]) sprite(ICONS[st], x + cw - 9, y + Math.round((ch - 9) / 2));
         const nm = apt === T.heroApt ? L(UI.st.me) : (r.status === 'unknown' ? '' : r.name.split(' ')[0]);

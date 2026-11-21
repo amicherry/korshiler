@@ -421,7 +421,7 @@ scenes.prologue = {
     rect(0, 0, W, 15, 'rgba(14,17,28,.88)'); rect(0, 15, W, 1, '#55607c');
     const h = this.h, f = this.homeFloor;
     const obj = this.phase === 'street' ? L(PRO.objHome) : h.floor < f ? L(PRO.objUp) : L(PRO.objDoor);
-    text('★ ' + obj.replace('{a}', this.heroApt).replace('{f}', f), 6, 4, { col: '#f2c94c', size: 6 });
+    text('★ ' + obj.replace('{a}', aptNo(this.heroApt)).replace('{f}', f), 6, 4, { col: '#f2c94c', size: 6 });
     if (this.phase === 'stairs') text(`${h.floor}${L(UI.floor)}`, 6, 20, { col: '#f4f3ee', shadow: '#0b0c10', size: 6 });
     const sw = textW(L(PRO.skip), 6) + 10;
     rect(W - sw - 3, 2, sw, 11, '#3a3946'); text(L(PRO.skip), W - 3 - sw / 2, 4, { col: '#c3c0cf', size: 6, align: 'center' });

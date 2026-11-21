@@ -122,7 +122,7 @@ const MockServer = (() => {
       const seconds = (Date.now() - run.startedAt) / 1000;
       // голос квартиры — последнее её событие «за» или «против»; «за» после «против» — передумал
       const vote = new Map(), via = new Map();
-      for (const e of body.events || []) if ((e.t === 'yes' || e.t === 'no') && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt) {
+      for (const e of body.events || []) if ((e.t === 'yes' || e.t === 'no') && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt && !isStorage(e.apt)) {
         if (e.t === 'no' && vote.get(e.apt) === 'yes') continue;
         vote.set(e.apt, e.t); if (e.t === 'yes') via.set(e.apt, e.via || 'door'); }
       const yesN = [...vote.values()].filter(v => v === 'yes').length, noN = [...vote.values()].filter(v => v === 'no').length;
