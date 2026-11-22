@@ -133,7 +133,7 @@ function drawHouseItem(id, k, t) {
   const A = (a, f) => { if (a <= 0) return; ctx.save(); ctx.globalAlpha = Math.min(1, a); f(); ctx.restore(); };
   switch (id) {
     case 'light': {   // окна лестницы: до — тёмные и мигают, после — зажигаются этаж за этажом снизу вверх
-      for (let f = 0; f < HM.floors; f++) { const y = HM.bottom - (f + 1) * HM.fh + 3, lit = k >= (f + 1) / HM.floors, flick = Math.sin(t / 90 + f * 7) > .6 && f % 3 === 1;
+      for (let f = 3; f < HM.floors; f++) { const y = HM.bottom - (f + 1) * HM.fh + 3, lit = k >= (f + 1) / HM.floors, flick = Math.sin(t / 90 + f * 7) > .6 && f % 3 === 1;
         rect(196, y - 1, 8, 8, lit ? '#f4e6a8' : flick ? '#8a8a66' : '#1f2538'); if (lit) A(.25, () => rect(193, y - 3, 14, 12, '#ffe9a8')); }
       break; }
     case 'door': {    // дверь подъезда: до — старая деревянная, приоткрыта, разбито стекло; после — новая железная со стеклом
@@ -358,10 +358,12 @@ scenes.house = {
     if (!this.anim) for (const id of ids) {
       const st = this.status(id), [cx, cy] = HSPOT[id]; if (st.kind === 'done') continue;
       const pulse = Math.floor(this.t / 350) % 2;
-      const mk = (bg, ch) => { const y = cy - 7 - (pulse ? 1 : 0); rect(cx - 7, y + 1, 14, 14, 'rgba(10,8,20,.5)'); rect(cx - 7, y, 14, 14, '#1b1a21'); rect(cx - 6, y + 1, 12, 12, bg); rect(cx - 6, y + 1, 12, 1, '#fff6c8'); text(ch, cx, y + 3, { align: 'center', col: '#1b1a21' }); };
-      if (st.kind === 'buy') mk(HOUSE_STATE.coins >= st.cost ? '#f2c94c' : '#a99fc8', '!');
-      else if (st.kind === 'vote') mk('#7fc4a8', '?');
-      else if (PROBLEMS.some(p => p.id === id)) { ctx.globalAlpha = .55; rect(cx - 3, cy - 2, 6, 5, '#55607c'); rect(cx - 2, cy - 5, 4, 3, '#55607c'); ctx.globalAlpha = 1; }
+      // маленькая «булавка» с хвостиком, чтобы не закрывать окна; недоступное — приглушено
+      const mk = (bg, ch, ink = '#1a1424') => { const y = cy - 13 - (pulse ? 1 : 0);
+        rect(cx - 5, y + 1, 10, 10, 'rgba(10,8,20,.45)'); rect(cx - 5, y, 10, 10, '#1b1a21'); rect(cx - 4, y + 1, 8, 8, bg); rect(cx - 4, y + 1, 8, 1, 'rgba(255,246,200,.7)');
+        rect(cx - 1, y + 10, 2, 2, '#1b1a21'); rect(cx, y + 12, 1, 1, '#1b1a21'); text(ch, cx, y + 2, { align: 'center', col: ink, size: 6 }); };
+      if (st.kind === 'buy') { if (HOUSE_STATE.coins >= st.cost) mk('#f2c94c', '!'); else mk('#4a4560', '!', '#a99fc8'); }
+      else if (st.kind === 'vote' && !PROBLEMS.some(p => p.id === id && p.kind === 'construction')) mk('#2f4a44', '?', '#7fc4a8');
     }
     // верхняя панель
     rect(0, 0, W, 19, '#0e111c'); rect(0, 19, W, 1, '#55607c');

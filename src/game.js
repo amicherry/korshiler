@@ -992,10 +992,12 @@ scenes.tour = {
         const s = 3 + Math.sin(A.t / 120) * 2; rect(x - s, y - s, s * 2, s * 2, 'rgba(242,201,76,.35)'); text('☎', x, y - 3, { col: '#f2c94c', align: 'center', size: 6 }); }
     } else if (A.kind === 'chat' && A.chat) {   // чат дома: вопрос жителя и ответ ИИ-помощника E-KNOT
       const a = Math.min(1, A.t / 300) * Math.min(1, (4200 - A.t) / 300); ctx.globalAlpha = a;
-      frameBox(70, 80, 260, 66, .96);
-      const q = wrapText(A.chat.q, 200, 6), an = wrapText(A.chat.a, 220, 6);
-      rect(80, 88, Math.min(206, q.reduce((m, l) => Math.max(m, textW(l, 6)), 0) + 10), q.length * 8 + 6, '#3a4a5a'); q.forEach((l, i) => text(l, 85, 91 + i * 8, { col: '#f4f3ee', size: 6 }));
-      if (A.t > 1100) { const y0 = 92 + q.length * 8 + 6; rect(106, y0, 216, an.length * 8 + 6, '#2f8577'); an.forEach((l, i) => text(l, 111, y0 + 3 + i * 8, { col: '#f4f3ee', size: 6 })); text(L(UI.aiName), 322, y0 - 8, { col: '#9fd9c2', size: 6, align: 'right' }); }
+      const q = wrapText(A.chat.q, 190, 6), an = wrapText(A.chat.a, 196, 6), qh = q.length * 8 + 6, ah = an.length * 8 + 6;
+      const y0 = 80, fh = 10 + qh + 12 + ah + 8; frameBox(70, y0, 260, fh, .96);
+      const qw = Math.min(204, q.reduce((m, l) => Math.max(m, textW(l, 6)), 0) + 12);
+      rect(80, y0 + 8, qw, qh, '#3a4a5a'); q.forEach((l, i) => text(l, 86, y0 + 11 + i * 8, { col: '#f4f3ee', size: 6 }));
+      if (A.t > 1100) { const ya = y0 + 8 + qh + 12; text(L(UI.aiName), 320, ya - 9, { col: '#9fd9c2', size: 6, align: 'right' });
+        rect(114, ya, 208, ah, '#2f8577'); an.forEach((l, i) => text(l, 120, ya + 3 + i * 8, { col: '#f4f3ee', size: 6 })); }
       ctx.globalAlpha = 1;
     }
     sprite(RACCOON, rx, ry);
@@ -1017,9 +1019,9 @@ scenes.tour = {
     if (!T.noTimer) { const left = this.end - this.minute, late = left < T.duration * .12;
       text(`${L(UI.day)} ${this.day()}/${T.days}`, 22, 3, { col: late ? '#e98f6f' : '#f4f3ee', size: 6 });
       rect(22, 12, 56, 3, '#2b2a33'); rect(22, 12, Math.round(56 * clamp(left / T.duration, 0, 1)), 3, late ? '#e98f6f' : '#7fc4a8'); }
-    else text(L(UI.noTimerHud), 22, 7, { col: '#8792ad', size: 6 });
-    // «За X / нужно Y», кворум
-    const n = this.votes(), o = this.outcome(), x0 = 84;
+    // «За X / нужно Y», кворум (в туре 1 без таймера — счётчик слева, подпись после него)
+    const n = this.votes(), o = this.outcome(), x0 = T.noTimer ? 22 : 84;
+    if (T.noTimer) text(L(UI.noTimerHud), x0 + textW(`${L(UI.yesShort)} ${n}/${o.need}`, 6) + 10, 7, { col: '#8792ad', size: 6 });
     text(`${L(UI.yesShort)} ${n}/${o.need}`, x0, T.rule === 'quorum' ? 3 : 7, { col: n >= o.need ? '#4caf6e' : '#f2c94c', size: 6 });
     if (T.rule === 'quorum') { const k = clamp(o.turnout / T.quorum, 0, 1); rect(x0, 12, 40, 3, '#2b2a33'); rect(x0, 12, Math.round(40 * k), 3, o.turnout >= T.quorum ? '#4caf6e' : '#9fb0cc');
       text(`${o.turnout}/${T.quorum}`, x0 + 43, 10, { col: '#9fb0cc', size: 6 }); }
@@ -1028,7 +1030,7 @@ scenes.tour = {
       rect(ox, 4, 6, 11, fl ? '#f4f3ee' : '#7fc4a8'); rect(ox + 1, 5, 4, 7, '#0e111c'); rect(ox + 2, 13, 2, 1, '#0e111c');
       text(`E-KNOT ${this.appShare()}%`, ox + 9, 3, { col: '#9fd9c2', size: 6 }); text('+' + this.onYes + ' −' + this.onNo, ox + 9, 11, { col: '#8792ad', size: 6 }); }
     if (button(L(UI.ballot), 0, 1, 'dark', { left: 252 }) && !this.busy && !DLG.open) this.ballot = !this.ballot;
-    if (this.app && button(L(UI.raccoon), 0, 1, this.rac.menu ? 'primary' : 'alt', { left: 338 }) && !this.busy && !DLG.open) this.rac.menu = !this.rac.menu;
+    if (this.app && button(L(UI.raccoon), 0, 1, this.rac.menu ? 'primary' : 'alt', { left: 338 }) && !this.busy && !DLG.open) { this.rac.menu = !this.rac.menu; if (this.rac.menu) toasts.length = 0; }
     const pend = Object.values(this.res).filter(r => r.status === 'online').length, papers = Object.values(this.res).filter(r => r.status === 'paper').length;
     let hy = 22; text(`${this.hero.floor}${L(UI.floor)}`, 8, hy, { col: '#f4f3ee', shadow: '#0b0c10', size: 6 });
     if (pend) text(L(UI.hudOnline).replace('{n}', pend), 84, hy, { col: '#7fc4a8', size: 6, shadow: '#0b0c10' });
@@ -1121,38 +1123,53 @@ scenes.result = {
     // тур 1 — бумажный «Протокол № 1» инициативной группы; туры 2–7 — протокол, сформированный в E-KNOT
     text(ekn ? L(UI.protEkn).replace('{n}', '0' + TT.n) : L(UI.prot1), W / 2, 12, { align: 'center', col: INK_MUTED, size: 6 });
     if (ekn) text(L(UI.protEknSub), W / 2, 20, { align: 'center', col: INK_TEAL, size: 6 });
-    const addr = (USER.complex && USER.complex.name ? USER.complex.name + ' · ' : '') + L(UI.protEntrance) + ' · ' + L(UI.day) + ' ' + (d.day || 1);
-    text(addr, W / 2, 28, { align: 'center', col: INK_MUTED, size: 6 });
-    text(L(UI.protAgenda) + ' ' + tourTitle(TT), 52, 37, { col: INK, size: 6 });
-    text(d.success ? L(TT.winT) : TT.rule === 'quorum' && (d.turnout || 0) < TT.quorum ? L(UI.noQuorum) : L(UI.lose), W / 2, 46, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
-    const need = d.need || TT.goal, src = d.src || {};
-    const rows = [[L(UI.protQuorum), `${d.turnout || 0} / ${APTS}` + (TT.quorum ? ` (≥${TT.quorum})` : ''), TT.quorum ? ((d.turnout || 0) >= TT.quorum ? INK_TEAL : INK_RED) : INK],
-      [L(UI.rTotal), `${d.signatures}/${need}`, d.signatures >= need ? INK_TEAL : INK_RED], [L(UI.rAgainst), String(d.against || 0)], [L(UI.protAbstain), String(d.abstain || 0)], [L(UI.protNotVoted), String(d.notVoted ?? '')]];
+    const addr = L(UI.protEntrance) + ' · ' + L(UI.day) + ' ' + (d.day || 1);
+    if (!ekn) text(addr, W / 2, 20, { align: 'center', col: INK_MUTED, size: 6 });
+    // повестка — одной строкой (длинная сокращается), итог крупно
+    let ag = L(UI.protAgenda) + ' ' + tourTitle(TT); while (textW(ag, 6) > 292 && ag.length > 10) ag = ag.slice(0, -2).trimEnd() + '…';
+    text(ag, W / 2, 30, { align: 'center', col: INK, size: 6 });
+    const quorumFail = TT.rule === 'quorum' && (d.turnout || 0) < TT.quorum;
+    text(d.success ? L(TT.winT) : quorumFail ? L(UI.noQuorum) : L(UI.lose), W / 2, 41, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
+    // четыре цифры: явка, «за», «против», «воздержались»
+    const need = d.need || TT.goal, src = d.src || {}, tw = 70;
+    const tiles = [[L(UI.protQuorum), `${d.turnout || 0}`, TT.quorum ? '≥' + TT.quorum : '/100', TT.quorum ? (quorumFail ? INK_RED : INK_TEAL) : INK],
+      [L(UI.yesShort), String(d.signatures), '≥' + need, d.signatures >= need ? INK_TEAL : INK_RED],
+      [L(UI.rAgainst), String(d.against || 0), '', INK], [L(UI.protAbstain), String(d.abstain || 0), '', INK]];
+    tiles.forEach(([lbl, big, sub, c], i) => { const x = 54 + i * (tw + 4);
+      rect(x, 58, tw, 32, 'rgba(120,100,60,.08)'); rect(x, 58, tw, 1, '#e2d9c2'); rect(x, 89, tw, 1, '#e2d9c2');
+      text(big, x + 5, 61, { col: c }); if (sub) text(sub, x + 7 + textW(big), 63, { col: INK_MUTED, size: 6 });
+      wrapText(lbl, tw - 8, 6).slice(0, 2).forEach((l, k) => text(l, x + 5, 73 + k * 7, { col: INK_MUTED, size: 6 })); });
+    let y = 96;
     const sum = (...k) => k.reduce((a, x) => a + (src[x] || 0), 0);
-    // источники голосов «за»: у дверей, бумага, доверенность, онлайн по каналам Енота
-    const chans = [['door', UI.srcDoor, sum('door', 'helper', 'council')], ['paper', UI.srcPaper, sum('paper')], ['proxy', UI.srcProxy, sum('proxy')],
-      ['online', UI.srcOnline, sum('online', 'owner')], ['notify', UI.rac_notify, sum('notify')], ['call', UI.rac_call, sum('call')], ['redial', UI.rac_redial, sum('redial')], ['chat', UI.rac_chat, sum('chat')]].filter(c => c[2]);
-    rows.forEach(([a, b, c], i) => { const y = 54 + i * 9; text(a, 54, y, { col: INK, size: 6 }); text(b, 346, y, { col: c || INK, align: 'right', size: 6 }); rect(54, y + 7, 292, 1, '#e2d9c2'); });
-    let y = 54 + rows.length * 9 + 2;
-    text(L(UI.protSources), 54, y, { col: INK_MUTED, size: 6 }); y += 9;
-    chans.forEach(([k, lbl, v], i) => { const x = 54 + (i % 2) * 150, yy = y + Math.floor(i / 2) * 8; text(`${L(lbl)}: ${v}`, x, yy, { col: INK, size: 6 }); });
-    y += Math.ceil(chans.length / 2) * 8 + 2;
-    if (ekn) { text(L(UI.protShare).replace('{n}', d.appShare || 0).replace('{m}', 100 - (d.appShare || 0)), 54, y, { col: INK_TEAL, size: 6 }); y += 9; }
-    // подписи: председатель, секретарь, члены совета (с тура 2)
-    if (ekn) { wrapText(L(UI.protSign), 290, 6).forEach(l => { text(l, 54, y, { col: INK_MUTED, size: 6 }); y += 8; }); }
-    else { text(L(UI.protSign1).replace('{n}', d.signatures), 54, y, { col: INK_MUTED, size: 6 }); y += 8; }
-    if (!d.offline) text(`${L(UI.rScore)} ${d.score}${d.newBest ? '★' : ''} · ${this.rank ? '#' + this.rank.rank : '…'}` + (d.coins ? ` · ${L(UI.rBudget)} +${money(d.coins)}` : ''), 54, y, { col: d.newBest ? INK_GOLD : INK, size: 6 });
-    y += 10;
+    if (ekn) {   // доля E-KNOT — полосой
+      const sh = clamp(d.appShare || 0, 0, 100), bw0 = 292, wE = Math.round(bw0 * sh / 100);
+      text('E-KNOT ' + sh + ' %', 54, y, { col: INK_TEAL, size: 6 }); text(L(UI.srcDoor) + ' ' + (100 - sh) + ' %', 346, y, { col: '#8a6a3a', size: 6, align: 'right' });
+      rect(54, y + 9, bw0, 5, '#d9c9a3'); rect(54, y + 9, wE, 5, '#2e8a76'); y += 20;
+    }
+    // источники «за» — одна-две короткие строки
+    const chans = [[UI.srcDoor, sum('door', 'helper', 'council')], [UI.srcPaper, sum('paper')], [UI.srcProxy, sum('proxy')], [UI.srcOnline, sum('online', 'owner')],
+      [UI.rac_notify, sum('notify')], [UI.rac_call, sum('call')], [UI.rac_redial, sum('redial')], [UI.rac_chat, sum('chat')]].filter(c => c[1]).map(([l, v]) => L(l) + ' ' + v);
+    // раскладываем по строкам целыми кусками, без «·» на конце строки
+    const cl = [''];
+    for (const c of chans) { const cur = cl[cl.length - 1], nx = cur ? cur + '  ·  ' + c : c; if (textW(nx, 6) > 292 && cur) cl.push(c); else cl[cl.length - 1] = nx; }
+    if (chans.length) cl.slice(0, 2).forEach(l => { text(l, 54, y, { col: INK_MUTED, size: 6 }); y += 8; });
+    y += 4; rect(54, y - 3, 292, 1, '#e2d9c2');
+    if (!d.offline) { text(`${L(UI.rScore)} ${d.score}${d.newBest ? '★' : ''} · ${this.rank ? '#' + this.rank.rank : '…'}`, 54, y + 2, { col: d.newBest ? INK_GOLD : INK, size: 6 });
+      if (d.coins) text('+' + money(d.coins), 346, y, { col: INK_TEAL, align: 'right' }); }
+    y += 14;
     let note, col = INK_MUTED;
     if (d.offline) note = L(UI.rOffline);
     else if (d.suspicious) { note = L(UI.rSuspicious); col = INK_RED; }
     else note = d.success ? (d.first ? fmtLine(L(TT.winNote)) : L(UI.rReplay)) : L(UI.rRetry);
-    wrapText(note, 290, 6).slice(0, 2).forEach(l => { text(l, W / 2, y, { align: 'center', col, size: 6 }); y += 8; });
+    wrapText(note, 292, 6).slice(0, 3).forEach(l => { text(l, W / 2, y, { align: 'center', col, size: 6 }); y += 8; });
+    // значки — коротко: «🏅 Төраға сайланды, Үй кеңесі · +70»
     if (!d.offline && !d.suspicious && d.reward) { const b = (d.reward.badges || [d.reward.badge]).map(k => BADGES[k] ? L(BADGES[k]) : '').filter(Boolean).join(', ');
-      const rt = L(d.reward.status === 'sent' ? UI.rRewardSent : UI.rRewardGuest).replace('{n}', d.reward.points).replace('{b}', b);
-      wrapText(rt, 290, 6).slice(0, 2).forEach(l => { text(l, W / 2, y, { align: 'center', col: d.reward.status === 'sent' ? INK_TEAL : INK_GOLD, size: 6 }); y += 8; }); }
-    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(318, 40); ctx.rotate(-.15); ctx.scale(s, s); ctx.globalAlpha = k;
-      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-26, -9, 52, 18); text(d.tourId === 'L1' ? 'ОСИ' : ['ИӘ', 'ЗА'][LI()] || 'ЗА', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
+      let rt = '★ ' + b + ' · +' + d.reward.points; while (textW(rt, 6) > 292 && rt.length > 8) rt = rt.slice(0, -2);
+      y += 2; text(rt, W / 2, y, { align: 'center', col: d.reward.status === 'sent' ? INK_TEAL : INK_GOLD, size: 6 }); y += 8; }
+    // подписи — мелко внизу
+    text(ekn ? L(UI.protSign) : L(UI.protSign1).replace('{n}', d.signatures), W / 2, 188, { align: 'center', col: '#b5a888', size: 6 });
+    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(324, 47); ctx.rotate(-.15); ctx.scale(s, s); ctx.globalAlpha = k;
+      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-24, -9, 48, 18); text(d.tourId === 'L1' ? 'ОСИ' : ['ИӘ', 'ЗА'][LI()] || 'ЗА', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
     const bw = 84;
     if (button(L(UI.toHouse), 108, 200, 'primary', { w: bw })) irisTo(108, 194, () => go('house', { focus: null }));
     if (button(L(UI.rating), 200, 200, 'alt', { w: bw })) irisTo(200, 194, () => go('leaderboard', { from: 'result' }));

@@ -428,13 +428,18 @@ scenes.quiz = {
     if (this.paused) this.drawPause();
   },
   drawCard(q) {
-    const lines = wrapText(L(q.q), 364, 8).slice(0, 3), ah = 15, h = 12 + lines.length * 11 + q.answers.length * ah + 4;
+    // длинный ответ переносится на 2 строки (казахский длиннее); если и так не влезает — мельче шрифт
+    const lines = wrapText(L(q.q), 364, 8).slice(0, 3);
+    const rows = q.answers.map(a => { const s = L(a); let sz = 8, ls = wrapText(s, 344, 8); if (ls.length > 2) { sz = 6; ls = wrapText(s, 344, 6).slice(0, 3); } return { sz, ls, h: Math.max(13, ls.length * (sz === 8 ? 10 : 8) + 4) }; });
+    const h = 12 + lines.length * 11 + rows.reduce((m, r) => m + r.h + 2, 0) + 4;
     frameBox(8, 24, 384, h, .95);
     lines.forEach((l, i) => text(l, 18, 30 + i * 11, { col: '#f4f3ee' }));
-    q.answers.forEach((a, i) => { const y = 30 + lines.length * 11 + 3 + i * ah, sel = this.pick === i;
-      rect(16, y, 368, ah - 2, sel ? '#3a4a3a' : '#1d2130'); rect(18, y + 2, 11, 9, sel ? '#f2c94c' : '#d8d2bf'); text('ABCD'[i], 23.5, y + 3, { col: '#1a1424', align: 'center', size: 6 });
-      const s = L(a), sz = textW(s, 8) > 340 ? 6 : 8; text(s, 34, y + (sz === 8 ? 2 : 4), { col: sel ? '#f2c94c' : '#cfd6e4', size: sz });
-      if (this.state === 'ask' && clickIn(16, y, 368, ah - 2)) this.choose(i); });
+    let y = 30 + lines.length * 11 + 3;
+    rows.forEach((R, i) => { const sel = this.pick === i;
+      rect(16, y, 368, R.h, sel ? '#3a4a3a' : '#1d2130'); rect(18, y + 2, 11, 9, sel ? '#f2c94c' : '#d8d2bf'); text('ABCD'[i], 23.5, y + 3, { col: '#1a1424', align: 'center', size: 6 });
+      R.ls.forEach((l, k) => text(l, 34, y + 2 + k * (R.sz === 8 ? 10 : 8) + (R.sz === 8 ? 0 : 1), { col: sel ? '#f2c94c' : '#cfd6e4', size: R.sz }));
+      if (this.state === 'ask' && clickIn(16, y, 368, R.h)) this.choose(i);
+      y += R.h + 2; });
     if (this.state === 'ask') {
       const c = clicks.find(c => c.y > 24 + h); if (c) { const wx = c.x + this.cam, i = this.cur.doors.findIndex(d => Math.abs(d - wx) < 27); if (i >= 0) { clicks.splice(clicks.indexOf(c), 1); this.choose(i); } }
       const n = q.answers.length; if (hit('up') || hit('left')) this.pick = (this.pick + n - 1) % n; if (hit('down') || hit('right')) this.pick = (this.pick + 1) % n; if (hit('act') && this.pick >= 0) this.choose(this.pick);
