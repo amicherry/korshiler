@@ -21,11 +21,12 @@ function drawNet(dt) {
 /* ---------- Диалоги в стиле Undertale ---------- */
 const DLG = { open: false, name: '', port: null, voice: 400, text: '', shown: 0, choices: null, cursor: 0, resolve: null, expr: 'neutral', mood: null, blipAt: 0 };
 function dlgOpen(name, port, voice = 400, mood = null) { setTouch({ act: L(UI.next) }); Object.assign(DLG, { open: true, name, port, voice, mood, text: '', shown: 0, choices: null }); }
-function dlgClose() { DLG.open = false; DLG.choices = null; DLG.resolve = null; }
+function dlgClose() { voiceStop(); DLG.open = false; DLG.choices = null; DLG.resolve = null; }
 // длинная реплика делится на страницы по 5 строк — ничего не обрезается
 const DLG_LINES = 5, DLG_TW = 320;
 function sayPage(t, expr) { setTouch({ act: L(UI.next) }); return new Promise(res => Object.assign(DLG, { text: t, shown: 0, choices: null, expr, resolve: res })); }
 async function say(t, expr = 'neutral') {
+  voicePlay(t);   // есть mp3 — играет голос, нет — обычный «писк»
   const lines = wrapText(t, DLG_TW);
   for (let i = 0; i < lines.length; i += DLG_LINES) await sayPage(lines.slice(i, i + DLG_LINES).join(' '), expr);
 }
@@ -51,7 +52,7 @@ function dlgUpdate(dt) {
   const len = DLG.text.length;
   if (DLG.shown < len) {
     DLG.shown = Math.min(len, DLG.shown + dt * .06);
-    DLG.blipAt -= dt; if (DLG.blipAt <= 0) { sfx.blip(DLG.voice + Math.random() * 40); DLG.blipAt = 55; }
+    DLG.blipAt -= dt; if (DLG.blipAt <= 0 && !VOICE.playing) { sfx.blip(DLG.voice + Math.random() * 40); DLG.blipAt = 55; }
   }
   if (hit('act') || clickIn(6, DLG_BOX.y, W - 12, DLG_BOX.h)) {
     if (DLG.shown < len) DLG.shown = len; else { const r = DLG.resolve; DLG.resolve = null; r(); }
@@ -154,9 +155,8 @@ scenes.title = {
     paper(70, 30, 260, 170, 2);
     text(L(UI.settings), W / 2, 42, { align: 'center', col: INK_RED });
     text(L(UI.lang), W / 2, 62, { align: 'center', col: INK });
-    if (button('ҚАЗ', W / 2 - 80, 76, LANG === 'kz' ? 'primary' : 'off', { w: 70 })) setLang('kz');
-    if (button('РУС', W / 2, 76, LANG === 'ru' ? 'primary' : 'off', { w: 70 })) setLang('ru');
-    if (button('ENG', W / 2 + 80, 76, LANG === 'en' ? 'primary' : 'off', { w: 70 })) setLang('en');
+    if (button('ҚАЗ', W / 2 - 42, 76, LANG === 'kz' ? 'primary' : 'off', { w: 76 })) setLang('kz');
+    if (button('РУС', W / 2 + 42, 76, LANG === 'ru' ? 'primary' : 'off', { w: 76 })) setLang('ru');
     text(L(UI.sound), W / 2, 100, { align: 'center', col: INK });
     if (button(SND.on ? L(UI.on) : L(UI.off), W / 2, 114, SND.on ? 'alt' : 'off')) { SND.on = !SND.on; saveStr('d67_sound', SND.on ? '1' : '0'); }
     if (button(this.done ? L(UI.resetDone) : this.sure ? L(UI.resetSure) : L(UI.reset), W / 2, 144, this.done ? 'off' : 'danger')) {
@@ -165,7 +165,7 @@ scenes.title = {
     if (button(L(UI.back), W / 2, 176, 'alt')) this.settings = false;
   },
 };
-function setLang(l) { LANG = l; saveStr('d67_lang', l); document.getElementById('rotate').textContent = L(UI.rotate); }
+function setLang(l) { LANG = l === 'ru' ? 'ru' : 'kz'; saveStr('d67_lang', l); document.getElementById('rotate').textContent = L(UI.rotate); }
 
 /* ============================================================
    СЦЕНА: создание персонажа
@@ -277,6 +277,9 @@ function makeResidents(tour, seed) {
 scenes.tour = {
   enter(data) {
     const tour = this.tour = TOURS[data.tour || 'L1'];
+    // первый заход в тур: сначала заставка («5 дней», «прошло полгода»…) и квиз перед собранием
+    SAVE.inter = SAVE.inter || {};
+    if (!data.skipInter && !SAVE.inter[tour.id]) { go('interlude', { tour: tour.id }); return; }
     this.fixed = new Set(HOUSE_STATE.fixed); this.problem = tour.problem ? PROBLEMS.find(p => p.id === tour.problem) : null;
     this.startedAt = Date.now();
     this.res = makeResidents(tour, hashStr(USER.userId + tour.id) + (SAVE.tours[tour.id]?.tries || 0));
@@ -286,10 +289,17 @@ scenes.tour = {
     // с собрания 2 (есть E-KNOT) часть соседей сама голосует в приложении — «за» или «против»
     const RR = rng(hashStr(USER.userId + tour.id) + 77 + (SAVE.tours[tour.id]?.tries || 0)), app = tour.n >= 2;
     for (const r of Object.values(this.res)) {
-      if (!r.A.renter && RR() < (REFUSE[r.arch] || 0) * (1 - repaired * .1)) r.refuser = true;
-      if (app && r.A.onlineOk && RR() < .16) r.selfAt = tour.start + tour.duration * (.08 + RR() * .8);
+      if (!r.A.renter && !r.A.notOwner && !r.A.noVote && RR() < (REFUSE[r.arch] || 0) * (1 - repaired * .1)) r.refuser = true;
+      if (app && r.A.onlineOk && !r.A.paperOnly && !r.A.renter && !r.A.notOwner && RR() < .12) r.selfAt = tour.start + tour.duration * (.08 + RR() * .8);
     }
-    this.app = app && !!SAVE.racIntro; this.onYes = 0; this.onNo = 0; this.onFlash = 0;
+    this.app = app; this.onYes = 0; this.onNo = 0; this.onFlash = 0;
+    // подростки курят на лестнице, пока нет камер; «нехорошая квартира» — пока нет домофона с доступом из E-KNOT
+    const fl = 3 + Math.floor(RR() * 9);
+    this.teens = this.fixed.has('cameras') ? null : { floor: fl === Math.ceil(tour.heroApt / tour.perFloor) ? fl + 1 : fl, x: 150 + RR() * 40, st: 'here', backAt: 0, t: 0 };
+    if (this.teens) for (const r of Object.values(this.res)) if (r.floor === this.teens.floor) r.mood -= 3;
+    this.shady = Object.values(this.res).find(r => r.A.noVote) || null;
+    // енот: 4 действия по очереди, вместо лимитов — паузы в игровых днях; бонус квиза — ещё одно дожатие
+    this.rac = { open: 0, uses: { notify: 0, call: 0, redial: 0, chat: 0 }, readyDay: { notify: 0, call: 0, redial: 0, chat: 0 }, bonus: (SAVE.quizBonus && SAVE.quizBonus[tour.id]) ? 1 : 0, menu: false };
     const R = rng(hashStr(USER.userId) + 9);
     this.doorLook = {}; for (let apt = 1; apt <= tour.floors * tour.perFloor; apt++) this.doorLook[apt] = pick(R, DOOR_STYLES);
     this.doorLook[tour.heroApt] = { col: '#2f6f62', kind: 'metal' };
@@ -298,7 +308,7 @@ scenes.tour = {
     const hf = Math.ceil(tour.heroApt / tour.perFloor);
     this.hero = { x: DOOR_X[(tour.heroApt - 1) % tour.perFloor] + 20, floor: hf, y: floorBase(hf, tour.floors), dir: -1, walkT: 0, moving: false, climb: null, knockT: 0 };
     this.minute = tour.start; this.end = tour.start + tour.duration;
-    this.events = []; this.raccoon = SAVE.racIntro ? tour.raccoon : 0; this.broadcasts = 0; this.remoteShown = 0; this.busy = false; this.ballot = false; this.goalShown = false; this.over = false;
+    this.events = []; this.broadcasts = 0; this.busy = false; this.ballot = false; this.goalShown = false; this.over = false;
     this.camY = clamp(this.hero.y - 165, 0, this.WH - H); this.camX = clamp(this.hero.x - W / 2, 0, SW - W);
     this.talker = { floor: tour.talkerFloor, x: 95, done: false, look: { skin: '#d6a07a', hair: 'short', hairCol: '#3a2a20', top: 'hoodie', topCol: '#3b3f55', pants: '#2b2a33', hat: 'cap', capCol: '#3f6f8c', beard: true } };
     this.helper = { state: 'hidden', floor: 2, x: 397, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
@@ -312,35 +322,37 @@ scenes.tour = {
     setTimeout(() => { if (!here()) return; toast(L(UI.meetingT).replace('{n}', tour.n), L(UI.meetingB).replace('{t}', L(tour.title)).replace('{r}', ruleText(tour)), 5200);
       if (tour.n === 1) setTimeout(() => here() && toast('E-KNOT', L(UI.tutTap)), 4600);
       if (tour.n >= 2 && !SAVE.racIntro) setTimeout(() => here() && this.racIntro(), 5400); }, 500);
+    setTouch({ move: true });
   },
   focus() { return { x: this.hero.x - this.camX, y: this.hero.y - this.camY - 14 }; },
   signatures() { return Object.values(this.res).filter(r => r.status === 'yes').length; },
-  // тур 2: онлайн-голоса двух других подъездов — та же формула, что на сервере
-  remoteTarget() { const R = this.tour.remote; return R ? Math.min(R.max, Math.floor(this.signatures() * R.perYes + this.broadcasts * R.perBroadcast)) : 0; },
-  votes() { return this.signatures() + Math.floor(this.remoteShown); },
+  votes() { return this.signatures(); },
   against() { return Object.values(this.res).filter(r => r.status === 'no').length; },
-  outcome() { return voteOutcome(this.tour, this.votes(), this.against()); },
+  abstained() { return Object.values(this.res).filter(r => r.status === 'abstain').length; },
+  outcome() { return voteOutcome(this.tour, this.votes(), this.against(), this.abstained()); },
+  // доля голосов «за», собранных приложением (уведомление, обзвон, дожатие, чат, приглашение хозяину)
+  appShare() { const y = this.events.filter(e => e.t === 'yes'), app = y.filter(e => APP_VIA.includes(e.via)).length; return y.length ? Math.round(app / y.length * 100) : 0; },
   goalMet() { return this.outcome().ok; },
   // с учётом обещавших проголосовать онлайн: можно закрыть собрание и дождаться их голосов
-  goalLikely() { const pend = Object.values(this.res).filter(r => r.status === 'online').length; return voteOutcome(this.tour, this.votes() + pend, this.against()).ok; },
+  goalLikely() { const pend = Object.values(this.res).filter(r => r.status === 'online').length; return voteOutcome(this.tour, this.votes() + pend, this.against(), this.abstained()).ok; },
   // игровой день 1…60: время тура растянуто на 60 дней
   day() { const T = this.tour; return clamp(Math.floor((this.minute - T.start) / T.duration * T.days) + 1, 1, T.days); },
   // после первого собрания сосед рассказывает про приложение E-KNOT и енота
   async racIntro() {
     if (this.busy || DLG.open) return setTimeout(() => scene === this && !this.over && !SAVE.racIntro && this.racIntro(), 1500);
     this.busy = true; this.plan = null;
-    const look = ARCH.student.look, h = this.hero, side = h.x + 26 < WALK_MAX ? 1 : -1;
+    const look = ARCH.it.look, h = this.hero, side = h.x + 26 < WALK_MAX ? 1 : -1;
     this.racNpc = { x: h.x + side * 26, floor: h.floor, look }; h.dir = side;
-    dlgOpen('Данияр', e => portrait(look, e), ARCH.student.voice);
-    await say(L(PRO.rac1), 'happy'); await say(L(PRO.rac2)); await say(L(PRO.rac3), 'think');
-    dlgOpen('E-KNOT', () => RACCOON_PORT, 900); await say(L(PRO.racGot), 'happy'); dlgClose();
-    SAVE.racIntro = true; persist(); this.app = true; this.raccoon = this.tour.raccoon; this.busy = false; this.racNpc.leaving = 1;
+    dlgOpen('Данияр', e => portrait(look, e), ARCH.it.voice);
+    await say(L(PRO.rac1), 'happy'); await say(L(PRO.rac2));
+    dlgOpen('E-KNOT', () => RACCOON_PORT, 900); await say(L(RAC_INTRO.notify), 'happy'); await say(L(UI.racMenuHint), 'happy'); dlgClose();
+    SAVE.racIntro = true; SAVE.racSeen = { ...(SAVE.racSeen || {}), notify: true }; persist(); this.busy = false; this.racNpc.leaving = 1;
   },
   // обещал проголосовать онлайн: голос придёт позже, через несколько игровых дней
-  goOnline(r, via) { r.status = 'online'; r.onlineAt = this.minute + 4 + Math.random() * this.tour.duration * .25; this.events.push({ t: 'online', apt: r.apt, via }); },
+  goOnline(r, via) { r.status = 'online'; r.channel = via; r.onlineAt = this.minute + 4 + Math.random() * this.tour.duration * .25; this.events.push({ t: 'online', apt: r.apt, via }); },
   onlineVote(r, yes) {
     r.status = yes ? 'yes' : 'no'; r.viaApp = true; this.onFlash = 700;
-    this.events.push({ t: yes ? 'yes' : 'no', apt: r.apt, via: 'online' });
+    this.events.push({ t: yes ? 'yes' : 'no', apt: r.apt, via: r.channel && r.channel !== 'door' ? r.channel : 'online' });
     if (yes) this.onYes++; else this.onNo++;
     if (this.hero.floor === r.floor) pop(DOOR_X[r.d], this.base(r.floor) - 70, yes ? '+1 E-KNOT' : '−1 E-KNOT', yes ? '#7fc4a8' : '#e88a7a');
     if (yes) this.checkGoal(300);
@@ -349,16 +361,23 @@ scenes.tour = {
   tickOnline() {
     const m = this.minute;
     for (const r of Object.values(this.res)) {
-      if (r.status === 'online' && m >= r.onlineAt) { const k = Math.random(), py = r.arch === 'night' ? .9 : .82;
-        if (k < py) this.onlineVote(r, true); else if (k < py + .06) this.onlineVote(r, false); else { r.status = 'thinking'; r.onlineAt = null; } }
+      if (r.status === 'online' && m >= r.onlineAt) this.resolveOnline(r);
       else if (this.app && r.selfAt && m >= r.selfAt) { r.selfAt = null;
         if (!['unknown', 'away', 'noanswer', 'thinking'].includes(r.status)) continue;
         if (r.mood >= 40 && !r.refuser) this.onlineVote(r, true); else if (r.mood < 28 || r.refuser) this.onlineVote(r, false); }
     }
   },
+  // обещанный онлайн-голос пришёл: «за», реже «против»; хозяева арендаторов и братья — через раз; «не за» в этом туре — воздержался
+  resolveOnline(r) {
+    const k = Math.random(), sc = scenFor(r.arch, this.tour);
+    if (r.ownerP != null) { if (k < r.ownerP) this.onlineVote(r, true); else { r.status = 'novote'; r.onlineAt = null; } return; }
+    if (sc && (sc.noYes || sc.abstainOnly)) { r.status = 'abstain'; r.viaApp = true; this.events.push({ t: 'abstain', apt: r.apt, via: r.channel || 'online' }); return; }
+    const py = r.arch === 'night' ? .9 : .84;
+    if (k < py) this.onlineVote(r, true); else if (k < py + .05) this.onlineVote(r, false); else { r.status = 'thinking'; r.onlineAt = null; }
+  },
   addTime(m) { this.minute += m; },
   base(f) { return floorBase(f, this.tour.floors); },
-  nearDoor() { const h = this.hero; if (h.climb || h.ride) return null; for (let d = 0; d < DOOR_X.length; d++) if (Math.abs(h.x - DOOR_X[d]) < 12) return (h.floor - 1) * DOOR_X.length + d + 1; return null; },
+  nearDoor() { const h = this.hero; if (h.climb || h.ride) return null; for (let d = 0; d < DOOR_X.length; d++) if (Math.abs(h.x - DOOR_X[d]) < 12) { const a = (h.floor - 1) * DOOR_X.length + d + 1; return isStorage(a) ? null : a; } return null; },
   nearLift() { const h = this.hero; return !h.climb && !h.ride && Math.abs(h.x - LIFT_X) < 12; },
   // лифт: пока не отремонтирован — только табличка; после ремонта возит на любой этаж
   useLift(to) {
@@ -383,18 +402,15 @@ scenes.tour = {
     const h = this.hero, T = this.tour;
     // время идёт, пока игрок ходит (в диалоге и в бюллетене — пауза)
     if (!this.busy && !this.ballot && !trans.phase) this.minute += dt / 1000 / T.secPerMin;
-    if (T.remote) { const tg = this.remoteTarget(), before = Math.floor(this.remoteShown);
-      if (this.remoteShown < tg) this.remoteShown = Math.min(tg, this.remoteShown + dt / 450);
-      const now = Math.floor(this.remoteShown); if (now > before && now % 5 === 0) pop(this.hero.x, this.hero.y - 62, '+5 E-KNOT', '#7fc4a8');
-      this.checkGoal(); }
-    if (this.minute >= this.end && !this.busy) { this.finish(true); return; }
+    if (!T.noTimer && this.minute >= this.end && !this.busy) { this.finish(true); return; }
+    this.updateTeens(dt);
     this.tickCouncil(); this.tickOnline(); if (this.onFlash > 0) this.onFlash -= dt;
     // помощница возвращается с результатом
     if (this.helper.state === 'busy' && this.minute >= this.helper.doneAt) this.helperDone();
     if (this.helper.state === 'hidden' && this.signatures() >= T.helperAfter) this.helper.state = 'shown';
     // крысы
     this.updateRats(dt);
-    if (this.racAnim) { this.racAnim.t += dt; if (this.racAnim.t > 1800) this.racAnim = null; }
+    if (this.racAnim) { this.racAnim.t += dt; if (this.racAnim.t > (this.racAnim.kind === 'chat' ? 4200 : 2200)) this.racAnim = null; }
 
     if (this.ballot) { if (hit('ballot') || hit('back') || hit('act')) this.ballot = false; return; }
     if (this.liftPick) { if (hit('back')) this.liftPick = false; for (let k = 1; k <= 9; k++) if (pressed['Digit' + k]) { this.liftPick = false; this.useLift(k); } return; }
@@ -411,7 +427,7 @@ scenes.tour = {
     }
 
     if (hit('ballot')) { this.ballot = true; return; }
-    if (hit('raccoon')) this.useRaccoon();
+    if (hit('raccoon') && this.app) this.rac.menu = !this.rac.menu;
 
     // лестница
     if (h.climb) {
@@ -539,74 +555,158 @@ scenes.tour = {
   },
 
   /* ---- стук в дверь и разговор ---- */
+  // реплика героя в разговоре с жильцом (его портрет и голос), потом — обратно к жильцу
+  async heroSay(r, line, expr = 'happy') {
+    const swap = DLG.port, swapName = DLG.name, swapMood = DLG.mood;
+    DLG.port = e => portrait(SAVE.look, e); DLG.name = SAVE.name; DLG.voice = 420;
+    await say(this.fmt(r, line), expr);
+    DLG.port = swap; DLG.name = swapName; DLG.voice = r.A.voice; DLG.mood = swapMood;
+  },
+  fmt(r, v) { const T = this.tour; return fmtLine(typeof v === 'string' ? v : L(v), { f: r.floor, apt: aptNo(r.apt), g: T.goal, q: T.quorum || '' }).replace('{n}', this.signatures()); },
   async visit(r) {
-    this.busy = true; const h = this.hero;
+    this.busy = true; const h = this.hero, T = this.tour;
     // встаём сбоку от двери, чтобы жилец вышел на порог, а не «в» героя
     let side = h.x <= DOOR_X[r.d] ? -1 : 1; if (DOOR_X[r.d] + side * 23 < WALK_MIN) side = 1; if (DOOR_X[r.d] + side * 23 > WALK_MAX) side = -1;
     await this.walkTo(DOOR_X[r.d] + side * 23); h.dir = -side;
-    h.knockT = 700; sfx.knock(); this.addTime(.5); pop(DOOR_X[r.d], this.base(r.floor) - 30, ['тық-тық', 'тук-тук', 'knock-knock'][LI()], '#c9cdc8');
+    h.knockT = 700; sfx.knock(); this.addTime(.5); pop(DOOR_X[r.d], this.base(r.floor) - 30, ['тық-тық', 'тук-тук'][LI()] || 'тук-тук', '#c9cdc8');
     await wait(750);
     const m = this.minute, A = r.A;
     if (r.status === 'online') { pop(DOOR_X[r.d], this.base(r.floor) - 70, L(UI.st.online), '#9fd9c2'); this.busy = false; return; }
     const away = r.away && m < r.returnAt;
     if (away) { r.status = r.status === 'unknown' ? 'away' : r.status; r.knocks++; pop(DOOR_X[r.d], this.base(r.floor) - 70, '...', '#9fb0cc'); toast('E-KNOT', L(UI.nobody), 2400); this.busy = false; return; }
-    const pNo = (r.sleeping ? .5 : A.deaf) * Math.pow(.45, r.knocks);
+    // бумажный голос или доверенность ждут героя — открывают сразу
+    const expecting = ['paper', 'proxy'].includes(r.status);
+    const pNo = expecting ? 0 : (r.sleeping ? .5 : A.deaf) * Math.pow(.45, r.knocks);
     if (Math.random() < pNo) { r.knocks++; if (r.status === 'unknown' || r.status === 'away') r.status = 'noanswer'; pop(DOOR_X[r.d], this.base(r.floor) - 70, '...', '#8f949c'); toast('E-KNOT', L(UI.noOpen), 2400); this.busy = false; return; }
     // открывают
     sfx.door(); await tweenDoor(r, 1);
     if (r.sleeping) { r.mood -= 8; r.sleeping = false; }
     r.away = false; this.addTime(.5);
-    dlgOpen(r.name, e => portrait(r.look, e), A.voice, A.renter ? null : () => r.mood);
-    // у каждого жильца свой вариант приветствия/истории/ответа; реакции чередуются без повторов подряд
-    const Ln = k => { if (k === 'story') { const c = this.complaint(r); if (c) return L(c); }
-      const v = A.lines[k] || GENERIC[k]; if (!Array.isArray(v)) return L(v);
-      if (['good', 'meh', 'bad'].includes(k)) { let i; do i = Math.floor(Math.random() * v.length); while (v.length > 1 && i === r.last[k]); r.last[k] = i; return L(v[i]); }
-      let line = v[r.v % v.length]; const top = Math.ceil(r.apt / this.tour.perFloor) === this.tour.floors;
+    const sc = A.noVote || A.renter || A.notOwner ? null : scenFor(r.arch, T);
+    dlgOpen(r.name, e => portrait(r.look, e), A.voice, A.noVote || A.renter || A.notOwner ? null : () => r.mood);
+    // реплика жильца: из сценария тура, иначе из характера; у каждого свой вариант, реакции без повторов подряд
+    const Ln = (k, src) => {
+      if (k === 'story') { const c = this.complaint(r); if (c) return this.fmt(r, c); }
+      let v = src !== undefined ? src : (sc && sc[k]) || A.lines[k] || GENERIC[k]; if (!v) return '';
+      if (!Array.isArray(v)) { if (v.top || v.low) { const top = r.floor === T.floors; v = (top && v.top) || (!top && v.low) || v; } return this.fmt(r, v); }
+      if (['good', 'meh', 'bad'].includes(k)) { let i; do i = Math.floor(Math.random() * v.length); while (v.length > 1 && i === r.last[k]); r.last[k] = i; return this.fmt(r, v[i]); }
+      let line = v[r.v % v.length]; const top = r.floor === T.floors;
       if (top && line.top) line = line.top; else if (!top && line.low) line = line.low;
-      return L(line); };
-    if (A.renter) { await say(Ln('greet')); r.status = 'renter'; return this.endVisit(r); }
+      return this.fmt(r, line); };
+    const tourLine = A.lines[T.scen];          // арендатор и не собственник: своя реплика в турах 4, 6, 7
+    if (A.noVote) return this.visitShady(r, Ln);
+    if (A.renter) return this.visitRenter(r, Ln, tourLine);
+    if (A.notOwner) return this.visitNotOwner(r, Ln, tourLine);
     if (r.status === 'yes') { await say(L(GENERIC.already), 'happy'); return this.endVisit(r); }
     if (r.status === 'no') { await say(L(GENERIC.againNo), 'angry'); return this.endVisit(r); }
+    if (r.status === 'abstain') { await say(Ln('think'), 'think'); return this.endVisit(r); }
     if (r.refuser) { const v = PRO.refuse[(r.apt + r.v) % PRO.refuse.length]; sfx.no(); await say(L(v), 'angry'); r.status = 'no'; this.events.push({ t: 'no', apt: r.apt, via: 'door' }); return this.endVisit(r); }
-    if (r.status === 'thinking') { r.mood += 4; await say(Ln('again')); } else await say(Ln('greet'), r.mood < 30 ? 'angry' : 'neutral');
-    const hero = e => portrait(SAVE.look, e);
+    // бумажный бюллетень (тур 2+): голос вносится в E-KNOT с пометкой «бумага»
+    const paper = r.status === 'paper' && T.n >= 2;
+    if (paper) { await say(this.fmt(r, PAPER[r.arch] || PAPER.apa), 'happy'); r.mood += 8; }
+    else if (r.status === 'thinking') { r.mood += 4; await say(Ln('again')); }
+    else await say(Ln('greet'), r.mood < 30 ? 'angry' : 'neutral');
+    const via = paper ? 'paper' : 'door';
+    if (paper && r.mood >= 60) return this.decide(r, sc, Ln, via);
+    if (r.holdLeft == null) r.holdLeft = A.hold || 0;
     for (let round = 0; round < 3; round++) {
+      const canOnline = this.app && !paper;
       const menu = [{ label: L(UI.cExplain), k: 'explain' }, { label: L(UI.aFacts), k: 'facts' }, { label: L(UI.aBenefit), k: 'benefit' }, { label: L(UI.aNeighbors), k: 'neighbors' },
-        { label: L(UI.aOnline), k: 'online' }, { label: L(UI.cListen), k: 'listen', dim: r.listened }, { label: L(UI.cLater), k: 'later' }].filter(m => m.k !== 'online' || this.app);
+        { label: L(UI.aOnline), k: 'online' }, { label: L(UI.cListen), k: 'listen', dim: r.listened }, { label: L(UI.cLater), k: 'later' }].filter(m => m.k !== 'online' || canOnline);
       const c = menu[await ask(menu)].k;
-      if (c === 'later') { await say(L(GENERIC.bye)); if (r.status !== 'yes') r.status = 'thinking'; return this.endVisit(r); }
-      // реплика героя
-      const heroLine = { explain: UI.heroExplain, facts: UI.heroFacts, benefit: UI.heroBenefit, neighbors: UI.heroNeighbors, online: UI.heroOnline, listen: UI.heroListen }[c];
-      const swap = DLG.port, swapName = DLG.name, swapMood = DLG.mood;
-      DLG.port = hero; DLG.name = SAVE.name; DLG.voice = 420;
-      await say(L(heroLine).replace('{n}', this.signatures()), 'happy');
-      DLG.port = swap; DLG.name = swapName; DLG.voice = A.voice; DLG.mood = swapMood;
+      if (c === 'later') {
+        // новосёлка не отпускает: «я ещё не досказала!»
+        if (r.holdLeft > 0) { r.holdLeft--; await say(this.fmt(r, pickLine(A.lines.hold, A.hold - r.holdLeft - 1)), 'angry'); this.addTime(1); round--; continue; }
+        await say(L(GENERIC.bye)); if (!['yes', 'paper'].includes(r.status)) r.status = 'thinking'; return this.endVisit(r);
+      }
+      // реплика героя: из сценария тура (объяснить / факты / выгода), остальное — общие фразы
+      const heroLine = (sc && sc.hero && sc.hero[c]) || { explain: UI.heroExplain, facts: UI.heroFacts, benefit: UI.heroBenefit, neighbors: UI.heroNeighbors, online: UI.heroOnline, listen: UI.heroListen }[c];
+      await this.heroSay(r, heroLine);
       if (c === 'online') {
         this.addTime(.5);
-        if (A.onlineOk) { this.goOnline(r, 'door'); await say(Ln('online'), 'happy'); return this.endVisit(r); }
-        r.mood += A.likes.online; await say(Ln('noOnline'), 'angry');
+        if (A.onlineOk && !A.paperOnly) { this.goOnline(r, 'door'); await say(Ln('online', (sc && sc.online) || A.lines.online || GENERIC.online), 'happy'); return this.endVisit(r); }
+        // от онлайна отказался — отметка 📄: герой придёт с бумажным бюллетенем
+        r.mood += A.likes.online; await say(Ln('noOnline', A.lines.noOnline || GENERIC.noOnline), 'angry');
+        if (T.n >= 2 && A.paperOnly) { r.status = 'paper'; pop(DOOR_X[r.d], this.base(r.floor) - 70, '📄', '#d8d2bf'); }
       } else if (c === 'listen') {
         this.addTime(3);
         if (r.listened) { await say(L(GENERIC.storyDone)); }
-        else { r.listened = true; r.mood += A.listen; await say(Ln('story'), A.listen > 0 ? 'sad' : 'angry'); SAVE.trust[r.apt] = (SAVE.trust[r.apt] || 0) + 4; }
+        else { r.listened = true; r.mood += A.listen || 0; await say(Ln('story'), (A.listen || 0) > 0 ? 'sad' : 'angry'); SAVE.trust[r.apt] = (SAVE.trust[r.apt] || 0) + 4; }
       } else {
         this.addTime(1);
-        let d = A.likes[c] + Math.round((Math.random() - .5) * 6);
+        let d = (A.likes[c] || 0) + Math.round((Math.random() - .5) * 6);
         if (c === 'neighbors' && A.likes.neighbors > 0) d += Math.min(14, this.signatures() * 2);
         r.mood += d;
         await say(Ln(d >= 10 ? 'good' : d <= 0 ? 'bad' : 'meh'), d >= 10 ? 'happy' : d <= 0 ? 'angry' : 'think');
       }
       r.mood = clamp(r.mood, 0, 100);
-      if (r.mood >= 70) { r.status = 'yes'; await say(Ln('yes'), 'happy'); this.signed(r, 'door'); return this.endVisit(r); }
-      if (r.mood <= 12) { r.status = 'no'; sfx.no(); await say(Ln('no'), 'angry'); this.events.push({ t: 'no', apt: r.apt }); return this.endVisit(r); }
+      if (r.mood >= 70) return this.decide(r, sc, Ln, via);
+      if (r.mood <= 12) return this.refuse(r, Ln);
     }
-    await say(Ln('think'), 'think'); r.status = 'thinking'; return this.endVisit(r);
+    await say(Ln('think'), 'think'); if (r.status !== 'paper') r.status = 'thinking'; return this.endVisit(r);
+  },
+  // жилец решился: «за»; но в некоторых турах характер «за» не голосует — только воздерживается или «подумаю»
+  async decide(r, sc, Ln, via) {
+    if (sc && sc.abstainOnly) { await say(this.fmt(r, sc.abstain || sc.think), 'think'); return this.abstain(r, via); }
+    if (sc && sc.noYes) { const t = sc.think || sc.abstain; await say(this.fmt(r, t), 'think');
+      if (/оздерж|қалыс/i.test((t.ru || '') + (t.kz || ''))) return this.abstain(r, via);
+      r.status = 'thinking'; return this.endVisit(r); }
+    r.status = 'yes'; await say(Ln('yes'), 'happy'); this.signed(r, via); return this.endVisit(r);
+  },
+  async refuse(r, Ln) { r.status = 'no'; sfx.no(); await say(Ln('no'), 'angry'); this.events.push({ t: 'no', apt: r.apt, via: 'door' }); return this.endVisit(r); },
+  abstain(r, via) { r.status = 'abstain'; this.events.push({ t: 'abstain', apt: r.apt, via }); pop(DOOR_X[r.d], this.base(r.floor) - 70, '⏸', '#c9c3b0'); this.checkGoal(300); return this.endVisit(r); },
+  // «нехорошая квартира»: дверь открывают нехотя, голоса нет — только намёк
+  async visitShady(r, Ln) {
+    if (r.status === 'novote') await say(Ln('again'), 'angry');
+    else { await say(Ln('greet'), 'angry'); await say(Ln('owner'), 'think'); r.status = 'novote'; }
+    return this.endVisit(r);
+  },
+  // арендатор: тур 1 — доверенность хозяйки, с тура 2 — приглашение хозяйке в E-KNOT
+  async visitRenter(r, Ln, tourLine) {
+    const T = this.tour, A = r.A;
+    if (r.status === 'proxy') return this.proxyVisit(r, .4);
+    if (r.status === 'online' || r.status === 'yes') { await say(Ln('again'), 'happy'); return this.endVisit(r); }
+    await say(tourLine ? this.fmt(r, pickLine(tourLine)) : Ln(T.n >= 2 ? 'greetApp' : 'greet'), 'happy');
+    if (!tourLine) await say(Ln('support'));
+    const menu = [T.n >= 2 ? { label: L(UI.aInvite), k: 'invite' } : { label: L(UI.aProxy), k: 'proxy' }, { label: L(UI.cLater), k: 'later' }];
+    const c = menu[await ask(menu)].k;
+    if (c === 'invite') { await say(Ln('online'), 'happy'); this.goOnline(r, 'owner'); r.ownerP = .5; return this.endVisit(r); }
+    if (c === 'proxy') { await this.heroSay(r, A.lines.proxyAsk); await say(this.fmt(r, A.lines.proxyOk), 'happy'); r.status = 'proxy'; return this.endVisit(r); }
+    await say(L(GENERIC.bye)); if (r.status === 'unknown') r.status = 'novote'; return this.endVisit(r);
+  },
+  // не собственник: живёт у брата. greet → любой довод → «квартира брата» → доверенность / онлайн / уйти
+  async visitNotOwner(r, Ln, tourLine) {
+    const T = this.tour, A = r.A;
+    if (r.status === 'proxy') return this.proxyVisit(r, .6);
+    if (r.status === 'online' || r.status === 'yes') { await say(Ln('again'), 'neutral'); return this.endVisit(r); }
+    if (r.revealed) await say(Ln('again'), 'neutral');
+    else {
+      await say(tourLine ? this.fmt(r, pickLine(tourLine)) : Ln('greet'), 'neutral');
+      const m0 = [{ label: L(UI.cExplain), k: 'explain' }, { label: L(UI.aFacts), k: 'facts' }, { label: L(UI.aBenefit), k: 'benefit' }];
+      const c0 = m0[await ask(m0)].k;
+      await this.heroSay(r, { explain: UI.heroExplain, facts: UI.heroFacts, benefit: UI.heroBenefit }[c0]);
+      await say(Ln('reveal1'), 'think'); await say(Ln('reveal2'), 'neutral'); r.revealed = true;
+    }
+    const menu = [{ label: L(UI.aProxy), k: 'proxy' }, ...(T.n >= 2 ? [{ label: L(UI.aOnline), k: 'online' }] : []), { label: L(UI.cLater), k: 'later' }];
+    const c = menu[await ask(menu)].k;
+    if (c === 'proxy') { await this.heroSay(r, A.lines.proxyAsk); await say(this.fmt(r, A.lines.proxyOk), 'happy'); r.status = 'proxy'; return this.endVisit(r); }
+    if (c === 'online') { await say(Ln('online'), 'neutral'); this.goOnline(r, 'owner'); r.ownerP = .5; return this.endVisit(r); }
+    await say(Ln('bye'), 'neutral'); r.status = 'novote'; return this.endVisit(r);
+  },
+  // доверенность: на следующем визите хозяин (брат) мог её оформить — тогда голос «за» по доверенности
+  async proxyVisit(r, p) {
+    const A = r.A;
+    if (Math.random() < p) { await say(this.fmt(r, A.lines.proxyYes), 'happy'); r.status = 'yes'; this.signed(r, 'proxy'); }
+    else await say(this.fmt(r, A.lines.proxyNotYet), 'think');
+    return this.endVisit(r);
   },
   signed(r, via) {
     sfx.stamp(); this.events.push({ t: 'yes', apt: r.apt, via });
-    // сосед подписал — остальным на этаже проще решиться
-    for (const o of Object.values(this.res)) if (o !== r && !['yes', 'no', 'renter'].includes(o.status)) { const df = Math.abs(o.floor - r.floor); if (df === 0) o.mood += 8; else if (df === 1) o.mood += 3; }
-    pop(DOOR_X[r.d], this.base(r.floor) - 70, '+1 ✓', '#4caf6e');
+    // сосед подписал — остальным на этаже проще решиться; бата ақсақала — ещё теплее
+    const bata = r.A.bata || 0;
+    for (const o of Object.values(this.res)) if (o !== r && !['yes', 'no', 'novote', 'abstain'].includes(o.status)) { const df = Math.abs(o.floor - r.floor); if (df === 0) o.mood += 8 + bata; else if (df === 1) o.mood += 3 + bata; }
+    if (bata) toast(r.name, L(UI.bata), 2600);
+    pop(DOOR_X[r.d], this.base(r.floor) - 70, via === 'paper' ? '+1 📄' : via === 'proxy' ? '+1 🔑' : '+1 ✓', '#4caf6e');
     this.stampT = 900;
     this.checkGoal(400);
   },
@@ -637,69 +737,113 @@ scenes.tour = {
   },
   // совет дома (после собрания 3): трижды за собрание обходит этаж, где больше всего нерешённых
   tickCouncil() {
-    const T = this.tour; if (T.n < 4) return;
+    const T = this.tour; if (T.n < 3) return;
     this.councilDone = this.councilDone || 0; if (this.councilDone >= 3) return;
     if (this.minute < T.start + T.duration * (.15 + this.councilDone * .17)) return;
     this.councilDone++;
-    const open = r => !r.A.renter && !['yes', 'no', 'online'].includes(r.status);
+    const open = r => !r.A.renter && !r.A.notOwner && !r.A.noVote && !['yes', 'no', 'online', 'abstain', 'novote'].includes(r.status);
     let best = 1, bn = -1; for (let f = 1; f <= T.floors; f++) { const k = Object.values(this.res).filter(r => r.floor === f && open(r)).length; if (k > bn) { bn = k; best = f; } }
     let n = 0;
     for (const r of Object.values(this.res)) { if (r.floor !== best || !open(r)) continue;
-      r.mood += 20; if (r.mood >= 60) { r.status = 'yes'; this.events.push({ t: 'yes', apt: r.apt, via: 'council' }); n++; } else if (r.status === 'unknown') r.status = 'thinking'; }
+      r.mood += 20; const sc = scenFor(r.arch, T); if (r.mood >= 60 && !(sc && (sc.noYes || sc.abstainOnly))) { r.status = 'yes'; this.events.push({ t: 'yes', apt: r.apt, via: 'council' }); n++; } else if (r.status === 'unknown') r.status = 'thinking'; }
     toast(L(UI.councilName), L(UI.councilDone).replace('{f}', best).replace('{n}', n), 3600);
   },
   helperDone() {
     this.helper.state = 'done'; const f = this.tour.helperFloor; let n = 0;
     for (const r of Object.values(this.res)) {
-      if (r.floor !== f || r.A.renter || ['yes', 'no', 'online'].includes(r.status)) continue;
+      if (r.floor !== f || r.A.renter || r.A.notOwner || r.A.noVote || ['yes', 'no', 'online', 'abstain', 'novote'].includes(r.status)) continue;
       if (r.away && this.minute < r.returnAt) continue;
-      r.mood += 22; if (r.mood >= 60) { r.status = 'yes'; this.events.push({ t: 'yes', apt: r.apt, via: 'helper' }); n++; } else r.status = 'thinking';
+      r.mood += 22; const sc = scenFor(r.arch, this.tour); if (r.mood >= 60 && !(sc && (sc.noYes || sc.abstainOnly))) { r.status = 'yes'; this.events.push({ t: 'yes', apt: r.apt, via: 'helper' }); n++; } else if (r.status !== 'paper') r.status = 'thinking';
     }
     toast(L(UI.helperName), L(UI.helperDone).replace('{f}', f).replace('{n}', n));
     this.checkGoal(4000);
   },
   checkGoal(delay = 0) {
     if (this.goalShown || !this.goalMet()) return; this.goalShown = true;
-    setTimeout(() => toast('E-KNOT', L(this.tour.remote ? UI.goalDone2 : UI.goalDone), 4200), delay);
+    setTimeout(() => toast('E-KNOT', L(UI.goalDone), 4200), delay);
   },
-  /* ---- енот: рассылка в E-KNOT ---- */
-  useRaccoon() {
+  /* ---- енот E-KNOT: 4 действия по очереди (уведомление → обзвон → дожатие → чат дома), между применениями — пауза ---- */
+  racReady(k) { const R = this.rac, i = RAC_ACTS.indexOf(k); if (i > R.open) return { ok: false, why: 'locked' };
+    if (k === 'redial' && R.bonus > 0) return { ok: true, bonus: true };
+    const d = R.readyDay[k] - this.day(); return d > 0 ? { ok: false, why: 'wait', days: d } : { ok: true }; },
+  async useRac(k) {
     if (this.busy || !this.app) return;
-    if (this.raccoon <= 0) { toast(L(UI.raccoon), L(UI.noRaccoon), 2400); return; }
-    this.raccoon--; this.racAnim = { t: 0 }; beep(988, .06, 'square', .04); beep(1318, .1, 'square', .04, .08);
-    let n = 0;
-    // уведомление доходит до всех, но откликаются те, кто уже пользуется приложением и не против
-    const R = rng(hashStr(USER.userId) + Math.floor(this.minute));
-    for (const r of Object.values(this.res)) {
-      const fatigue = Math.pow(.6, this.broadcasts) * (r.pinged ? .4 : 1); r.pinged = true;
-      if (r.A.renter) { if (!['online', 'yes'].includes(r.status) && !r.ownerAsked && R() < .5 * fatigue) { r.ownerAsked = true; this.goOnline(r, 'owner'); n++; } continue; }
-      if (!r.A.onlineOk || r.refuser) continue;
-      // чем больше соседей уже проголосовало, тем охотнее откликаются на рассылку («уже 30 соседей за»)
-      const social = Math.min(.3, this.signatures() / APTS * .7);
-      const chance = ({ away: .6, noanswer: .6, thinking: r.mood >= 35 ? .6 : .15, unknown: .25 + social }[r.status] || 0) * fatigue;
-      if (R() >= chance) continue;
-      this.goOnline(r, 'raccoon'); n++;
+    const st = this.racReady(k); if (!st.ok) { toast(L(UI.raccoon), st.why === 'locked' ? L(UI.racLocked) : L(UI.racWait).replace('{n}', st.days), 2200); return; }
+    const R = this.rac; R.menu = false;
+    // при первом появлении действия Енот коротко объясняет, что оно делает
+    SAVE.racSeen = SAVE.racSeen || {};
+    if (!SAVE.racSeen[k]) { SAVE.racSeen[k] = true; persist(); this.busy = true; dlgOpen('E-KNOT', () => RACCOON_PORT, 900); await say(L(RAC_INTRO[k]), 'happy'); dlgClose(); this.busy = false; }
+    if (k === 'redial' && st.bonus) R.bonus--; else R.readyDay[k] = this.day() + RAC_PAUSE[k];
+    const fat = Math.pow(.6, R.uses[k]); R.uses[k]++; R.open = Math.max(R.open, Math.min(3, RAC_ACTS.indexOf(k) + 1));
+    this.racAnim = { kind: k, t: 0 }; beep(988, .06, 'square', .04); beep(1318, .1, 'square', .04, .08);
+    const T = this.tour, all = Object.values(this.res), seed = rng(hashStr(USER.userId + k) + Math.floor(this.minute)), rnd = () => seed();
+    const undecided = r => ['unknown', 'thinking', 'away', 'noanswer'].includes(r.status) && !r.refuser && !r.A.noVote;
+    const social = Math.min(.3, this.signatures() / APTS * .7);
+    let n = 0, pp = 0, body = '';
+    if (k === 'notify') {
+      // уведомление всем, у кого есть E-KNOT: откликаются нерешившие (у повторов отклик ниже)
+      for (const r of all) { if (!undecided(r) || !r.A.onlineOk || r.A.paperOnly || r.A.renter || r.A.notOwner) continue;
+        if (rnd() < (.2 + social * .4) * fat) { this.goOnline(r, 'notify'); n++; } }
+      body = L(RAC.notifyB).replace('{n}', n);
+    } else if (k === 'call') {
+      // обзвон: с приложением — онлайн; «бумажные» (апа, ата, ворчун) — отметка 📄, к ним идёт герой
+      const said = [];
+      for (const r of all) { if (!undecided(r) || r.A.renter || r.A.notOwner) continue;
+        if (r.A.paperOnly) { if (T.n >= 2 && rnd() < .9 * Math.max(.5, fat)) { r.status = 'paper'; r.mood += 6; pp++; said.push([r, 'ansPaper']); } continue; }
+        if (!r.A.onlineOk) continue;
+        const ch = (r.status === 'away' ? .4 : .3) * fat;
+        if (rnd() < ch) { this.goOnline(r, 'call'); n++; if (said.length < 4) said.push([r, 'ansApp']); } else if (r.mood < 25 && rnd() < .3) said.push([r, 'ansRefuse']); }
+      body = L(RAC.callB).replace('{n}', n).replace('{p}', pp);
+      said.slice(0, 4).forEach(([r, a], i) => setTimeout(() => r.floor === this.hero.floor && pop(DOOR_X[r.d], this.base(r.floor) - 74, L(RAC[a]).slice(0, 26), a === 'ansRefuse' ? '#e88a7a' : '#9fd9c2'), 600 + i * 500));
+    } else if (k === 'redial') {
+      // дожатие: обещавшие голосуют сразу, «подумаю» и «не открыл» при хорошем настрое — чаще «за»
+      for (const r of all) {
+        if (r.status === 'online') { r.channel = r.channel === 'door' ? 'redial' : r.channel; this.resolveOnline(r); n++; continue; }
+        if (!['thinking', 'noanswer'].includes(r.status) || r.A.paperOnly || !r.A.onlineOk || r.refuser || r.A.renter || r.A.notOwner) continue;
+        if (r.mood >= 35 && rnd() < .6 * Math.max(.5, fat)) { r.channel = 'redial'; this.resolveOnline(r); n++; } }
+      body = L(RAC.redialB).replace('{n}', n);
+    } else if (k === 'chat') {
+      // WhatsApp/Telegram: ссылка без установки приложения — отсутствующие хозяева; ИИ-помощник подбирает каждому его довод
+      const half = this.signatures() >= T.goal / 2;
+      for (const r of all) {
+        if ((r.A.renter || r.A.notOwner) && ['unknown', 'novote', 'proxy'].includes(r.status) && rnd() < .5 * fat) { this.goOnline(r, 'chat'); r.ownerP = 1; n++; continue; }
+        if (!undecided(r) || r.A.renter || r.A.notOwner) continue;
+        if (r.status === 'away' && !r.A.paperOnly && rnd() < .35 * fat) { this.goOnline(r, 'chat'); n++; continue; }
+        r.mood += half ? 4 : 1;
+        const best = Math.max(...Object.values(r.A.likes || { x: 0 })); r.mood += Math.round(best * .6 * Math.max(.5, fat));
+        if (r.mood >= 70 && !r.A.paperOnly) { this.goOnline(r, 'chat'); r.onlineAt = this.minute + 1; n++; }
+      }
+      const ai = AI_CHAT[T.scen]; this.racAnim.chat = ai ? { q: fmtLine(L(ai.q)), a: fmtLine(L(ai.a)) } : null;
+      body = fmtLine(L(RAC.chatMsg).replace('{t}', tourTitle(T)).replace('{n}', this.signatures()).replace('{g}', T.goal));
     }
-    this.events.push({ t: 'broadcast' }); this.broadcasts++;
-    setTimeout(() => toast(L(UI.raccoonT), L(UI.raccoonB) + ' (+' + n + ')'), 900);
-    if (this.tour.remote) setTimeout(() => toast('E-KNOT', L(UI.remoteToast).replace('{n}', this.tour.remote.perBroadcast)), 3600);
+    this.events.push({ t: 'broadcast', via: k }); this.broadcasts++;
+    setTimeout(() => toast(L(RAC[k + 'T']), body, 3600), 900);
+    this.checkGoal(1200);
+  },
+  /* ---- подростки на лестнице: курят, при виде героя убегают; через несколько дней — на другом этаже ---- */
+  updateTeens(dt) {
+    const G = this.teens; if (!G) return; G.t += dt;
+    if (G.st === 'here' && this.hero.floor === G.floor && !this.hero.climb && Math.abs(this.hero.x - G.x) < 60) {
+      G.st = 'flee'; G.fleeT = 0; const line = TEENS.flee[Math.floor(Math.random() * TEENS.flee.length)];
+      pop(G.x, this.base(G.floor) - 56, L(line), '#c9c3b0'); sfx.select();
+      if (!this.teensSeen) { this.teensSeen = true; setTimeout(() => scene === this && !this.over && toast(SAVE.name, L(TEENS.hero), 3200), 1400); }
+    }
+    if (G.st === 'flee') { G.fleeT += dt; if (G.fleeT > 1400) { G.st = 'gone'; G.backAt = this.day() + 6; for (const r of Object.values(this.res)) if (r.floor === G.floor) r.mood += 3; } }
+    if (G.st === 'gone' && this.day() >= G.backAt) { let f; do f = 3 + Math.floor(Math.random() * 10); while (f === this.hero.floor || f === G.floor);
+      G.floor = f; G.st = 'here'; for (const r of Object.values(this.res)) if (r.floor === f) r.mood -= 3; }
   },
   /* ---- конец тура ---- */
   async finish(timeUp) {
     if (this.over) return; this.over = true; setTouch({});
     if (timeUp) toast('E-KNOT', L(UI.timeUp), 2000);
     // онлайн-подписи приходят к концу тура
-    for (const r of Object.values(this.res)) if (r.status === 'online') {
-      const k = Math.random(), py = r.arch === 'night' ? .9 : .82;
-      if (k < py) { r.status = 'yes'; this.events.push({ t: 'yes', apt: r.apt, via: 'online' }); } else if (k < py + .06) { r.status = 'no'; this.events.push({ t: 'no', apt: r.apt, via: 'online' }); } else r.status = 'thinking';
-    }
+    for (const r of Object.values(this.res)) if (r.status === 'online') this.resolveOnline(r);
     let result;
     try { result = await API.tourFinish(this.run, this.events); }
     catch (e) {
       // сервер не ответил — показываем итог, посчитанный в игре, но без рейтинга и бонусов
-      const yes = new Set(this.events.filter(e => e.t === 'yes').map(e => e.apt)), own = yes.size, remote = this.remoteTarget(), n = own + remote;
-      const against = this.against(), out = voteOutcome(this.tour, n, against);
-      result = { signatures: n, own, remote, against, turnout: out.turnout, need: out.need, online: this.events.filter(e => e.t === 'yes' && e.via === 'online').length, success: out.ok, coins: 0, score: null, offline: true };
+      const n = this.signatures(), against = this.against(), ab = this.abstained(), out = voteOutcome(this.tour, n, against, ab);
+      result = { signatures: n, own: n, against, abstain: ab, turnout: out.turnout, need: out.need, success: out.ok, coins: 0, score: null, offline: true };
     }
     const T = this.tour.id, prev = SAVE.tours[T] || { tries: 0, best: 0, done: false };
     SAVE.tours[T] = { tries: prev.tries + 1, best: Math.max(prev.best, result.signatures), done: prev.done || result.success };
@@ -707,7 +851,10 @@ scenes.tour = {
     if (result.first && !HOUSE_STATE.won.includes(this.tour.id)) HOUSE_STATE.won.push(this.tour.id);
     // результат — в приложение E-KNOT (WebView) и на его сервер (docs/API.md)
     try { const payload = buildResult(this, result); notifyApp('result', payload); sendResultToServer(payload); } catch (e) { console.warn(e); }
-    const stats = { ...result, tourId: this.tour.id, goal: this.tour.goal, problem: this.problem, against: this.against(), thinking: Object.values(this.res).filter(r => r.status === 'thinking').length };
+    // источники голосов для протокола: у дверей, бумага, доверенность, каналы E-KNOT
+    const src = {}; for (const e of this.events) if (e.t === 'yes') src[e.via || 'door'] = (src[e.via || 'door'] || 0) + 1;
+    const stats = { ...result, tourId: this.tour.id, goal: this.tour.goal, problem: this.problem, against: this.against(), abstain: this.abstained(), src, appShare: this.appShare(), day: this.day(),
+      thinking: Object.values(this.res).filter(r => r.status === 'thinking').length, notVoted: Object.values(this.res).filter(r => !['yes', 'no', 'abstain'].includes(r.status)).length };
     setTimeout(() => irisTo(this.hero.x - this.camX, this.hero.y - this.camY - 14, () => go('result', stats)), timeUp ? 1200 : 200);
   },
 
@@ -769,6 +916,18 @@ scenes.tour = {
       else { ctx.globalAlpha = n.leaving ? clamp(1 - (n.leaving - 1000) / 600, 0, 1) : 1;
         sprite(personSprite(n.look, n.leaving ? 'walk' + (Math.floor(n.leaving / 95) % 8) : 'idle' + (Math.floor(t / 600) % 2)), n.x + (n.leaving ? n.leaving * .05 : 0) - 9, this.base(n.floor) - PH - cy, !n.leaving && h.x < n.x);
         ctx.globalAlpha = 1; } }
+    // подростки курят на площадке; при виде героя — бегом к лестнице
+    if (this.teens && this.teens.st !== 'gone') { const G = this.teens, gb = this.base(G.floor) - cy;
+      if (gb > -60 && gb < H + 60) for (let i = 0; i < 3; i++) {
+        const fx = G.st === 'flee' ? G.x + (STAIR_FOOT - G.x) * Math.min(1, G.fleeT / 1200) + i * 6 : G.x + i * 13 - 13;
+        ctx.globalAlpha = G.st === 'flee' ? clamp(1 - (G.fleeT - 900) / 500, 0, 1) : 1;
+        sprite(personSprite(TEEN_LOOKS[i], G.st === 'flee' ? 'walk' + (Math.floor((G.fleeT + i * 90) / 80) % 8) : 'idle' + (Math.floor(t / 700 + i) % 2)), Math.round(fx) - 9, gb - PH + 2, G.st === 'flee' ? STAIR_FOOT < G.x : i === 2);
+        if (G.st === 'here' && i !== 1) { const k = ((t / 1600 + i * .4) % 1); ctx.globalAlpha = .5 * (1 - k); rect(Math.round(fx + 4 + Math.sin(k * 6) * 2), Math.round(gb - PH + 12 - k * 16), 2, 2, '#c9cdc8'); }
+        ctx.globalAlpha = 1; } }
+    // «нехорошая квартира»: громкая музыка или посетители, пока нет домофона с доступом из E-KNOT
+    if (this.shady && !this.fixed.has('door')) { const r = this.shady, sb = this.base(r.floor) - cy, x = DOOR_X[r.d];
+      if (sb > -60 && sb < H + 60) { if (r.apt % 2) { for (let i = 0; i < 2; i++) { const k = ((t / 900 + i * .5) % 1); ctx.globalAlpha = 1 - k; text('♪', x - 6 + i * 10 + Math.sin(k * 7) * 3, sb - 66 - k * 14, { col: '#b88ad0', size: 6 }); } ctx.globalAlpha = 1; }
+        else { const k = (t % 9000) / 9000; if (k < .25) { const vx = x + 60 - k * 4 * 60; sprite(personSprite(SHADY_GUEST, 'walk' + (Math.floor(t / 95) % 8)), Math.round(vx) - 9, sb - PH, true); } } } }
     // помощница
     if (this.helper.state === 'shown') {
       const hb = this.base(this.helper.floor) - cy;
@@ -791,16 +950,13 @@ scenes.tour = {
     }
     ctx.restore();
     drawPops(dt, cx, cy);
-    // енот с рассылкой
-    if (this.racAnim) {
-      const k = this.racAnim.t / 1800, rx = lerp(W + 20, -30, k), ry = 40 + Math.sin(k * Math.PI) * 30;
-      sprite(RACCOON, rx, ry);
-      for (let i = 0; i < 8; i++) { const pk = clamp(k * 1.6 - i * .08, 0, 1); if (pk <= 0 || pk >= 1) continue; sprite(PLANE, rx + 10 + pk * 140 * Math.cos(i), ry + pk * 160 * Math.sin(i * .7 + .4)); }
-    }
+    // енот: у каждого действия своя анимация
+    if (this.racAnim) this.drawRacAnim(t);
     if (this.stampT > 0) { this.stampT -= dt; const s = 1 + Math.max(0, (this.stampT - 600) / 300) * 1.5; ctx.save(); ctx.globalAlpha = Math.min(1, this.stampT / 300);
       ctx.translate(W / 2, 92); ctx.rotate(-.18); ctx.scale(s, s); rect(-34, -12, 68, 24, 'rgba(76,175,110,.25)'); ctx.strokeStyle = '#4caf6e'; ctx.lineWidth = 2; ctx.strokeRect(-34, -12, 68, 24);
       text(['ҚОЛ ҚОЙДЫ', 'ПОДПИСАНО', 'SIGNED'][LI()], 0, -4, { col: '#4caf6e', align: 'center' }); ctx.restore(); }
     this.drawHUD();
+    if (this.rac.menu && !this.busy && !DLG.open) this.drawRacMenu();
     dlgDraw();
     if (this.ballot) this.drawBallot();
     if (this.paused) {
@@ -820,36 +976,63 @@ scenes.tour = {
       if (button(L(UI.close), W / 2, 56 + rows * 28 + 4, 'alt')) this.liftPick = false;
     }
     // нажатие по подъезду: герой сам идёт к двери / на нужный этаж
-    if (!this.busy && !DLG.open && !this.ballot && !this.liftPick && !this.over && !this.hero.ride) { const c = clicks.find(c => c.y > 24); if (c) { clicks.splice(clicks.indexOf(c), 1); this.onTap(c.x + cx, c.y + cy); } }
+    if (!this.busy && !DLG.open && !this.ballot && !this.liftPick && !this.over && !this.hero.ride && !this.rac.menu) { const c = clicks.find(c => c.y > 24); if (c) { clicks.splice(clicks.indexOf(c), 1); this.onTap(c.x + cx, c.y + cy); } }
+  },
+  drawRacAnim(t) {
+    const A = this.racAnim, k = A.t / 2200, cy = Math.round(this.camY), cx = Math.round(this.camX);
+    const rx = lerp(W + 20, W - 60, Math.min(1, A.t / 400)), ry = 30;
+    if (A.kind === 'notify') {          // экраны телефонов загораются в окнах-дверях
+      for (const r of Object.values(this.res)) { if (r.status !== 'online' || r.channel !== 'notify') continue; const y = this.base(r.floor) - cy - 52, x = DOOR_X[r.d] - cx;
+        if (y < 20 || y > H) continue; const on = (A.t / 140 + r.apt) % 3 < 2; rect(x - 3, y, 6, 9, '#0e111c'); rect(x - 2, y + 1, 4, 6, on ? '#9fe8d0' : '#2f8577'); }
+    } else if (A.kind === 'call') {     // волна звонков по этажам
+      for (let f = 1; f <= this.tour.floors; f++) { const y = this.base(f) - cy - 40; if (y < 20 || y > H) continue; const kk = clamp(k * 2 - (this.tour.floors - f) * .05, 0, 1);
+        if (kk > 0 && kk < 1) { ctx.globalAlpha = 1 - kk; ctx.strokeStyle = '#9fd9c2'; ctx.lineWidth = 1; for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.arc(this.hero.x - cx, y, 8 + kk * 220 + i * 10, -0.6, 0.6); ctx.stroke(); ctx.beginPath(); ctx.arc(this.hero.x - cx, y, 8 + kk * 220 + i * 10, Math.PI - .6, Math.PI + .6); ctx.stroke(); } ctx.globalAlpha = 1; } }
+    } else if (A.kind === 'redial') {   // пульсирующие метки над дверями, куда дозвонились
+      for (const r of Object.values(this.res)) { if (r.channel !== 'redial') continue; const y = this.base(r.floor) - cy - 80, x = DOOR_X[r.d] - cx; if (y < 20 || y > H) continue;
+        const s = 3 + Math.sin(A.t / 120) * 2; rect(x - s, y - s, s * 2, s * 2, 'rgba(242,201,76,.35)'); text('☎', x, y - 3, { col: '#f2c94c', align: 'center', size: 6 }); }
+    } else if (A.kind === 'chat' && A.chat) {   // чат дома: вопрос жителя и ответ ИИ-помощника E-KNOT
+      const a = Math.min(1, A.t / 300) * Math.min(1, (4200 - A.t) / 300); ctx.globalAlpha = a;
+      frameBox(70, 80, 260, 66, .96);
+      const q = wrapText(A.chat.q, 200, 6), an = wrapText(A.chat.a, 220, 6);
+      rect(80, 88, Math.min(206, q.reduce((m, l) => Math.max(m, textW(l, 6)), 0) + 10), q.length * 8 + 6, '#3a4a5a'); q.forEach((l, i) => text(l, 85, 91 + i * 8, { col: '#f4f3ee', size: 6 }));
+      if (A.t > 1100) { const y0 = 92 + q.length * 8 + 6; rect(106, y0, 216, an.length * 8 + 6, '#2f8577'); an.forEach((l, i) => text(l, 111, y0 + 3 + i * 8, { col: '#f4f3ee', size: 6 })); text(L(UI.aiName), 322, y0 - 8, { col: '#9fd9c2', size: 6, align: 'right' }); }
+      ctx.globalAlpha = 1;
+    }
+    sprite(RACCOON, rx, ry);
+  },
+  // меню енота: 4 действия, открываются по очереди; у каждого — пауза в днях
+  drawRacMenu() {
+    frameBox(214, 22, 182, 92, .97);
+    text(L(UI.raccoon), 222, 28, { col: '#9fd9c2', size: 6 });
+    RAC_ACTS.forEach((k, i) => { const st = this.racReady(k), y = 38 + i * 18;
+      const lbl = L(UI['rac_' + k]) + (st.ok ? (st.bonus ? ' +1' : '') : st.why === 'locked' ? ' 🔒' : ` · ${st.days} ${L(UI.daysShort)}`);
+      if (button(lbl, 305, y, st.ok ? 'alt' : 'off', { w: 176 })) this.useRac(k); });
+    if (clicks.length) clicks.length = 0;
   },
   drawHUD() {
     const T = this.tour;
     rect(0, 0, W, 19, '#0e111c'); rect(0, 19, W, 1, '#55607c'); rect(0, 20, W, 1, 'rgba(5,6,10,.6)');
-    rect(126, 3, 1, 13, '#2c3346'); rect(238, 3, 1, 13, '#2c3346');
-    const m = Math.floor(this.minute), hh = Math.floor(m / 60), mm = m % 60;
-    const left = this.end - this.minute;
-    // часы
-    // кнопка паузы вместо значка часов
     if (button('II', 0, 1, 'dark', { left: 1, w: 16 }) && !this.busy && !DLG.open) this.paused = true;
-    const late = left < T.duration * .12;
-    text(`${L(UI.day)} ${this.day()}/${T.days}`, 22, 7, { col: late ? '#e98f6f' : '#f4f3ee', size: 6 });
-    rect(88, 7, 35, 5, '#2b2a33'); rect(88, 7, Math.round(35 * clamp(left / T.duration, 0, 1)), 5, late ? '#e98f6f' : '#7fc4a8');
-    // подписи
-    const n = this.votes(), o = this.outcome();
-    if (T.rule === 'quorum') {
-      text(`${L(UI.yesShort)} ${n}/${o.need}`, 132, 3, { col: n >= o.need ? '#4caf6e' : '#f2c94c', size: 6 });
-      text(`${L(UI.turnShort)} ${o.turnout}/${T.quorum}`, 132, 11, { col: o.turnout >= T.quorum ? '#4caf6e' : '#9fb0cc', size: 6 });
-    } else text(`${L(T.n === 1 ? UI.signs : UI.yesShort)} ${n}/${T.goal}`, 132, 5, { col: n >= T.goal ? '#4caf6e' : '#f2c94c' });
-    // обещали подписать онлайн в E-KNOT — придут к концу собрания, показываем отдельно, чтобы итог не был сюрпризом
-    const pend = Object.values(this.res).filter(r => r.status === 'online').length;
-    if (pend) text(L(UI.hudOnline).replace('{n}', pend), 132, 22, { col: '#7fc4a8', size: 6, shadow: '#0b0c10' });
-    // онлайн-голоса из E-KNOT: «за» и «против», пришедшие в приложении — меняются по ходу собрания
-    if (this.app) { const ox = ONLINE_HUD_X, fl = this.onFlash > 0 && Math.floor(this.onFlash / 120) % 2;
+    // дни — с тура 2 (в туре 1 таймера нет)
+    if (!T.noTimer) { const left = this.end - this.minute, late = left < T.duration * .12;
+      text(`${L(UI.day)} ${this.day()}/${T.days}`, 22, 3, { col: late ? '#e98f6f' : '#f4f3ee', size: 6 });
+      rect(22, 12, 56, 3, '#2b2a33'); rect(22, 12, Math.round(56 * clamp(left / T.duration, 0, 1)), 3, late ? '#e98f6f' : '#7fc4a8'); }
+    else text(L(UI.noTimerHud), 22, 7, { col: '#8792ad', size: 6 });
+    // «За X / нужно Y», кворум
+    const n = this.votes(), o = this.outcome(), x0 = 84;
+    text(`${L(UI.yesShort)} ${n}/${o.need}`, x0, T.rule === 'quorum' ? 3 : 7, { col: n >= o.need ? '#4caf6e' : '#f2c94c', size: 6 });
+    if (T.rule === 'quorum') { const k = clamp(o.turnout / T.quorum, 0, 1); rect(x0, 12, 40, 3, '#2b2a33'); rect(x0, 12, Math.round(40 * k), 3, o.turnout >= T.quorum ? '#4caf6e' : '#9fb0cc');
+      text(`${o.turnout}/${T.quorum}`, x0 + 43, 10, { col: '#9fb0cc', size: 6 }); }
+    // доля E-KNOT и онлайн-голоса
+    if (this.app) { const ox = 172, fl = this.onFlash > 0 && Math.floor(this.onFlash / 120) % 2;
       rect(ox, 4, 6, 11, fl ? '#f4f3ee' : '#7fc4a8'); rect(ox + 1, 5, 4, 7, '#0e111c'); rect(ox + 2, 13, 2, 1, '#0e111c');
-      text('+' + this.onYes, ox + 9, 3, { col: '#4caf6e', size: 6 }); text('−' + this.onNo, ox + 9, 11, { col: this.onNo ? '#e88a7a' : '#8792ad', size: 6 }); }
-    if (button(L(UI.ballot), 0, 1, 'dark', { left: 244 }) && !this.busy && !DLG.open) this.ballot = !this.ballot;
-    if (this.app) { if (button(`${L(UI.raccoon)}×${this.raccoon}`, 0, 1, this.raccoon ? 'alt' : 'off', { left: 330 })) this.useRaccoon(); }
-    text(`${this.hero.floor}${L(UI.floor)}`, 8, 22, { col: '#f4f3ee', shadow: '#0b0c10', size: 6 });
+      text(`E-KNOT ${this.appShare()}%`, ox + 9, 3, { col: '#9fd9c2', size: 6 }); text('+' + this.onYes + ' −' + this.onNo, ox + 9, 11, { col: '#8792ad', size: 6 }); }
+    if (button(L(UI.ballot), 0, 1, 'dark', { left: 252 }) && !this.busy && !DLG.open) this.ballot = !this.ballot;
+    if (this.app && button(L(UI.raccoon), 0, 1, this.rac.menu ? 'primary' : 'alt', { left: 338 }) && !this.busy && !DLG.open) this.rac.menu = !this.rac.menu;
+    const pend = Object.values(this.res).filter(r => r.status === 'online').length, papers = Object.values(this.res).filter(r => r.status === 'paper').length;
+    let hy = 22; text(`${this.hero.floor}${L(UI.floor)}`, 8, hy, { col: '#f4f3ee', shadow: '#0b0c10', size: 6 });
+    if (pend) text(L(UI.hudOnline).replace('{n}', pend), 84, hy, { col: '#7fc4a8', size: 6, shadow: '#0b0c10' });
+    if (papers) text(`📄 ${papers}`, 220, hy, { col: '#d8d2bf', size: 6, shadow: '#0b0c10' });
     if ((this.goalMet() || this.goalLikely()) && !this.busy && !DLG.open) { if (button(L(UI.finish), W / 2, 30, 'primary')) this.finish(false); }
   },
   drawBallot() {
@@ -857,7 +1040,7 @@ scenes.tour = {
     rect(0, 0, W, H, 'rgba(11,12,16,.55)');
     paper(40, 22, 320, 192, 8);
     text(L(UI.ballotTitle), W / 2, 30, { align: 'center', col: INK_RED });
-    const rowH = T.floors > 9 ? 10 : T.floors > 5 ? 13 : 24, ch = rowH - 1;
+    const rowH = 10, ch = rowH - 1;
     for (let f = T.floors; f >= 1; f--) {
       const y = 42 + (T.floors - f) * rowH;
       text(`${f}`, 54, y + Math.round(ch / 2) - 3, { col: INK_MUTED, size: 6 });
@@ -867,25 +1050,21 @@ scenes.tour = {
         rect(x, y, cw, ch, '#e2d9c2'); rect(x, y + ch - 1, cw, 1, '#cfc3a5');
         const ty = y + Math.round(ch / 2) - 3;
         text(aptNo(apt), x + 2, ty, { col: isStorage(apt) ? INK_MUTED : INK, size: 6 });
-        if (isStorage(apt)) { rect(x, y, cw, ch, 'rgba(120,110,90,.18)'); continue; }
-        const st = apt === T.heroApt ? 'me' : r.status;
-        if (ICONS[st]) sprite(ICONS[st], x + cw - 9, y + Math.round((ch - 9) / 2));
-        const nm = apt === T.heroApt ? L(UI.st.me) : (r.status === 'unknown' ? '' : r.name.split(' ')[0]);
-        if (cw > 60) text(nm.length > 6 ? nm.slice(0, 5) + '.' : nm, x + 28, ty, { col: INK_MUTED, size: 6 });
+        if (isStorage(apt)) { rect(x, y, cw, ch, 'rgba(120,110,90,.18)'); sprite(ICONS.novote, x + cw - 9, y); continue; }
+        const st = apt === T.heroApt ? 'me' : r.status === 'renter' ? 'novote' : r.status;
+        if (ICONS[st]) sprite(ICONS[st], x + cw - 9, y);
       }
     }
-    if (T.remote) {   // полоска онлайн-голосов двух других подъездов
-      const y = 42 + T.floors * rowH + 2, k = Math.floor(this.remoteShown) / T.remote.max;
-      text(L(UI.remote), 68, y, { col: INK, size: 6 }); text(`${Math.floor(this.remoteShown)}/${T.remote.max}`, 332, y, { col: INK_TEAL, size: 6, align: 'right' });
-      rect(68, y + 8, 264, 4, '#e2d9c2'); rect(68, y + 8, Math.round(264 * k), 4, '#4c9a84');
-    }
     const cnt = s => Object.values(this.res).filter(r => r.status === s).length;
-    const leg = [['yes', cnt('yes')], ['online', cnt('online')], ['thinking', cnt('thinking')], ['no', cnt('no')], ['away', cnt('away')], ['noanswer', cnt('noanswer')]];
-    const ly = T.remote ? 174 : 170; leg.forEach(([k, v], i) => { const x = 62 + i * 46; sprite(ICONS[k], x, ly); text(String(v), x + 12, ly + 1, { col: INK }); });
-    if (button(L(UI.close), W / 2, T.remote ? 190 : 188, 'alt')) this.ballot = false;
+    const leg = [['yes', cnt('yes')], ['no', cnt('no')], ['abstain', cnt('abstain')], ['thinking', cnt('thinking')], ['online', cnt('online')], ['paper', cnt('paper')], ['proxy', cnt('proxy')], ['novote', cnt('novote') + HOUSE.storage.length]];
+    leg.forEach(([k, v], i) => { const x = 58 + i * 37; sprite(ICONS[k], x, 176); text(String(v), x + 11, 177, { col: INK, size: 6 }); });
+    if (button(L(UI.close), W / 2, 190, 'alt')) this.ballot = false;
   },
 };
-const REFUSE = { grump: .4, business: .15, night: .1, student: .06, mom: .04, apa: .04, ata: .03, teacher: .05, dad: .06, it: .08 };
+const REFUSE = { grump: .4, business: .15, night: .1, mom: .04, apa: .04, ata: .03, teacher: .05, dad: .06, it: .08, novosel: .02 };
+const RAC_ACTS = ['notify', 'call', 'redial', 'chat'], RAC_PAUSE = { notify: 5, call: 7, redial: 5, chat: 7 };
+// каналы, через которые голос собрало приложение E-KNOT (в протоколе — доля E-KNOT)
+const APP_VIA = ['online', 'notify', 'call', 'redial', 'chat', 'owner'];
 // внешность жильца: пол, возраст, причёска, седина, очки, борода, головной убор, одежда и цвета
 const SKINS = ['#f1c7a3', '#e8b892', '#e3ad86', '#d9a77c', '#c98e66', '#b07a56'];
 const HAIR_Y = ['#2b2420', '#1b1a21', '#4a2e22', '#6a4028', '#a5503c', '#3a2a20', '#2b2420'], HAIR_O = ['#c9c6c0', '#9c9a96', '#8f8a84', '#6e6a66', '#b8b4ac'];
@@ -907,7 +1086,10 @@ function varyLook(a, R) {
     case 'teacher': Object.assign(L, { body: 'f', old: true, hair: any(['bun', 'bun', 'short', 'curly']), hairCol: ch(.6) ? any(HAIR_O) : any(['#6a2a2a', '#4a2e22', '#8a4a3a']), glasses: ch(.75), top: ch(.6) ? 'jacket' : 'shirt', bottom: ch(.7) ? 'skirt' : 'pants', skirtCol: any(SKIRT_C) }); break;
     case 'mom': youngF(); L.top = any(['shirt', 'hoodie', 'shirt', 'jacket']); break;
     case 'dad': youngM(); Object.assign(L, { beard: ch(.4), top: any(['hoodie', 'shirt', 'leather']) }); if (ch(.25)) Object.assign(L, { hat: 'cap', capCol: any(['#b8443f', '#3f6f8c', '#2b2a33']) }); break;
-    case 'student': ch(.5) ? youngF() : youngM(); Object.assign(L, { top: ch(.65) ? 'hoodie' : 'shirt', headphones: ch(.4), glasses: ch(.2) });
+    case 'novosel': youngF(); L.top = any(['shirt', 'jacket', 'hoodie']); break;
+    case 'renter': youngF(); L.top = any(['hoodie', 'shirt']); L.headphones = ch(.25); break;
+    case 'shady': youngM(); Object.assign(L, { top: 'leather', topCol: any(['#2b2a33', '#3a2a2a']), beard: ch(.5) }); break;
+    case 'notowner': ch(.5) ? youngF() : youngM(); Object.assign(L, { top: ch(.65) ? 'hoodie' : 'shirt', headphones: ch(.4), glasses: ch(.2) });
       if (L.body === 'm' && ch(.25)) Object.assign(L, { hat: 'cap', capCol: any(['#b8443f', '#3f6f8c', '#c79a3b', '#2b2a33']) }); break;
     case 'business': if (ch(.7)) youngM(); else { youngF(); L.hair = any(['bun', 'long']); L.bottom = 'skirt'; }
       Object.assign(L, { top: ch(.8) ? 'jacket' : 'leather', topCol: any(['#2b2a33', '#3a4a5a', '#4a4a52', '#5a3a3a']), glasses: ch(.25), beard: L.body === 'm' && ch(.15) }); break;
@@ -919,12 +1101,9 @@ function varyLook(a, R) {
   if (!L.top) L.top = 'shirt';
   return L;
 }
-function namePool(a, look) {
-  if (a === 'apa') return NAMES.apa; if (a === 'grump') return NAMES.grump; if (a === 'ata') return NAME_POOL.ata; if (a === 'teacher') return NAME_POOL.teacher;
-  const young = ['student', 'renter', 'it'].includes(a);
-  return look.body === 'f' ? (young ? NAME_POOL.youngF : NAME_POOL.adultF) : (young ? NAME_POOL.youngM : NAME_POOL.adultM);
-}
 const ONLINE_HUD_X = 208;
+const TEEN_LOOKS = [{ body: 'm', skin: '#e3ad86', hair: 'short', hairCol: '#2b2420', top: 'hoodie', topCol: '#2b2a33', hat: 'cap', capCol: '#b8443f' }, { body: 'm', skin: '#d9a77c', hair: 'curly', hairCol: '#3a2a20', top: 'hoodie', topCol: '#4a5a7a' }, { body: 'f', skin: '#f1c7a3', hair: 'long', hairCol: '#4a2e22', top: 'hoodie', topCol: '#6a3a4a', bottom: 'pants' }];
+const SHADY_GUEST = { body: 'm', skin: '#c98e66', hair: 'short', hairCol: '#1b1a21', top: 'leather', topCol: '#2b2a33', hat: 'cap', capCol: '#2b2a33' };
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 function tweenDoor(r, to) { return new Promise(res => { const from = r.door, t0 = performance.now(); (function step() { const k = Math.min(1, (performance.now() - t0) / 260); r.door = lerp(from, to, k); if (k < 1) requestAnimationFrame(step); else res(); })(); }); }
 
@@ -936,42 +1115,48 @@ scenes.result = {
     this.rank = null; if (!d.offline) API.leaderboard('complex').then(r => this.rank = r.mine).catch(() => {}); },
   update(dt) { this.t += dt; if (hit('act')) irisTo(W / 2, 200, () => go('house')); },
   draw(dt) {
-    const d = this.d;
+    const d = this.d, TT = TOURS[d.tourId] || TOURS.L1, ekn = TT.n >= 2;
     drawNight(dt);
-    paper(56, 10, 288, 210, 11);
-    const t2 = d.tourId === 't2';
-    text(L(UI.protocol).replace('1', d.tourId ? d.tourId.slice(1) : '1'), W / 2, 18, { align: 'center', col: INK_MUTED });
-    const TT = TOURS[d.tourId] || TOURS.L1;
-    text(d.success ? L(TT.winT) : TT.rule === 'quorum' && (d.turnout || 0) < TT.quorum ? L(UI.noQuorum) : L(UI.lose), W / 2, 32, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
-    // у дверей + онлайн = всего: те же числа, что игрок видел на экране собрания
-    const online = d.online || 0, door = Math.max(0, d.signatures - online - (d.remote || 0));
-    const rows = [[L(UI.rDoor), String(door)]];
-    if (online) rows.push([L(UI.rOnline), '+' + online]);
-    if (d.remote) rows.push([L(UI.remote), '+' + d.remote]);
-    const need = d.need || TT.goal;
-    rows.push([L(UI.rTotal), `${d.signatures}/${need}`, d.signatures >= need ? INK_TEAL : INK_RED], [L(UI.rAgainst), String(d.against)]);
-    if (TT.rule === 'quorum') rows.push([L(UI.rTurnout), `${d.turnout || 0}/${TT.quorum}`, (d.turnout || 0) >= TT.quorum ? INK_TEAL : INK_RED]);
-    rows.push([L(UI.rThinking), String(d.thinking)]);
-    if (!d.offline) rows.push([L(UI.rScore) + ' / ' + L(UI.rRank), String(d.score) + (d.newBest ? '★' : '') + ' · ' + (this.rank ? '#' + this.rank.rank : '…'), d.newBest ? INK_GOLD : INK], [L(UI.rBudget), '+₸' + d.coins]);
-    const rh = rows.length > 8 ? 10 : 11;
-    rows.forEach(([a, b, c], i) => { text(a, 74, 46 + i * rh, { col: INK }); text(b, 326, 46 + i * rh, { col: c || INK, align: 'right' }); rect(74, 55 + i * rh, 252, 1, '#e2d9c2'); });
-    // бонус в приложение
+    paper(40, 6, 320, 214, 11);
+    // тур 1 — бумажный «Протокол № 1» инициативной группы; туры 2–7 — протокол, сформированный в E-KNOT
+    text(ekn ? L(UI.protEkn).replace('{n}', '0' + TT.n) : L(UI.prot1), W / 2, 12, { align: 'center', col: INK_MUTED, size: 6 });
+    if (ekn) text(L(UI.protEknSub), W / 2, 20, { align: 'center', col: INK_TEAL, size: 6 });
+    const addr = (USER.complex && USER.complex.name ? USER.complex.name + ' · ' : '') + L(UI.protEntrance) + ' · ' + L(UI.day) + ' ' + (d.day || 1);
+    text(addr, W / 2, 28, { align: 'center', col: INK_MUTED, size: 6 });
+    text(L(UI.protAgenda) + ' ' + tourTitle(TT), 52, 37, { col: INK, size: 6 });
+    text(d.success ? L(TT.winT) : TT.rule === 'quorum' && (d.turnout || 0) < TT.quorum ? L(UI.noQuorum) : L(UI.lose), W / 2, 46, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
+    const need = d.need || TT.goal, src = d.src || {};
+    const rows = [[L(UI.protQuorum), `${d.turnout || 0} / ${APTS}` + (TT.quorum ? ` (≥${TT.quorum})` : ''), TT.quorum ? ((d.turnout || 0) >= TT.quorum ? INK_TEAL : INK_RED) : INK],
+      [L(UI.rTotal), `${d.signatures}/${need}`, d.signatures >= need ? INK_TEAL : INK_RED], [L(UI.rAgainst), String(d.against || 0)], [L(UI.protAbstain), String(d.abstain || 0)], [L(UI.protNotVoted), String(d.notVoted ?? '')]];
+    const sum = (...k) => k.reduce((a, x) => a + (src[x] || 0), 0);
+    // источники голосов «за»: у дверей, бумага, доверенность, онлайн по каналам Енота
+    const chans = [['door', UI.srcDoor, sum('door', 'helper', 'council')], ['paper', UI.srcPaper, sum('paper')], ['proxy', UI.srcProxy, sum('proxy')],
+      ['online', UI.srcOnline, sum('online', 'owner')], ['notify', UI.rac_notify, sum('notify')], ['call', UI.rac_call, sum('call')], ['redial', UI.rac_redial, sum('redial')], ['chat', UI.rac_chat, sum('chat')]].filter(c => c[2]);
+    rows.forEach(([a, b, c], i) => { const y = 54 + i * 9; text(a, 54, y, { col: INK, size: 6 }); text(b, 346, y, { col: c || INK, align: 'right', size: 6 }); rect(54, y + 7, 292, 1, '#e2d9c2'); });
+    let y = 54 + rows.length * 9 + 2;
+    text(L(UI.protSources), 54, y, { col: INK_MUTED, size: 6 }); y += 9;
+    chans.forEach(([k, lbl, v], i) => { const x = 54 + (i % 2) * 150, yy = y + Math.floor(i / 2) * 8; text(`${L(lbl)}: ${v}`, x, yy, { col: INK, size: 6 }); });
+    y += Math.ceil(chans.length / 2) * 8 + 2;
+    if (ekn) { text(L(UI.protShare).replace('{n}', d.appShare || 0).replace('{m}', 100 - (d.appShare || 0)), 54, y, { col: INK_TEAL, size: 6 }); y += 9; }
+    // подписи: председатель, секретарь, члены совета (с тура 2)
+    if (ekn) { wrapText(L(UI.protSign), 290, 6).forEach(l => { text(l, 54, y, { col: INK_MUTED, size: 6 }); y += 8; }); }
+    else { text(L(UI.protSign1).replace('{n}', d.signatures), 54, y, { col: INK_MUTED, size: 6 }); y += 8; }
+    if (!d.offline) text(`${L(UI.rScore)} ${d.score}${d.newBest ? '★' : ''} · ${this.rank ? '#' + this.rank.rank : '…'}` + (d.coins ? ` · ${L(UI.rBudget)} +${money(d.coins)}` : ''), 54, y, { col: d.newBest ? INK_GOLD : INK, size: 6 });
+    y += 10;
     let note, col = INK_MUTED;
     if (d.offline) note = L(UI.rOffline);
     else if (d.suspicious) { note = L(UI.rSuspicious); col = INK_RED; }
-    else note = d.success ? (d.first ? L(TT.winNote) : L(UI.rReplay)) : L(UI.rRetry);
-    let ny = 46 + rows.length * rh + 4;
-    wrapText(note, 250).slice(0, 3).forEach(l => { text(l, 200, ny, { align: 'center', col, size: 6 }); ny += 9; });
-    // значок и баллы в приложение — отдельной строкой
-    if (!d.offline && !d.suspicious && d.reward) { const b = BADGES[d.reward.badge] ? L(BADGES[d.reward.badge]) : '';
+    else note = d.success ? (d.first ? fmtLine(L(TT.winNote)) : L(UI.rReplay)) : L(UI.rRetry);
+    wrapText(note, 290, 6).slice(0, 2).forEach(l => { text(l, W / 2, y, { align: 'center', col, size: 6 }); y += 8; });
+    if (!d.offline && !d.suspicious && d.reward) { const b = (d.reward.badges || [d.reward.badge]).map(k => BADGES[k] ? L(BADGES[k]) : '').filter(Boolean).join(', ');
       const rt = L(d.reward.status === 'sent' ? UI.rRewardSent : UI.rRewardGuest).replace('{n}', d.reward.points).replace('{b}', b);
-      wrapText(rt, 250).slice(0, 2).forEach(l => { text(l, 200, ny + 1, { align: 'center', col: d.reward.status === 'sent' ? INK_TEAL : INK_GOLD, size: 6 }); ny += 9; }); }
-    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(304, 15); ctx.rotate(-.15); ctx.scale(s, s); ctx.globalAlpha = k;
-      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-30, -10, 60, 20); text(d.tourId === 'L1' ? ['ОСИ', 'ОСИ', 'OSI'][LI()] : ['ИӘ', 'ЗА', 'YES'][LI()], 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
+      wrapText(rt, 290, 6).slice(0, 2).forEach(l => { text(l, W / 2, y, { align: 'center', col: d.reward.status === 'sent' ? INK_TEAL : INK_GOLD, size: 6 }); y += 8; }); }
+    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(318, 40); ctx.rotate(-.15); ctx.scale(s, s); ctx.globalAlpha = k;
+      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-26, -9, 52, 18); text(d.tourId === 'L1' ? 'ОСИ' : ['ИӘ', 'ЗА'][LI()] || 'ЗА', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
     const bw = 84;
-    if (button(L(UI.toHouse), 108, 186, 'primary', { w: bw })) irisTo(108, 194, () => go('house', { focus: d.success && d.first && d.problem ? d.problem.id : null }));
-    if (button(L(UI.rating), 200, 186, 'alt', { w: bw })) irisTo(200, 194, () => go('leaderboard', { from: 'result' }));
-    if (button(L(UI.again), 292, 186, 'alt', { w: bw })) irisTo(292, 194, () => go('tour', { tour: d.tourId || 'L1' }));
+    if (button(L(UI.toHouse), 108, 200, 'primary', { w: bw })) irisTo(108, 194, () => go('house', { focus: null }));
+    if (button(L(UI.rating), 200, 200, 'alt', { w: bw })) irisTo(200, 194, () => go('leaderboard', { from: 'result' }));
+    if (button(L(UI.again), 292, 200, 'alt', { w: bw })) irisTo(292, 194, () => go('tour', { tour: d.tourId || 'L1', skipInter: true }));
   },
 };
 

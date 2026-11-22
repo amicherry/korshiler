@@ -12,17 +12,17 @@ const {chromium}=require('playwright'); const fs=require('fs');
  check('tour=1 → пройдены туры 0 и 1', st.won, ['L1','L2']); check('сообщение ready в приложение', st.ready, 'ready');
  await pg.screenshot({path:'shots/launch_menu.png'});
  // сыграть тур 3 (совет): нужен ремонт света — председатель чинит без собрания
- const p = await pg.evaluate(async()=>{ go('tour',{tour:'L2'}); for (let i=0;i<40 && !scene.run;i++) await wait(100);
+ const p = await pg.evaluate(async()=>{ go('tour',{tour:'L2',skipInter:true}); for (let i=0;i<40 && !scene.run;i++) await wait(100);
    const s=scene; s.startedAt-=200000; MockServer.debugDB().runs[s.run.runId].startedAt-=200000;
    let a=1; for (const r of Object.values(s.res)) { if (a++ <= 40) { r.status='yes'; s.events.push({t:'yes',apt:r.apt}); } else if (a <= 60) { r.status='no'; s.events.push({t:'no',apt:r.apt}); } }
    await s.finish(false); await wait(300); return window._msgs.filter(m=>m.type==='result').pop(); });
  const r=p && p.payload; console.log(JSON.stringify({...r, events: r && r.events.length}));
  check('результат ушёл в приложение', !!r, true);
- check('поля результата', r && Object.keys(r).filter(k=>k!=='events').sort(), ['apartments','badges','clientVersion','daysLimit','daysUsed','finishedAt','firstWin','game','lang','offline','required','rule','runId','score','startedAt','success','token','tour','tourCode','version','votes'].sort());
+ check('поля результата', r && Object.keys(r).filter(k=>k!=='events').sort(), ['apartments','badges','clientVersion','daysLimit','daysUsed','eknotShare','finishedAt','firstWin','game','lang','offline','protocol','required','rule','runId','score','startedAt','success','token','tour','tourCode','version','votes'].sort());
  check('тур 2 (повтор) → tour=1, chairman, кворум', r && [r.tour, r.tourCode, r.rule, r.apartments, r.required.turnout], [1,'chairman','quorum_half_plus_one',100,51]);
  check('голоса: 40 за, 19 против, явка 59 → победа, значок уже был', r && [r.votes.yes, r.votes.no, r.votes.turnout, r.success, r.badges], [40,19,59,true,[]]);
  check('токен передан обратно', r && r.token, 'eyJ-test-123');
- // английский
+ // английского больше нет: lang=en → казахский
  await pg.goto('file://'+process.cwd()+'/index.html?lang=en&stable'); await pg.waitForTimeout(2600);
- check('lang=en', await pg.evaluate(()=>LANG), 'en'); await pg.screenshot({path:'shots/launch_en.png'});
+ check('lang=en игнорируется (только kz/ru)', ['kz','ru'].includes(await pg.evaluate(()=>LANG)), true);
  console.log(errs); await b.close(); })();

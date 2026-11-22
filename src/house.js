@@ -18,8 +18,8 @@ const HM = { x0: 100, x1: 300, top: 41, fh: 11, floors: 13, ground: 186 };   // 
 HM.bottom = HM.top + HM.fh * HM.floors;   // 184
 const HSPOT = {   // где на карте каждая вещь (для подсветки и нажатия)
   light: [200, 112, 20, 130], door: [200, 174, 22, 16], roof: [170, 41, 60, 12], basement: [92, 181, 20, 12],
-  playground: [348, 206, 90, 30], lift: [140, 37, 30, 12], antenna: [268, 26, 22, 24], sign: [200, 28, 130, 14],
-  bench: [246, 194, 40, 10], flowers: [252, 186, 50, 6], trees: [51, 180, 50, 40], lamps: [78, 176, 16, 40], parking: [48, 212, 80, 18],
+  playground: [348, 206, 90, 30], lift: [140, 37, 30, 12], antenna: [268, 26, 22, 24],
+  pit: [228, 196, 20, 8], yard: [256, 190, 50, 12], cameras: [222, 160, 14, 12], walls: [150, 120, 30, 30], letnik: [60, 204, 70, 26],
 };
 
 const HOUSE_ART = { built: false };
@@ -225,6 +225,22 @@ function drawHouseItem(id, k, t) {
         text(ch, x0 + acc, 24, { size: 6, col: on ? '#ff6a45' : '#3c1714' }); acc += textW(ch, 6); });
       if (k >= 1) A(.25 + .05 * Math.sin(t / 140), () => { ctx.save(); ctx.globalCompositeOperation = 'lighter'; rect(x0 - 6, 20, textW(s, 6) + 12, 15, '#ff4a30'); ctx.restore(); });
       break; }
+    case 'pit': {    // яма у входа: до — провал в асфальте с лужей, после — ровная заплатка
+      A(1 - k, () => { rect(222, 194, 14, 5, '#1a1424'); rect(224, 195, 10, 3, '#2c2a4a'); rect(226, 196, 4, 1, '#6a5f8e'); p(221, 193, '#5a4a6a'); p(236, 196, '#5a4a6a'); });
+      A(k, () => { rect(220, 193, 18, 6, '#4a4060'); rect(220, 193, 18, 1, '#5a5070'); });
+      break; }
+    case 'cameras': A(k, () => { for (const [cx, cy] of [[217, 162], [102, 150], [296, 150]]) { rect(cx, cy, 5, 3, '#cfcbd8'); rect(cx + 4, cy + 1, 2, 1, '#2a2440'); if (Math.sin(t / 300 + cx) > 0) p(cx + 1, cy + 1, '#ff4a3a'); } }); break;
+    case 'walls': A(k, () => { rect(177, HM.top + 1, 46, HM.bottom - HM.top - 1, 'rgba(200,220,210,.10)');
+      for (let f = 1; f < HM.floors; f += 3) { const y = HM.top + f * HM.fh + 3; rect(184, y, 5, 4, '#c9a95a'); rect(185, y + 1, 3, 2, '#7a5a8a'); } }); break;
+    case 'yard': A(k, () => {
+      for (const bx of [230, 256]) { rect(bx, 193, 10, 2, '#8a5a3a'); rect(bx, 190, 10, 1, '#8a5a3a'); rect(bx + 1, 195, 1, 2, '#2a2a2a'); rect(bx + 8, 195, 1, 2, '#2a2a2a'); }
+      for (const fx of [126, 150, 228, 254]) { rect(fx, 186, 20, 3, '#4a3a2a'); for (let i = 0; i < 6; i++) rect(fx + 1 + i * 3, 184 + (i % 2), 2, 2, ['#e05a7a', '#f2c94c', '#f4f3ee'][i % 3]); }
+      for (const lx of [78, 396]) { rect(lx, 160, 1, 32, '#1a1e28'); rect(lx - 3, 159, 7, 2, '#2a2f3c'); rect(lx - 2, 161, 5, 1, '#fff1b8');
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .18; ctx.fillStyle = '#ffd890'; ctx.beginPath(); ctx.moveTo(lx - 2, 162); ctx.lineTo(lx + 3, 162); ctx.lineTo(lx + 14, 192); ctx.lineTo(lx - 13, 192); ctx.fill(); ctx.restore(); } }); break;
+    case 'letnik': A(k, () => {   // летнее кафе: настил, столики под зонтами, гирлянда
+      rect(34, 200, 86, 20, '#5a4a3a'); for (let x = 36; x < 118; x += 6) rect(x, 200, 1, 20, '#4a3a2a');
+      for (let k2 = 0; k2 <= 80; k2++) { const xx = 36 + k2, yy = 190 + Math.round(Math.sin(k2 / 80 * Math.PI) * 3); p(xx, yy, '#1c1626'); if (k2 % 8 === 0) p(xx, yy + 1, Math.sin(t / 200 + k2) > 0 ? '#ffe28a' : '#e8a24a'); }
+      for (const [tx, col] of [[50, '#b8443f'], [78, '#2f8577'], [104, '#c79a3b']]) { rect(tx - 7, 196, 15, 3, col); rect(tx - 5, 195, 11, 1, shade(col, 25)); rect(tx, 199, 1, 9, '#2a2238'); rect(tx - 3, 208, 7, 2, '#cfcbd8'); rect(tx - 6, 210, 3, 3, '#6a5a4a'); rect(tx + 4, 210, 3, 3, '#6a5a4a'); } }); break;
     case 'bench': A(k, () => { for (const bx of [230, 256]) { rect(bx, 193, 10, 2, '#8a5a3a'); rect(bx, 190, 10, 1, '#8a5a3a'); rect(bx + 1, 195, 1, 2, '#2a2a2a'); rect(bx + 8, 195, 1, 2, '#2a2a2a'); } }); break;
     case 'flowers': A(k, () => { for (const fx of [126, 150, 228, 254]) { rect(fx, 186, 20, 3, '#4a3a2a'); for (let i = 0; i < 6; i++) rect(fx + 1 + i * 3, 184 + (i % 2), 2, 2, ['#e05a7a', '#f2c94c', '#f4f3ee'][i % 3]); } }); break;
     case 'trees': A(k, () => { for (const [tx, s] of [[40, 1.1], [62, .9]]) { const h = Math.round(22 * s * Math.min(1, k * 1.2));
@@ -309,8 +325,10 @@ scenes.house = {
     if (pi >= 0) { const P = PROBLEMS[pi], c = canFix(P, HOUSE_STATE);
       if (c.why === 'done') return { kind: 'done' };
       if (!c.ok) { const I = tourInfo(c.tour.n - 1);
-        if (!I.open) return { kind: 'locked', text: (c.why === 'chair' ? L(UI.hNeedChair) + ' ' : '') + I.why };
-        return { kind: 'vote', text: c.why === 'chair' ? L(UI.hNeedChair) : L(UI.hNeedVote).replace('{n}', c.tour.n), level: c.tour.id }; }
+        // решение собрания: появится само после победы в туре
+        if (c.why === 'vote') return { kind: I.open ? 'vote' : 'locked', text: L(UI.hAuto).replace('{n}', c.tour.n).replace('{t}', tourTitle(c.tour)) + (I.open ? '' : ' ' + I.why), level: c.tour.id };
+        if (!I.open) return { kind: 'locked', text: L(UI.hNeedChair) + ' ' + I.why };
+        return { kind: 'vote', text: L(UI.hNeedChair), level: c.tour.id }; }
       return { kind: 'buy', cost: P.cost };
     }
     const d = DECOR.find(x => x.id === id);
@@ -347,7 +365,7 @@ scenes.house = {
     }
     // верхняя панель
     rect(0, 0, W, 19, '#0e111c'); rect(0, 19, W, 1, '#55607c');
-    text(`${L(UI.budget)} ₸${HOUSE_STATE.coins}`, 6, 5, { col: '#f2c94c' });
+    text(`${L(UI.budget)} ${money(HOUSE_STATE.coins)}`, 6, 5, { col: '#f2c94c', size: 6 });
     text(`★${HOUSE_STATE.score}`, 128, 5, { col: '#9fd9c2' });
     if (button(L(UI.meetings), 0, 1, 'primary', { left: 176 })) irisTo(W / 2, 120, () => go('levels'));
     if (button(L(UI.menu), 0, 1, 'dark', { left: 344 })) irisTo(W / 2, 120, () => go('title'));
@@ -372,12 +390,12 @@ scenes.house = {
     const p = PROBLEMS.find(x => x.id === id), d = DECOR.find(x => x.id === id), st = this.status(id);
     frameBox(8, 150, W - 16, 70, .95);
     text(L((p || d).name), 16, 157, { col: '#f4f3ee' });
-    if (p) wrapText(L(p.desc), 230, 6).slice(0, 2).forEach((l, i) => text(l, 16, 170 + i * 9, { col: '#cfd6e4', size: 6 }));
+    if (p) wrapText(fmtLine(L(p.desc)), 230, 6).slice(0, 2).forEach((l, i) => text(l, 16, 170 + i * 9, { col: '#cfd6e4', size: 6 }));
     else text(L(UI.hDecorDesc).replace('{n}', d.pts), 16, 170, { col: '#cfd6e4', size: 6 });
     const bx = 318;
     if (st.kind === 'buy') {
       const ok = HOUSE_STATE.coins >= st.cost;
-      text(`₸${st.cost}`, bx, 160, { align: 'center', col: ok ? '#f2c94c' : '#e88a7a' });
+      text(money(st.cost), bx, 160, { align: 'center', col: ok ? '#f2c94c' : '#e88a7a', size: 6 });
       if (button(ok ? L(UI.hFix) : L(UI.hEarn), bx, 178, ok ? 'primary' : 'alt', { w: 120 })) {
         if (ok) this.buy(id); else irisTo(W / 2, 120, () => go('levels'));
       }
@@ -398,24 +416,24 @@ scenes.levels = {
     rect(0, 0, W, H, 'rgba(10,12,20,.55)');
     frameBox(20, 8, 360, 210, .95);
     text(L(UI.meetings), W / 2, 15, { align: 'center', col: '#f4f3ee' });
-    text(`₸${HOUSE_STATE.coins}`, 370, 15, { align: 'right', col: '#f2c94c', size: 6 });
+    text(money(HOUSE_STATE.coins), 370, 15, { align: 'right', col: '#f2c94c', size: 6 });
     LEVELS.forEach((_, i) => {
-      const I = tourInfo(i), y = 26 + i * 23, x = 30;
-      rect(x, y, 340, 22, I.open ? '#1d2130' : '#151822'); rect(x, y + 21, 340, 1, '#0a0c12');
-      text(`${I.L.n}.`, x + 6, y + 8, { col: I.open ? '#f2c94c' : '#55607c', size: 6 });
-      text(L(I.L.title), x + 22, y + 2, { col: I.open ? '#f4f3ee' : '#55607c', size: 6 });
+      const I = tourInfo(i), y = 24 + i * 21, x = 30;
+      rect(x, y, 340, 20, I.open ? '#1d2130' : '#151822'); rect(x, y + 19, 340, 1, '#0a0c12');
+      text(`${I.L.n}.`, x + 6, y + 7, { col: I.open ? '#f2c94c' : '#55607c', size: 6 });
+      const tt = tourTitle(I.L); text(textW(tt, 6) > 250 ? tt.slice(0, 40) + '…' : tt, x + 22, y + 2, { col: I.open ? '#f4f3ee' : '#55607c', size: 6 });
       const short = I.L.rule === 'quorum' ? L(UI.lvQuorum).replace('{q}', I.L.quorum) : L(UI.lvYes).replace('{g}', I.L.goal);
-      text(`${short} · ${I.L.days} ${L(UI.daysWord)}`, x + 22, y + 9, { col: I.open ? '#cfd6e4' : '#55607c', size: 6 });
-      text(I.open ? `+₸${I.won ? I.L.reward.replay : I.L.reward.first}` : I.why, x + 22, y + 16, { col: I.open ? '#9fd9c2' : '#8a6a6a', size: 6 });
-      if (I.won) text('★', x + 266, y + 8, { col: '#f2c94c', size: 6, align: 'center' });
-      if (I.open && button(L(UI.play2), x + 306, y + 3, I.won ? 'alt' : 'primary', { w: 60 })) irisTo(W / 2, 120, () => go('tour', { tour: I.L.id }));
+      const sub = I.open ? `${short}${I.L.noTimer ? '' : ' · ' + I.L.days + ' ' + L(UI.daysWord)}` + (!I.won && I.L.income ? ` · +${money(I.L.income)}` : '') : I.why;
+      text(sub, x + 22, y + 11, { col: I.open ? '#9fd9c2' : '#8a6a6a', size: 6 });
+      if (I.won) text('★', x + 266, y + 7, { col: '#f2c94c', size: 6, align: 'center' });
+      if (I.open && button(L(UI.play2), x + 306, y + 2, I.won ? 'alt' : 'primary', { w: 60 })) irisTo(W / 2, 120, () => go('tour', { tour: I.L.id }));
     });
-    // викторина «Знаток ЖКХ» — открыта всегда
-    { const y = 26 + LEVELS.length * 23 + 2, x = 30;
-      rect(x, y, 340, 22, '#22303a'); rect(x, y, 2, 22, '#7fc4a8');
-      text('★', x + 9, y + 8, { col: '#7fc4a8', size: 6, align: 'center' });
-      text(L(UI.qzMenu), x + 22, y + 3, { col: '#f4f3ee', size: 6 }); text(L(UI.qzMenuSub), x + 22, y + 12, { col: '#9fd9c2', size: 6 });
-      if (button(L(UI.qzPlay), x + 306, y + 3, 'alt', { w: 60 })) irisTo(W / 2, 120, () => go('quiz')); }
-    if (button(L(UI.back), W / 2, 198, 'alt')) irisTo(W / 2, 120, () => go('house'));
+    // общий квиз «Знаток ЖКХ» — все вопросы; значок — за все 7 квизов перед турами
+    { const y = 24 + LEVELS.length * 21 + 1, x = 30;
+      rect(x, y, 340, 20, '#22303a'); rect(x, y, 2, 20, '#7fc4a8');
+      text('★', x + 9, y + 7, { col: '#7fc4a8', size: 6, align: 'center' });
+      text(L(UI.qzMenu), x + 22, y + 2, { col: '#f4f3ee', size: 6 }); text(L(UI.qzMenuSub), x + 22, y + 11, { col: '#9fd9c2', size: 6 });
+      if (button(L(UI.qzPlay), x + 306, y + 2, 'alt', { w: 60 })) irisTo(W / 2, 120, () => go('quiz')); }
+    if (button(L(UI.back), W / 2, 200, 'alt')) irisTo(W / 2, 120, () => go('house'));
   },
 };

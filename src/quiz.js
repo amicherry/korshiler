@@ -6,7 +6,9 @@
 
 let QUIZ_DATA = null;
 function quizValidQ(q) { return q && q.q && Array.isArray(q.answers) && q.answers.length >= 2 && q.answers.length <= 4 && Number.isInteger(q.correct) && q.correct >= 0 && q.correct < q.answers.length; }
-function quizValid(d) { return !!(d && Array.isArray(d.questions) && d.questions.filter(quizValidQ).length >= 3); }
+function quizValid(d) { return !!(d && d.tours && Object.values(d.tours).some(t => Array.isArray(t.questions) && t.questions.filter(quizValidQ).length >= 3)); }
+// все вопросы (общий квиз «Знаток ЖКХ») или вопросы одного тура
+function quizPool(d, tourCode) { return tourCode ? ((d.tours[tourCode] || {}).questions || []) : Object.values(d.tours).flatMap(t => t.questions); }
 async function loadQuiz() {
   if (QUIZ_DATA) return QUIZ_DATA;
   let d = QUIZ_BUILTIN;
@@ -20,7 +22,7 @@ async function loadQuiz() {
 }
 function shuffle(a, R = Math.random) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 // вопрос на один показ: ответы перемешаны, correct пересчитан
-function prepQuestion(q) { const order = shuffle(q.answers.map((_, i) => i)); return { id: q.id, q: q.q, explain: q.explain, src: q, answers: order.map(i => q.answers[i]), correct: order.indexOf(q.correct) }; }
+function prepQuestion(q) { const order = shuffle(q.answers.map((_, i) => i)); return { id: q.id, q: q.q, explain: q.explain, law: q.law, hard: q.level === 'hard', src: q, answers: order.map(i => q.answers[i]), correct: order.indexOf(q.correct) }; }
 
 /* ---------- чиби: 16×22 + контур, большая голова, тот же образ, что у героя ---------- */
 const CHIBI_CACHE = new Map();
@@ -228,13 +230,18 @@ const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x
 /* ---------- сцена ---------- */
 const QZ_SPEED = .13, QZ_JUMP = -.42, QZ_G = .0012;
 scenes.quiz = {
-  async enter() {
+  async enter(data = {}) {
     buildQuizArt(); setTouch({ act: L(UI.qzJump) });
-    this.state = 'loading'; this.t = 0; this.coins = 0; this.first = 0; this.done = 0; this.wrong = 0; this.paused = false; this.result = null; this.dust = [];
+    this.state = 'loading'; this.t = 0; this.coins = 0; this.first = 0; this.second = 0; this.hardFirst = 0; this.done = 0; this.wrong = 0; this.paused = false; this.result = null; this.dust = [];
     this.look = Object.assign({}, DEFAULT_LOOK, SAVE.look || {});
+    // квиз перед туром (5 вопросов тура, минимум один расчётный) или общий «Знаток ЖКХ» (все вопросы)
+    this.tourId = data.tour || null; this.then = data.then || null;
+    const T = this.tourId ? TOURS[this.tourId] : null, code = T ? T.code : null;
     const d = await loadQuiz(); this.cfg = d;
-    const pool = shuffle(d.questions.filter(quizValidQ)), n = Math.min(d.questionsPerRun || 8, pool.length);
-    this.total = n; this.queue = pool.slice(0, n).map(prepQuestion);
+    const all = shuffle(quizPool(d, code).filter(quizValidQ)), per = code ? ((d.tours[code] || {}).questionsPerRun || 5) : (d.generalPerRun || 8);
+    const n = Math.min(per, all.length), hard = all.find(q => q.level === 'hard');
+    let pick = all.slice(0, n); if (hard && !pick.includes(hard)) pick[n - 1] = hard;
+    this.total = n; this.hardN = pick.filter(q => q.level === 'hard').length; this.queue = shuffle(pick).map(prepQuestion);
     // трасса: [бег, двери] × n, затем бег и финиш
     this.segs = []; let x = 60;
     for (const q of this.queue) { x = this.addRun(x, 380 + Math.random() * 80, 2); x = this.addDoors(x, q); }
@@ -302,10 +309,11 @@ scenes.quiz = {
   choose(i) { if (this.state !== 'ask') return; this.pick = i; this.state = 'go'; },
   answer() {
     const s = this.cur, q = s.q, ok = this.pick === q.correct; q.tries = (q.tries || 0) + 1;
-    if (ok) { const c = q.tries === 1 ? (this.cfg.coinsFirstTry ?? 10) : (this.cfg.coinsRetry ?? 3); this.coins += c; this.done++; if (q.tries === 1) this.first++;
-      this.fb = { ok: true, text: L(UI.qzRight).replace('{c}', c).replace('{n}', this.done).replace('{t}', this.total) }; sfx.stamp && sfx.stamp(); }
+    const right = 'ABCD'[q.correct] + ' — ' + L(q.answers[q.correct]);
+    if (ok) { const c = q.tries === 1 ? (q.hard ? 50000 : 20000) : 5000; this.coins += c; this.done++; if (q.tries === 1) { this.first++; if (q.hard) this.hardFirst++; } else this.second++;
+      this.fb = { ok: true, text: L(UI.qzRight).replace('{c}', money(c)).replace('{n}', this.done).replace('{t}', this.total) + (q.explain ? ' ' + L(q.explain) : ''), law: q.law }; sfx.stamp && sfx.stamp(); }
     else { this.wrong++;
-      this.fb = { ok: false, text: L(UI.qzWrong).replace('{a}', 'ABCD'[q.correct] + ' — ' + L(q.answers[q.correct])) + (q.explain ? ' ' + L(q.explain) : '') }; beep(160, .2, 'sawtooth', .05); }
+      this.fb = { ok: false, text: L(UI.qzWrong).replace('{a}', right) + (q.explain ? ' ' + L(q.explain) : ''), law: q.law }; beep(160, .2, 'sawtooth', .05); }
     this.state = 'feedback'; setTouch({ act: L(UI.next) });
   },
   next() {
@@ -330,8 +338,12 @@ scenes.quiz = {
     if (this.state === 'end') return; this.state = 'end'; setTouch({});
     const sec = Math.round((Date.now() - this.startedAt) / 1000), ratio = this.total ? this.first / this.total : 0, title = ratio >= (this.cfg.titleThreshold ?? .8);
     let res = { coins: this.coins, badge: title ? 'zhkh_expert' : null, offline: true };
-    try { res = await API.quizFinish({ firstTry: this.first, total: this.total, wrong: this.wrong, coins: this.coins, seconds: sec }); HOUSE_STATE = await API.house(); } catch (e) {}
-    this.result = { ...res, first: this.first, total: this.total, title, sec };
+    try { res = await API.quizFinish({ tourId: this.tourId, firstTry: this.first, second: this.second, hardFirst: this.hardFirst, total: this.total, wrong: this.wrong, seconds: sec }); HOUSE_STATE = await API.house(); SAVE.coins = HOUSE_STATE.coins; } catch (e) {}
+    // ≥ 80 % верных с первой попытки в квизе тура — +1 «дожатие» у Енота в этом туре
+    if (this.tourId && ratio >= .8) { SAVE.quizBonus = SAVE.quizBonus || {}; SAVE.quizBonus[this.tourId] = true; }
+    if (this.tourId) { SAVE.quizDone = SAVE.quizDone || {}; SAVE.quizDone[this.tourId] = Math.max(SAVE.quizDone[this.tourId] || 0, Math.round(ratio * 100)); }
+    persist();
+    this.result = { ...res, first: this.first, total: this.total, title: !!res.badge, bonus: this.tourId && ratio >= .8, sec };
     try { notifyApp('result', { version: 1, game: 'korshiler', token: LAUNCH.token, runId: 'quiz-' + this.startedAt, tour: null, tourCode: 'quiz', success: true,
       quiz: { firstTry: this.first, total: this.total, wrong: this.wrong }, coins: res.coins, badges: res.badge ? [res.badge] : [], startedAt: new Date(this.startedAt).toISOString(),
       finishedAt: new Date().toISOString(), lang: LANG, clientVersion: CLIENT_VERSION }); } catch (e) {}
@@ -429,13 +441,18 @@ scenes.quiz = {
     }
   },
   drawFeedback() {
-    const f = this.fb, lines = wrapText(f.text, 340, 6).slice(0, 6), h = 34 + lines.length * 9 + (f.ok ? 0 : 11) + 24;
-    frameBox(24, 40, 352, h, .96);
-    text(f.ok ? L(UI.qzOk) : L(UI.qzNo), W / 2, 48, { align: 'center', col: f.ok ? '#7fe08a' : '#e98f6f' });
-    if (f.ok) sprite(QZ.page, W / 2 - 5, 59);
-    lines.forEach((l, i) => text(l, W / 2, 72 + i * 9, { align: 'center', col: '#f4f3ee', size: 6 }));
-    if (!f.ok) text(L(UI.qzLonger), W / 2, 72 + lines.length * 9 + 1, { align: 'center', col: '#f2c94c', size: 6 });
-    if (button(L(UI.next), W / 2, 40 + h - 20, 'primary') || hit('act')) this.next();
+    const f = this.fb, lines = wrapText(f.text, 340, 6).slice(0, 9), law = f.law && f.law.ref ? wrapText('§ ' + L(f.law.ref), 300, 6).slice(0, 2) : [];
+    const h = 34 + lines.length * 9 + (f.ok ? 0 : 11) + law.length * 9 + (law.length ? 6 : 0) + 24;
+    frameBox(24, 30, 352, h, .96);
+    text(f.ok ? L(UI.qzOk) : L(UI.qzNo), W / 2, 38, { align: 'center', col: f.ok ? '#7fe08a' : '#e98f6f' });
+    if (f.ok) sprite(QZ.page, W / 2 - 5, 49);
+    lines.forEach((l, i) => text(l, W / 2, 62 + i * 9, { align: 'center', col: '#f4f3ee', size: 6 }));
+    let y = 62 + lines.length * 9 + 1;
+    if (!f.ok) { text(L(UI.qzLonger), W / 2, y, { align: 'center', col: '#f2c94c', size: 6 }); y += 11; }
+    // статья закона — ссылка на adilet.zan.kz на языке игры
+    if (law.length) { law.forEach((l, i) => text(l, W / 2, y + 2 + i * 9, { align: 'center', col: '#9fd9c2', size: 6 }));
+      if (clickIn(40, y, 320, law.length * 9 + 4)) { try { window.open(L(f.law.url), '_blank', 'noopener'); } catch (e) {} } y += law.length * 9 + 6; }
+    if (button(L(UI.next), W / 2, 30 + h - 20, 'primary') || hit('act')) this.next();
   },
   drawIntro() {
     rect(0, 0, W, H, 'rgba(10,12,20,.55)'); frameBox(40, 34, 320, 150, .96);
@@ -450,19 +467,20 @@ scenes.quiz = {
     const r = this.result;
     rect(0, 0, W, H, 'rgba(10,12,20,.55)'); paper(70, 24, 260, 178, 7);
     text(L(UI.qzDone), W / 2, 34, { align: 'center', col: '#2e6a5a' });
-    const rows = [[L(UI.qzFirst), `${r.first}/${r.total}`], [L(UI.qzWrongN), String(this.wrong)], [L(UI.rBudget), '+₸' + (r.coins ?? this.coins)]];
+    const rows = [[L(UI.qzFirst), `${r.first}/${r.total}`], [L(UI.qzWrongN), String(this.wrong)], [L(UI.rBudget), '+' + money(r.coins ?? 0)]];
     rows.forEach(([a, b], i) => { text(a, 86, 54 + i * 13, { col: INK }); text(b, 314, 54 + i * 13, { col: INK, align: 'right' }); rect(86, 63 + i * 13, 228, 1, '#e2d9c2'); });
-    if (r.limit) text(L(UI.qzLimit), W / 2, 90, { align: 'center', col: INK_MUTED, size: 6 });
-    const note = r.title ? L(UI.qzTitleGot) : L(UI.qzTitleNeed).replace('{p}', Math.round((this.cfg.titleThreshold ?? .8) * 100));
+    if (r.paidBefore) text(L(UI.qzPaidBefore), W / 2, 90, { align: 'center', col: INK_MUTED, size: 6 });
+    const note = this.tourId ? (r.bonus ? L(UI.qzBonus) : L(UI.qzNoBonus)) : r.title ? L(UI.qzTitleGot) : L(UI.qzTitleNeed);
     wrapText(note, 220, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, 98 + i * 9, { align: 'center', col: r.title ? INK_TEAL : INK, size: 6 }));
     if (r.title) { ctx.save(); ctx.translate(W / 2, 138); ctx.rotate(-.08); ctx.strokeStyle = '#2e6a5a'; ctx.lineWidth = 2; ctx.strokeRect(-62, -10, 124, 20); text(L(TITLES.zhkh_expert).toUpperCase(), 0, -4, { col: '#2e6a5a', align: 'center' }); ctx.restore(); }
-    if (button(L(UI.again), W / 2 - 66, 176, 'alt')) irisTo(W / 2, 120, () => go('quiz'));
-    if (button(L(UI.toHouse), W / 2 + 66, 176, 'primary')) irisTo(W / 2, 120, () => go('house'));
+    if (button(L(UI.again), W / 2 - 66, 176, 'alt')) irisTo(W / 2, 120, () => go('quiz', { tour: this.tourId, then: this.then }));
+    if (this.then) { if (button(L(UI.toMeeting), W / 2 + 66, 176, 'primary')) irisTo(W / 2, 120, () => go('tour', { tour: this.then, skipInter: true })); }
+    else if (button(L(UI.toHouse), W / 2 + 66, 176, 'primary')) irisTo(W / 2, 120, () => go('house'));
   },
   drawPause() {
     rect(0, 0, W, H, 'rgba(10,12,20,.7)'); frameBox(110, 60, 180, 96, .96);
     text(L(UI.pause), W / 2, 70, { align: 'center', col: '#f4f3ee' });
     if (button(L(UI.resume), W / 2, 92, 'primary')) this.paused = false;
-    if (button(L(UI.quitLevel), W / 2, 118, 'danger')) irisTo(W / 2, 120, () => go('house'));
+    if (button(L(UI.quitLevel), W / 2, 118, 'danger')) irisTo(W / 2, 120, () => this.then ? go('tour', { tour: this.then, skipInter: true }) : go('house'));
   },
 };

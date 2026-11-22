@@ -83,18 +83,18 @@ function portrait(look, expr = 'neutral') {
 }
 
 /* ---------- енот (маскот), портрет и маленький спрайт ---------- */
-const RAC = [
+const RAC_ROWS = [
   "................", ".......k...k....", "......kgk.kgk...", "......kgggggk...", ".....kglllllgk..", ".....kmmwmwmmk..",
   ".....kmmlllmmkk.", "kk...kllllllllk.", "ktk...kkllllkk..", "kgtk.kgggggggk..", ".kgtkggggggggk..", "..kkgglllllggk..",
   "....kggllllggk..", "....kgggggggk...", "....kmk...kmk...", "....kk....kk...."];
 const RAC_PAL = { k: '#2b2a33', g: '#8f949c', l: '#d8dad6', w: '#f4f3ee', m: '#3b3a46', t: '#4b4a57' };
-const RACCOON = makeCanvas(16, 16, ({ p }) => RAC.forEach((row, y) => [...row].forEach((ch, x) => RAC_PAL[ch] && p(x, y, RAC_PAL[ch]))));
+const RACCOON = makeCanvas(16, 16, ({ p }) => RAC_ROWS.forEach((row, y) => [...row].forEach((ch, x) => RAC_PAL[ch] && p(x, y, RAC_PAL[ch]))));
 const RACCOON_PORT = makeCanvas(40, 40, ({ g, r }) => { r(0, 0, 40, 40, '#2f8577'); g.drawImage(RACCOON, 0, 0, 16, 16, 4, 6, 32, 32); });
 const EKNOT_PORT = makeCanvas(40, 40, ({ r }) => { r(0, 0, 40, 40, '#2f8577'); r(8, 8, 24, 24, '#f4f3ee'); r(13, 13, 3, 14, '#2f8577'); r(13, 13, 13, 3, '#2f8577'); r(13, 19, 10, 3, '#2f8577'); r(13, 24, 13, 3, '#2f8577'); });
 
 /* ---------- значки статусов 9×9 ---------- */
 function icon(kind) {
-  const C = { yes: '#4caf6e', no: '#d9534f', thinking: '#f2c94c', away: '#5b6b8a', noanswer: '#8f949c', online: '#2f8577', renter: '#a19eae', unknown: null, me: '#e98f6f' }[kind];
+  const C = { yes: '#4caf6e', no: '#d9534f', thinking: '#f2c94c', away: '#5b6b8a', noanswer: '#8f949c', online: '#2f8577', renter: '#a19eae', unknown: null, me: '#e98f6f', abstain: '#9a8f78', paper: '#d8d2bf', proxy: '#7a6ab0', novote: '#55505e' }[kind];
   if (!C) return null;
   return makeCanvas(9, 9, ({ r, p, line }) => {
     r(1, 0, 7, 9, OUT); r(0, 1, 9, 7, OUT); r(1, 1, 7, 7, C);
@@ -107,7 +107,11 @@ function icon(kind) {
     if (kind === 'online') { r(3, 2, 3, 5, w); r(3, 3, 3, 2, C); p(4, 6, C); }
     if (kind === 'renter') { r(2, 3, 3, 3, w); r(5, 4, 3, 1, w); p(7, 5, w); }
     if (kind === 'me') { r(2, 4, 5, 3, w); line(2, 4, 4, 2, w); line(4, 2, 6, 4, w); }
+    if (kind === 'abstain') { r(3, 2, 1, 5, w); r(5, 2, 1, 5, w); }                               // ⏸ воздержался
+    if (kind === 'paper') { r(2, 1, 5, 7, '#f4f3ee'); r(3, 3, 3, 1, OUT); r(3, 5, 3, 1, OUT); }   // 📄 нужна бумага
+    if (kind === 'proxy') { r(2, 3, 3, 3, w); r(3, 4, 1, 1, C); r(5, 4, 3, 1, w); p(6, 5, w); }    // 🔑 ждём доверенность
+    if (kind === 'novote') { line(2, 2, 6, 6, w); r(1, 1, 7, 7, 'rgba(0,0,0,0)'); p(4, 1, w); p(1, 4, w); p(7, 4, w); p(4, 7, w); }   // ⛔ без голоса
   });
 }
-const ICONS = {}; for (const k of ['yes', 'no', 'thinking', 'away', 'noanswer', 'online', 'renter', 'me']) ICONS[k] = icon(k);
+const ICONS = {}; for (const k of ['yes', 'no', 'thinking', 'away', 'noanswer', 'online', 'renter', 'me', 'abstain', 'paper', 'proxy', 'novote']) ICONS[k] = icon(k);
 

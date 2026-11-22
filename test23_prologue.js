@@ -41,11 +41,11 @@ const LANG = process.env.QLANG || 'ru';
  }
  console.log(log.join('\n'));
  const st = await pg.evaluate(()=>({ scene: Object.keys(scenes).find(k=>scenes[k]===scene), tour: scene.tour && scene.tour.id, seen: SAVE.seenIntro, mom: SAVE.helpedMom, trust: SAVE.trust[65] }));
- check('после квартиры — тур 1', st.scene==='tour' && st.tour==='L1', JSON.stringify(st));
+ check('после квартиры — заставка тура 1 (квиз или собрание)', st.scene==='interlude', JSON.stringify(st));
  check('пролог отмечен', st.seen===true);
  check('крыса, лужа, вонь, лифт', !!(seen.jump && seen.slip && seen.lie && seen.smell), JSON.stringify(Object.keys(seen).filter(k=>!k.includes('|'))));
  check('помогли маме → соседи 9-го этажа доверяют', st.mom===true && st.trust===5);
- await pg.waitForTimeout(1500); await shot('tour1');
- const hud = await pg.evaluate(()=>({ app: scene.app, rac: scene.raccoon, menuOnline: false }));
+ await pg.waitForTimeout(800); await shot('inter1'); await pg.evaluate(()=>go('tour',{tour:'L1',skipInter:true})); await pg.waitForTimeout(1500); await shot('tour1');
+ const hud = await pg.evaluate(()=>({ app: scene.app, rac: scene.rac.open, menuOnline: false }));
  check('в туре 1 нет енота и онлайна', hud.app===false && hud.rac===0, JSON.stringify(hud));
  console.log('errors', errs); await b.close(); })();

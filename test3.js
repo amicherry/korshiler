@@ -1,7 +1,7 @@
 const {chromium}=require('playwright'); const fs=require('fs');
 (async()=>{
  const b=await chromium.launch();
- for(const lang of ['kz','ru','en']){
+ for(const lang of ['kz','ru']){
  const pg=await b.newPage({viewport:{width:1200,height:675}});
  const errs=[]; pg.on('pageerror',e=>errs.push('PAGEERR '+e.message));
  await pg.route('**/fonts.googleapis.com/**', r=>r.abort());
@@ -13,10 +13,11 @@ const {chromium}=require('playwright'); const fs=require('fs');
  await pg.mouse.click(600+186, 610+12); await pg.waitForTimeout(400); await shot('b_settings'); await key('Escape');
  await key('Enter'); await pg.waitForTimeout(1200); await pg.fill('#nameInput','Әмина'); await shot('c_creator');
  await pg.evaluate(()=>scenes.creator.done()); await pg.waitForTimeout(1300); await pg.waitForTimeout(1500); await shot('d_prologue');
- await pg.evaluate(()=>scenes.prologue.finish()); for(let i=0;i<40;i++){ await pg.waitForTimeout(300); if(await pg.evaluate(()=>scene===scenes.tour)) break; } await pg.waitForTimeout(900);
- await pg.evaluate(()=>{ scene.talker.done=true; for(const r of Object.values(scene.res)){ r.status=['yes','no','thinking','away','noanswer','online','unknown'][r.apt%7]; if(r.A.renter) r.status='renter'; } });
+ await pg.evaluate(()=>scenes.prologue.finish()); for(let i=0;i<40;i++){ await pg.waitForTimeout(300); if(await pg.evaluate(()=>scene===scenes.interlude)) break; } await pg.waitForTimeout(900); await shot('d2_interlude');
+ await pg.evaluate(()=>go('tour',{tour:'L1',skipInter:true})); await pg.waitForTimeout(1200);
+ await pg.evaluate(()=>{ if(scene.talker) scene.talker.done=true; for(const r of Object.values(scene.res)){ r.status=['yes','no','thinking','away','noanswer','online','unknown'][r.apt%7];  } });
  await key('KeyB'); await pg.waitForTimeout(300); await shot('e_ballot'); await key('KeyB');
- await pg.evaluate(()=>{ const r=Object.values(scene.res).find(r=>!r.A.renter); r.status='unknown'; r.away=false; r.knocks=5; scene.hero.floor=r.floor; scene.hero.y=scene.base(r.floor); scene.hero.x=DOOR_X[r.d]-8; });
+ await pg.evaluate(()=>{ const r=Object.values(scene.res).find(r=>!['renter','notowner','shady'].includes(r.arch)); r.status='unknown'; r.away=false; r.knocks=5; scene.hero.floor=r.floor; scene.hero.y=scene.base(r.floor); scene.hero.x=DOOR_X[r.d]-8; });
  await key('KeyE'); await pg.waitForTimeout(1600); await key('Enter'); await pg.waitForTimeout(300); await shot('f_dialog');
  await key('ArrowRight'); await key('Enter'); await pg.waitForTimeout(300); await shot('g_args');
  await pg.evaluate(()=>{ DLG.open=false; scene.busy=false; scene.minute=scene.end; }); await pg.waitForTimeout(3600); await shot('h_result');

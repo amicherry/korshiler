@@ -8,14 +8,14 @@
    Описание запросов: docs/API.md
    ============================================================ */
 /* ---------- параметры запуска из приложения E-KNOT (docs/API.md, раздел 1) ----------
-   ?token=…&lang=kz|ru|en&name=…&level=3&tour=1&title=chairman&complex=ЖК%20Нұрлы
+   ?token=…&lang=kz|ru&name=…&level=3&tour=1&title=chairman&complex=ЖК%20Нұрлы
    Всё, кроме token, — только для отображения: правду о прогрессе знает сервер. */
 const LAUNCH = (() => {
   const q = new URLSearchParams(location.search), s = (k, n) => { const v = (q.get(k) || '').trim(); return v ? v.slice(0, n) : null; };
   const int = (k, lo, hi) => { const v = parseInt(q.get(k), 10); return Number.isFinite(v) && v >= lo && v <= hi ? v : null; };
   const token = s('token', 512) || (/^#[A-Za-z0-9-]+$/.test(location.hash) ? location.hash.slice(1) : null);
-  const lang = ['kz', 'ru', 'en'].includes(q.get('lang')) ? q.get('lang') : null;
-  return { token, lang, name: s('name', 16), level: int('level', 0, 999), tour: int('tour', -1, 5), title: s('title', 32), complex: s('complex', 28) };
+  const lang = ['kz', 'ru'].includes(q.get('lang')) ? q.get('lang') : null;
+  return { token, lang, name: s('name', 16), level: int('level', 0, 999), tour: int('tour', -1, 6), title: s('title', 32), complex: s('complex', 28) };
 })();
 
 const API_CONFIG = {
@@ -84,7 +84,7 @@ const MockServer = (() => {
       const u = me(session); const p = body.profile || {};
       // сервер не даёт игре самой себе начислить монеты: их меняет только итог тура
       const old = db.profiles[u.userId] || {};
-      db.profiles[u.userId] = { ...p, coins: old.coins || 0, rewardsTotal: old.rewardsTotal || 0 }; commit();
+      db.profiles[u.userId] = { ...p, coins: old.coins || 0, rewardsTotal: old.rewardsTotal || 0, quizPaid: old.quizPaid || {}, quizBest: old.quizBest || {} }; commit();   // серверные поля (оплата квизов) клиент не перезаписывает
       return { ok: true };
     },
     'DELETE /profile'({ session }) {
@@ -102,17 +102,20 @@ const MockServer = (() => {
     // викторина: монеты в бюджет ЖК и значок «Знаток ЖКХ» (80 % верных с первой попытки)
     'POST /quiz/finish'({ session, body }) {
       const u = me(session), total = clamp(body.total | 0, 0, 30), first = clamp(body.firstTry | 0, 0, total), sec = +body.seconds || 0;
-      const suspicious = total < 3 || sec < total * 4;                         // 8 вопросов быстрее 32 секунд не пробежать
-      // викторину можно проходить сколько угодно, но монеты — только за первые три прохождения в день
-      const qd = today(); const profQ = db.profiles[u.userId] || (db.profiles[u.userId] = {}); if (profQ.quizDay !== qd) { profQ.quizDay = qd; profQ.quizRuns = 0; }
-      profQ.quizRuns = (profQ.quizRuns || 0) + 1;
-      const coins = suspicious || profQ.quizRuns > 3 ? 0 : clamp(body.coins | 0, 0, total * 10);
-      const prof = db.profiles[u.userId] || (db.profiles[u.userId] = {}); prof.coins = (prof.coins || 0) + coins;
+      const second = clamp(body.second | 0, 0, total - first), hard = clamp(body.hardFirst | 0, 0, first), tour = TOURS[body.tourId] || null;
+      const suspicious = total < 3 || sec < total * 4;                         // 5 вопросов быстрее 20 секунд не пробежать
+      const prof = db.profiles[u.userId] || (db.profiles[u.userId] = {}); prof.quizPaid = prof.quizPaid || {}; prof.quizBest = prof.quizBest || {};
+      // «знания экономят деньги»: +20 000 ₸ за верный ответ с первой попытки, +5 000 со второй, расчётный +50 000 — только за первый проход квиза тура
+      const paidBefore = !!(tour && prof.quizPaid[tour.id]);
+      const coins = suspicious || !tour || paidBefore ? 0 : (first - hard) * 20000 + hard * 50000 + second * 5000;
+      if (tour && !suspicious) { prof.quizPaid[tour.id] = true; prof.quizBest[tour.id] = Math.max(prof.quizBest[tour.id] || 0, first / Math.max(1, total)); }
+      prof.coins = (prof.coins || 0) + coins;
       let reward = null; db.rewards[u.userId] = db.rewards[u.userId] || [];
-      const expert = !suspicious && total >= 5 && first / total >= .8;
+      // значок «Знаток ЖКХ» — за все 7 квизов перед турами (каждый ≥ 80 %)
+      const expert = !suspicious && LEVELS.every(l => (prof.quizBest[l.id] || 0) >= .8);
       if (expert && !db.rewards[u.userId].some(r => r.badge === 'zhkh_expert')) {
         reward = { tourId: 'quiz', points: 100, badge: 'zhkh_expert', status: u.guest ? 'needs_login' : 'sent', at: Date.now() }; db.rewards[u.userId].push(reward); }
-      commit(); return { coins, badge: expert ? 'zhkh_expert' : null, reward, suspicious, totalCoins: prof.coins, limit: !suspicious && profQ.quizRuns > 3 };
+      commit(); return { coins, badge: expert ? 'zhkh_expert' : null, reward, suspicious, totalCoins: prof.coins, paidBefore };
     },
     'POST /tours/finish'({ session, body }) {
       const u = me(session); const run = db.runs[body.runId];
@@ -120,23 +123,26 @@ const MockServer = (() => {
       if (run.finished) return run.result;                                     // повторная отправка — тот же ответ
       const tour = TOURS[run.tourId], maxApt = tour.floors * tour.perFloor;
       const seconds = (Date.now() - run.startedAt) / 1000;
-      // голос квартиры — последнее её событие «за» или «против»; «за» после «против» — передумал
+      // голос квартиры — последнее её событие «за», «против» или «воздержался»; «за» после «против» — передумал. Кладовые не голосуют
       const vote = new Map(), via = new Map();
-      for (const e of body.events || []) if ((e.t === 'yes' || e.t === 'no') && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt && !isStorage(e.apt)) {
-        if (e.t === 'no' && vote.get(e.apt) === 'yes') continue;
-        vote.set(e.apt, e.t); if (e.t === 'yes') via.set(e.apt, e.via || 'door'); }
-      const yesN = [...vote.values()].filter(v => v === 'yes').length, noN = [...vote.values()].filter(v => v === 'no').length;
+      for (const e of body.events || []) if (['yes', 'no', 'abstain'].includes(e.t) && e.apt >= 1 && e.apt <= maxApt && e.apt !== tour.heroApt && !isStorage(e.apt)) {
+        if (e.t !== 'yes' && vote.get(e.apt) === 'yes') continue;
+        vote.set(e.apt, e.t); via.set(e.apt, e.via || 'door'); }
+      const cnt = t => [...vote.values()].filter(v => v === t).length, yesN = cnt('yes'), noN = cnt('no'), abN = cnt('abstain');
       const suspicious = seconds < 15 && yesN > 3;                           // 4+ голоса за 15 секунд не бывает
-      const own = suspicious ? 0 : yesN, against = suspicious ? 0 : noN, online = suspicious ? 0 : [...via.values()].filter(v => v === 'online').length;
-      const remote = 0, signatures = own;
-      const out = voteOutcome(tour, own, against), success = out.ok;
+      const own = suspicious ? 0 : yesN, against = suspicious ? 0 : noN, abstain = suspicious ? 0 : abN;
+      const appVia = ['online', 'notify', 'call', 'redial', 'chat', 'owner'];
+      const online = suspicious ? 0 : [...via.entries()].filter(([a, v]) => vote.get(a) === 'yes' && appVia.includes(v)).length;
+      const signatures = own;
+      const out = voteOutcome(tour, own, against, abstain), success = out.ok;
+      // очки — только для рейтинга (за голоса у дверей больше, чем за онлайн)
       const score = signatures * 100 + online * 20 + (success ? 300 + Math.max(0, Math.round(600 - seconds) * 2) : 0);
-      // бюджет: за первую победу на собрании — больше, за повтор — меньше; сверх нормы — доплата за подпись
+      // деньги за победу «с неба» не падают: бюджет полугодия (взносы, повышение, аренда) приходит один раз — после первой победы в туре
       const H = house(u.userId), first = success && !H.won.includes(tour.id);
-      // доплата сверх нормы — только за голоса, собранные лично у дверей, и не больше 10; онлайн и рассылка енота денег не дают
-      const doorYes = [...via.entries()].filter(([a, v]) => vote.get(a) === 'yes' && ['door', 'helper', 'council'].includes(v)).length;
-      const coins = success ? (first ? tour.reward.first : tour.reward.replay) + clamp(doorYes - tour.goal, 0, 10) * tour.reward.perExtra : Math.min(own, tour.goal) * 4;
-      if (success && first) H.won.push(tour.id);
+      const coins = first ? tour.income : 0;
+      if (first) { H.won.push(tour.id);
+        // решение собрания выполнено: летник, вышка, лифт, крыша (и подвал) появляются сами
+        for (const p of PROBLEMS) if (p.kind === 'construction' && p.tour === tour.id && !H.fixed.includes(p.id)) H.fixed.push(p.id); }
       const prof = db.profiles[u.userId] || (db.profiles[u.userId] = {});
       prof.coins = (prof.coins || 0) + coins;
       const prevBest = (db.scores[u.userId] || {}).best || 0, best = Math.max(prevBest, score);
@@ -144,12 +150,12 @@ const MockServer = (() => {
       // бонусы в приложение — только вошедшим через E-KNOT и только за первую победу в туре
       let reward = null; db.rewards[u.userId] = db.rewards[u.userId] || [];
       if (success && !db.rewards[u.userId].some(r => r.tourId === tour.id)) {
-        reward = { tourId: tour.id, points: 50 + tour.n * 10, badge: tour.badge, status: u.guest ? 'needs_login' : 'sent', at: Date.now() };
+        reward = { tourId: tour.id, points: 50 + tour.n * 10, badge: tour.badge, badges: tour.badges || [tour.badge], status: u.guest ? 'needs_login' : 'sent', at: Date.now() };
         if (!u.guest) { db.rewards[u.userId].push(reward); prof.rewardsTotal = (prof.rewardsTotal || 0) + reward.points; }
       }
       run.finished = true;
-      run.result = { signatures, own, remote, online, against, turnout: out.turnout, need: out.need, success, first, score, best, newBest: score > prevBest, coins, totalCoins: prof.coins, reward, suspicious, problem: tour.problem,
-        badges: success && first ? [tour.badge] : [] };
+      run.result = { signatures, own, online, against, abstain, turnout: out.turnout, need: out.need, success, first, score, best, newBest: score > prevBest, coins, totalCoins: prof.coins, reward, suspicious, problem: tour.problem,
+        badges: success && first ? (tour.badges || [tour.badge]) : [] };
       commit();
       return run.result;
     },
@@ -166,7 +172,6 @@ const MockServer = (() => {
         cost = p.cost;
       } else if (dc) {
         if (H.decor.includes(dc.id)) err(409, 'already');
-        if (H.fixed.length < dc.after) err(403, 'locked');
         cost = dc.cost;
       } else err(404, 'no_item');
       if ((prof.coins || 0) < cost) err(402, 'no_money');
@@ -279,7 +284,8 @@ function buildResult(scene, r) {
   return {
     version: 1, game: 'korshiler', token: LAUNCH.token, runId: (scene.run && scene.run.runId) || ('local-' + Date.now()),
     tour: T.n - 1, tourCode: T.code, success: !!r.success, rule: T.rule === 'quorum' ? 'quorum_half_plus_one' : T.goal === PCT.twoThirds ? 'two_thirds_of_all' : T.goal === PCT.half ? 'half_plus_one_of_all' : 'tenth_of_all',
-    apartments: APTS, votes: { yes: r.signatures, no: r.against ?? scene.against(), undecided: thinking, notReached, turnout: r.turnout ?? (r.signatures + scene.against()) },
+    apartments: APTS, protocol: T.n === 1 ? '1' : 'EKN-0' + T.n, eknotShare: scene.appShare ? scene.appShare() : 0,
+    votes: { yes: r.signatures, no: r.against ?? scene.against(), abstain: r.abstain ?? scene.abstained(), undecided: thinking, notReached, turnout: r.turnout ?? (r.signatures + scene.against()) },
     required: { yes: r.need || T.goal, turnout: T.quorum || null }, daysUsed: scene.day(), daysLimit: T.days,
     score: r.score ?? null, firstWin: !!r.first, badges: r.badges || [], startedAt: new Date(scene.startedAt).toISOString(), finishedAt: new Date().toISOString(),
     lang: LANG, clientVersion: CLIENT_VERSION, offline: !!r.offline, events: scene.events.map(e => ({ t: e.t, apt: e.apt, via: e.via || 'door' })),
