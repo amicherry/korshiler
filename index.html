@@ -38,7 +38,7 @@ body{height:100%;margin:0;background:var(--frame);color:var(--ink);overflow:hidd
   color:rgba(244,243,238,.9);padding:0;cursor:pointer;touch-action:none;font:10px var(--font-pixel);
   -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);text-shadow:0 1px 0 #000}
 .btn.small{width:clamp(66px,19vh,88px);height:clamp(66px,19vh,88px)}
-.btn.act{width:clamp(88px,27vh,120px);height:clamp(88px,27vh,120px);font-size:11px;border-color:rgba(242,201,76,.6)}
+.btn.act{width:clamp(88px,27vh,120px);height:clamp(88px,27vh,120px);font-size:11px;padding:0 12px;line-height:1.2;text-align:center;white-space:normal;overflow-wrap:anywhere;border-color:rgba(242,201,76,.6)}
 .btn.on{background:var(--pad-on)}
 .btn svg{width:38%;height:38%;fill:currentColor}
 #fs{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:calc(8px + env(safe-area-inset-right,0px));z-index:6;width:40px;height:40px;
@@ -144,7 +144,7 @@ document.querySelectorAll('[data-k]').forEach(b => {
 const touchBtn = k => document.querySelector(`[data-k="${k}"]`);
 // какие экранные кнопки нужны сейчас: стрелки «влево/вправо» — только там, где герой ходит
 function setTouch({ act = null, up = false, down = false, move = false } = {}) {
-  const a = touchBtn('act'); if (a) { a.hidden = act === null; if (act !== null && a.textContent !== act) a.textContent = act; }
+  const a = touchBtn('act'); if (a) { a.hidden = act === null; if (act !== null && a.textContent !== act) { a.textContent = act; a.style.fontSize = act.length <= 3 ? '24px' : act.length > 13 ? '8px' : act.length > 9 ? '9px' : ''; } }
   const u = touchBtn('up'), d = touchBtn('down'); if (u) u.hidden = !up; if (d) d.hidden = !down;
   for (const k of ['left', 'right']) { const b = touchBtn(k); if (b) b.hidden = !move; }
 }
@@ -4320,10 +4320,9 @@ scenes.tour = {
         sprite(personSprite(TEEN_LOOKS[i], G.st === 'flee' ? 'walk' + (Math.floor((G.fleeT + i * 90) / 80) % 8) : 'idle' + (Math.floor(t / 700 + i) % 2)), Math.round(fx) - 9, gb - PH + 2, G.st === 'flee' ? STAIR_FOOT < G.x : i === 2);
         if (G.st === 'here' && i !== 1) { const k = ((t / 1600 + i * .4) % 1); ctx.globalAlpha = .5 * (1 - k); rect(Math.round(fx + 4 + Math.sin(k * 6) * 2), Math.round(gb - PH + 12 - k * 16), 2, 2, '#c9cdc8'); }
         ctx.globalAlpha = 1; } }
-    // «нехорошая квартира»: громкая музыка или посетители, пока нет домофона с доступом из E-KNOT
+    // «нехорошая квартира»: громкая музыка, пока нет домофона с доступом из E-KNOT
     if (this.shady && !this.fixed.has('door')) { const r = this.shady, sb = this.base(r.floor) - cy, x = DOOR_X[r.d];
-      if (sb > -60 && sb < H + 60) { if (r.apt % 2) { for (let i = 0; i < 2; i++) { const k = ((t / 900 + i * .5) % 1); ctx.globalAlpha = 1 - k; text('♪', x - 6 + i * 10 + Math.sin(k * 7) * 3, sb - 66 - k * 14, { col: '#b88ad0', size: 6 }); } ctx.globalAlpha = 1; }
-        else { const k = (t % 9000) / 9000; if (k < .25) { const vx = x + 60 - k * 4 * 60; sprite(personSprite(SHADY_GUEST, 'walk' + (Math.floor(t / 95) % 8)), Math.round(vx) - 9, sb - PH, true); } } } }
+      if (sb > -60 && sb < H + 60) { { for (let i = 0; i < 2; i++) { const k = ((t / 900 + i * .5) % 1); ctx.globalAlpha = 1 - k; text('♪', x - 6 + i * 10 + Math.sin(k * 7) * 3, sb - 66 - k * 14, { col: '#b88ad0', size: 6 }); } ctx.globalAlpha = 1; } } }
     // помощница
     if (this.helper.state === 'shown') {
       const hb = this.base(this.helper.floor) - cy;
@@ -4646,7 +4645,7 @@ scenes.interlude = {
     // 5 дней × (утро, день, вечер) — по 1,4 с на часть дня
     this.kind = this.T.n === 2 ? 'days' : this.T.n === 1 ? 'quiz' : this.T.n === 7 ? 'years' : 'months';
     this.phase = this.kind === 'quiz' ? 'offer' : 'show';
-    setTouch({ act: L(UI.skip) });
+    setTouch(this.phase === 'show' ? { act: '▸▸' } : {});   // на телефоне пропуск — круглая кнопка, без длинной надписи
   },
   part() { return Math.floor(this.t / 1400); },   // 0…14
   update(dt) {
@@ -4689,7 +4688,7 @@ scenes.interlude = {
       rect(0, 0, W, 22, 'rgba(14,17,28,.85)');
       text(`${L(UI.day)} ${day}/5 · ${L([UI.morning, UI.noon, UI.evening][p])}`, 8, 4, { col: '#f2c94c', size: 6 });
       text(L(UI.notice5), 8, 13, { col: '#cfd6e4', size: 6 });
-      text(L(UI.liftStill), W - 8, 4, { col: '#e88a7a', size: 6, align: 'right' });
+      text(L(UI.liftStill), W - 26, 4, { col: '#e88a7a', size: 6, align: 'right' });
     } else {
       drawHouseMap(this.t, null);
       rect(0, 0, W, H, 'rgba(10,12,20,.55)');
@@ -4703,7 +4702,7 @@ scenes.interlude = {
       if (this.kind === 'years') text(L(UI.savingsRoof), W / 2, 134, { align: 'center', col: '#9fd9c2', size: 6 });
       text(`${L(UI.budget)} ${money(HOUSE_STATE.coins)}`, W / 2, 146, { align: 'center', col: '#f4f3ee', size: 6 });
     }
-    if (this.phase === 'show') { if (button(L(UI.skip), W - 48, 200, 'dark', { w: 84 })) this.phase = 'offer'; return; }
+    if (this.phase === 'show') { if (!isTouch && button(L(UI.skip), W, 200, 'dark')) this.phase = 'offer'; return; }   // ширина по тексту, прижата к правому краю
     // предложение: квиз перед собранием
     rect(0, 0, W, H, 'rgba(10,12,20,.55)'); frameBox(50, 40, 300, 146, .97);
     text(L(UI.meetingT).replace('{n}', T.n), W / 2, 50, { align: 'center', col: '#9fd9c2', size: 6 });

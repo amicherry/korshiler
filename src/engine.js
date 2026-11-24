@@ -63,7 +63,7 @@ document.querySelectorAll('[data-k]').forEach(b => {
 const touchBtn = k => document.querySelector(`[data-k="${k}"]`);
 // какие экранные кнопки нужны сейчас: стрелки «влево/вправо» — только там, где герой ходит
 function setTouch({ act = null, up = false, down = false, move = false } = {}) {
-  const a = touchBtn('act'); if (a) { a.hidden = act === null; if (act !== null && a.textContent !== act) a.textContent = act; }
+  const a = touchBtn('act'); if (a) { a.hidden = act === null; if (act !== null && a.textContent !== act) { a.textContent = act; a.style.fontSize = act.length <= 3 ? '24px' : act.length > 13 ? '8px' : act.length > 9 ? '9px' : ''; } }
   const u = touchBtn('up'), d = touchBtn('down'); if (u) u.hidden = !up; if (d) d.hidden = !down;
   for (const k of ['left', 'right']) { const b = touchBtn(k); if (b) b.hidden = !move; }
 }

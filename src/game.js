@@ -924,10 +924,9 @@ scenes.tour = {
         sprite(personSprite(TEEN_LOOKS[i], G.st === 'flee' ? 'walk' + (Math.floor((G.fleeT + i * 90) / 80) % 8) : 'idle' + (Math.floor(t / 700 + i) % 2)), Math.round(fx) - 9, gb - PH + 2, G.st === 'flee' ? STAIR_FOOT < G.x : i === 2);
         if (G.st === 'here' && i !== 1) { const k = ((t / 1600 + i * .4) % 1); ctx.globalAlpha = .5 * (1 - k); rect(Math.round(fx + 4 + Math.sin(k * 6) * 2), Math.round(gb - PH + 12 - k * 16), 2, 2, '#c9cdc8'); }
         ctx.globalAlpha = 1; } }
-    // «нехорошая квартира»: громкая музыка или посетители, пока нет домофона с доступом из E-KNOT
+    // «нехорошая квартира»: громкая музыка, пока нет домофона с доступом из E-KNOT
     if (this.shady && !this.fixed.has('door')) { const r = this.shady, sb = this.base(r.floor) - cy, x = DOOR_X[r.d];
-      if (sb > -60 && sb < H + 60) { if (r.apt % 2) { for (let i = 0; i < 2; i++) { const k = ((t / 900 + i * .5) % 1); ctx.globalAlpha = 1 - k; text('♪', x - 6 + i * 10 + Math.sin(k * 7) * 3, sb - 66 - k * 14, { col: '#b88ad0', size: 6 }); } ctx.globalAlpha = 1; }
-        else { const k = (t % 9000) / 9000; if (k < .25) { const vx = x + 60 - k * 4 * 60; sprite(personSprite(SHADY_GUEST, 'walk' + (Math.floor(t / 95) % 8)), Math.round(vx) - 9, sb - PH, true); } } } }
+      if (sb > -60 && sb < H + 60) { { for (let i = 0; i < 2; i++) { const k = ((t / 900 + i * .5) % 1); ctx.globalAlpha = 1 - k; text('♪', x - 6 + i * 10 + Math.sin(k * 7) * 3, sb - 66 - k * 14, { col: '#b88ad0', size: 6 }); } ctx.globalAlpha = 1; } } }
     // помощница
     if (this.helper.state === 'shown') {
       const hb = this.base(this.helper.floor) - cy;

@@ -10,7 +10,7 @@ scenes.interlude = {
     // 5 дней × (утро, день, вечер) — по 1,4 с на часть дня
     this.kind = this.T.n === 2 ? 'days' : this.T.n === 1 ? 'quiz' : this.T.n === 7 ? 'years' : 'months';
     this.phase = this.kind === 'quiz' ? 'offer' : 'show';
-    setTouch({ act: L(UI.skip) });
+    setTouch(this.phase === 'show' ? { act: '▸▸' } : {});   // на телефоне пропуск — круглая кнопка, без длинной надписи
   },
   part() { return Math.floor(this.t / 1400); },   // 0…14
   update(dt) {
@@ -53,7 +53,7 @@ scenes.interlude = {
       rect(0, 0, W, 22, 'rgba(14,17,28,.85)');
       text(`${L(UI.day)} ${day}/5 · ${L([UI.morning, UI.noon, UI.evening][p])}`, 8, 4, { col: '#f2c94c', size: 6 });
       text(L(UI.notice5), 8, 13, { col: '#cfd6e4', size: 6 });
-      text(L(UI.liftStill), W - 8, 4, { col: '#e88a7a', size: 6, align: 'right' });
+      text(L(UI.liftStill), W - 26, 4, { col: '#e88a7a', size: 6, align: 'right' });
     } else {
       drawHouseMap(this.t, null);
       rect(0, 0, W, H, 'rgba(10,12,20,.55)');
@@ -67,7 +67,7 @@ scenes.interlude = {
       if (this.kind === 'years') text(L(UI.savingsRoof), W / 2, 134, { align: 'center', col: '#9fd9c2', size: 6 });
       text(`${L(UI.budget)} ${money(HOUSE_STATE.coins)}`, W / 2, 146, { align: 'center', col: '#f4f3ee', size: 6 });
     }
-    if (this.phase === 'show') { if (button(L(UI.skip), W - 48, 200, 'dark', { w: 84 })) this.phase = 'offer'; return; }
+    if (this.phase === 'show') { if (!isTouch && button(L(UI.skip), W, 200, 'dark')) this.phase = 'offer'; return; }   // ширина по тексту, прижата к правому краю
     // предложение: квиз перед собранием
     rect(0, 0, W, H, 'rgba(10,12,20,.55)'); frameBox(50, 40, 300, 146, .97);
     text(L(UI.meetingT).replace('{n}', T.n), W / 2, 50, { align: 'center', col: '#9fd9c2', size: 6 });
