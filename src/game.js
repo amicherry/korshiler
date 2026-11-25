@@ -288,6 +288,13 @@ function makeResidents(tour, seed) {
       away, returnAt: tour.start + 8 + Math.floor(R() * 34) + (R() < .2 ? 999 : 0), knocks: 0, listened: false, v: (seen[a] = (seen[a] || 0) + 1) + vOff, last: {}, sleeping: !!A.sleeper, door: 0, met: false,
       floor: Math.ceil(apt / tour.perFloor), d: (apt - 1) % tour.perFloor };
   }
+  // собрание 1: озвученные Апа и Ворчун всегда на этаже героя — кв. 48 и кв. 52 (у всех игроков одинаково)
+  if (tour.id === 'L1') for (const [no, arch] of [['48', 'apa'], ['52', 'grump']]) {
+    const s1 = Object.keys(res).find(k => aptNo(+k) === no), s2 = Object.keys(res).find(k => res[k].arch === arch && k !== s1);
+    if (!s1 || !s2 || res[s1].arch === arch) continue;
+    const A1 = res[s1], A2 = res[s2], keep = o => ({ apt: o.apt, floor: o.floor, d: o.d });
+    res[s1] = { ...A2, ...keep(A1), away: false }; res[s2] = { ...A1, ...keep(A2) };
+  }
   return res;
 }
 
@@ -306,7 +313,7 @@ scenes.tour = {
     // с собрания 2 (есть E-KNOT) часть соседей сама голосует в приложении — «за» или «против»
     const RR = rng(hashStr(USER.userId + tour.id) + 77 + (SAVE.tours[tour.id]?.tries || 0)), app = tour.n >= 2;
     for (const r of Object.values(this.res)) {
-      if (!r.A.renter && !r.A.notOwner && !r.A.noVote && RR() < (REFUSE[r.arch] || 0) * (1 - repaired * .1) * (tour.scen === 'tariff' ? 1.5 : 1)) r.refuser = true;
+      if (!(tour.id === 'L1' && ['48', '52'].includes(aptNo(r.apt))) && !r.A.renter && !r.A.notOwner && !r.A.noVote && RR() < (REFUSE[r.arch] || 0) * (1 - repaired * .1) * (tour.scen === 'tariff' ? 1.5 : 1)) r.refuser = true;
       if (app && r.A.onlineOk && !r.A.paperOnly && !r.A.renter && !r.A.notOwner && RR() < .12) r.selfAt = tour.start + tour.duration * (.08 + RR() * .8);
     }
     this.app = app && !!SAVE.racIntro; this.onYes = 0; this.onNo = 0; this.onFlash = 0;
