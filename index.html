@@ -162,7 +162,8 @@ function setTouch({ act = null, up = false, down = false, move = false } = {}) {
 let clicks = [];
 const pointer = { x: -1, y: -1 };
 function toLogical(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
-cv.addEventListener('pointerdown', e => { audioUnlock(); const p = toLogical(e); clicks.push(p); });
+cv.addEventListener('pointerdown', e => { audioUnlock(); const p = toLogical(e); clicks.push(p); pointer.down = true; pointer.x = p.x; pointer.y = p.y; });
+addEventListener('pointerup', () => { pointer.down = false; }); addEventListener('pointercancel', () => { pointer.down = false; });
 cv.addEventListener('pointermove', e => { const p = toLogical(e); pointer.x = p.x; pointer.y = p.y; });
 const TAP_PAD = isTouch ? 3 : 0;   // палец толще курсора: зона нажатия чуть больше кнопки
 function clickIn(x, y, w, h) {
@@ -468,9 +469,10 @@ const UI = {
   qzRight:    { kz: 'Бет табылды: {n}/{t}. +{c} ₸', ru: 'Страница найдена: {n}/{t}. +{c} ₸' },
   qzWrong:    { kz: 'Дұрыс жауап: {a}.', ru: 'Правильно: {a}.' },
   qzLonger: { kz: 'Жол ұзарды — бұл сұрақ кейін қайта келеді.', ru: 'Путь удлинился — этот вопрос вернётся позже.' },
-  qzDone:     { kz: 'ТЕХПАСПОРТ ЖИНАЛДЫ!', ru: 'ТЕХПАСПОРТ СОБРАН!' },
+  qzTrips:    { kz: 'Сүрінді', ru: 'Споткнулся' },
+  qzDone:     { kz: 'КВИЗ АЯҚТАЛДЫ!', ru: 'КВИЗ ПРОЙДЕН!' },
   qzFirst:    { kz: 'Бірінші реттен дұрыс', ru: 'Верно с первой попытки' },
-  qzWrongN:   { kz: 'Қате есіктер', ru: 'Неверных дверей' },
+  qzWrongN:   { kz: 'Қате жауаптар', ru: 'Ошибок' },
   qzTitleGot: { kz: '«ТКШ білгірі» атағы мен белгісі — E-KNOT профиліңде!', ru: 'Звание и значок «Знаток ЖКХ» — в твоём профиле E-KNOT!' },
   qzTitleNeed:{ kz: '«ТКШ білгірі» атағы үшін сұрақтардың {p} %-ына бірінші реттен дұрыс жауап бер.', ru: 'Для звания «Знаток ЖКХ» ответь верно с первой попытки на {p} % вопросов.' },
   day:        { kz: 'КҮН', ru: 'ДЕНЬ' },
@@ -559,6 +561,13 @@ const UI = {
   tutTap:     { kz: 'Есікке немесе басқа қабатқа бас — кейіпкер өзі барады.', ru: 'Нажми на дверь или на другой этаж — герой дойдёт сам.' },
   tut1:       { kz: 'Есікке жақындап, ҚАҒУ бас. Есік астындағы жарық — үйде біреу бар.', ru: 'Подойди к двери и нажми СТУК. Свет под дверью — кто-то дома.' },
   tut2:       { kz: 'Сол жақта саты. ▲▼ арқылы қабат ауыстыр. Әр әрекет уақыт алады!', ru: 'Слева лестница: ▲▼ — сменить этаж. Каждое действие тратит время!' },
+  danT:       { kz: 'Көрші хабарлама жіберді', ru: 'Сосед прислал сообщение' },
+  danB:       { kz: 'Данияр ({apt}-пәтер, {f}-қабат): «Кіріп кетші, бір нәрсе көрсетейін — дауыс жинау оңайырақ болады»', ru: 'Данияр (кв. {apt}, {f} этаж): «Зайди ко мне, покажу одну штуку — голоса собирать станет проще»' },
+  insideT:    { kz: 'Подъезд ішінен', ru: 'Подъезд изнутри' },
+  insideBtn:  { kz: 'ПОДЪЕЗД', ru: 'ПОДЪЕЗД' },
+  insideDone: { kz: 'Ішінде жасалды:', ru: 'Внутри сделано:' },
+  insideHint: { kz: 'Жоғары-төмен жылжыт: тышқанмен сүйре немесе ↑ ↓', ru: 'Листай вверх-вниз: тяни мышкой или ↑ ↓' },
+  tipT:       { kz: 'Кеңес', ru: 'Подсказка' },
   nobody:     { kz: 'Ешкім жоқ сияқты. Кейін қайта келуге болады.', ru: 'Похоже, никого нет. Можно зайти позже.' },
   noOpen:     { kz: 'Ешкім ашпады... Тағы қағып көр.', ru: 'Никто не открыл... Попробуй ещё раз.' },
   goalDone: { kz: 'Қажетті дауыстар бар! Жиналысты аяқтауға немесе тағы жинауға болады.', ru: 'Нужные голоса есть! Можно завершить собрание или собрать ещё.' },
@@ -1021,7 +1030,8 @@ Object.assign(UI, {
   rac_notify:  { kz: 'Хабарлама', ru: 'Уведомление' },
   rac_call:    { kz: 'Қоңырау', ru: 'Обзвон' },
   rac_redial:  { kz: 'Қайта қоңырау', ru: 'Дожатие' },
-  rac_chat:    { kz: 'WhatsApp / Telegram', ru: 'WhatsApp / Telegram' },
+  rac_chat:    { kz: 'Үй чаты', ru: 'Чат дома' },
+  racSoon:     { kz: 'кейін', ru: 'позже' },
   daysShort:   { kz: 'күн', ru: 'дн.' },
   aiName:      { kz: 'E-KNOT ЖИ-көмекшісі', ru: 'ИИ-помощник E-KNOT' },
   noTimerHud:  { kz: 'Уақыт шектеусіз', ru: 'Без таймера' },
@@ -1052,12 +1062,12 @@ Object.assign(UI, {
   budgetCame:  { kz: 'Жөндеу бюджетіне түсті: +{m}', ru: 'В бюджет на ремонт пришло: +{m}' },
   savingsRoof: { kz: 'Жинақ шотында шатырға ≈ 15 млн ₸', ru: 'На сберегательном счёте на крышу ≈ 15 млн ₸' },
   quizOffer:   { kz: 'Жиналыс алдында квиз: 5 сұрақ. Дұрыс жауап — бюджетке ақша.', ru: 'Квиз перед собранием: 5 вопросов. Верные ответы — деньги в бюджет.' },
-  quizOfferBonus: { kz: 'Жиналыс алдында квиз: 5 сұрақ. 80 %-дан көп болса — Енотта +1 қайта қоңырау.', ru: 'Квиз перед собранием: 5 вопросов. От 80 % — +1 дожатие у Енота.' },
+  quizOfferBonus: { kz: 'Жиналыс алдында квиз: 5 сұрақ. Дұрыс жауап — бюджетке ақша, 4 бірден дұрыс — Енот тағы бір рет көмектеседі.', ru: 'Квиз перед собранием: 5 вопросов. Верные ответы — деньги в бюджет, 4 верных с первого раза — Енот поможет ещё раз.' },
   quizGo:      { kz: 'Квиз ▸', ru: 'Квиз ▸' },
   toMeeting:   { kz: 'Жиналысқа ▸', ru: 'К собранию ▸' },
   qzPaidBefore:{ kz: 'Бұл квиз үшін ақша бұрын берілген.', ru: 'Деньги за этот квиз уже начислены раньше.' },
-  qzBonus:     { kz: 'Керемет! Бұл жиналыста Енотта +1 қайта қоңырау.', ru: 'Отлично! В этом собрании у Енота +1 дожатие.' },
-  qzNoBonus:   { kz: '80 %-дан көп болса — Енотта +1 қайта қоңырау. Тағы көріңіз!', ru: 'От 80 % — +1 дожатие у Енота. Попробуй ещё!' },
+  qzBonus:     { kz: 'Керемет! Жиналыста Енот көршілерге тағы бір рет қоңырау шалады.', ru: 'Отлично! На собрании Енот ещё раз обзвонит соседей.' },
+  qzNoBonus:   { kz: '5 сұрақтың 4-еуіне бірден дұрыс жауап берсең — Енот жиналыста тағы бір рет көмектеседі.', ru: 'Ответь верно с первого раза на 4 вопроса из 5 — и Енот на собрании поможет ещё раз.' },
 });
 Object.assign(UI.st || (UI.st = {}), { abstain: { kz: 'қалыс', ru: 'воздерж.' }, paper: { kz: 'қағаз', ru: 'бумага' }, proxy: { kz: 'сенімхат', ru: 'доверен.' }, novote: { kz: 'дауыссыз', ru: 'без голоса' } });
 UI.qzMenuSub = { kz: 'Барлық сұрақ · белгі — 7 квиздің бәрі үшін', ru: 'Все вопросы · значок — за все 7 квизов' };
@@ -1068,6 +1078,34 @@ const INTER_LINES = [
   { kz: 'ОСИ құрамыз ба, енді?', ru: 'ОСИ, что ли, создаём?' },
   { kz: 'Лифт тағы тұр...', ru: 'Лифт опять стоит...' },
   { kz: 'E-KNOT-та дауыс беремін.', ru: 'Проголосую в E-KNOT.' },
+];
+
+/* ---------- подсказки «?»: что значит каждая надпись (простыми словами) ---------- */
+Object.assign(UI, {
+  helpBtn:   { kz: '?', ru: '?' },
+  helpOk:    { kz: 'ТҮСІНІКТІ', ru: 'ПОНЯТНО' },
+  helpTourT: { kz: 'Жиналыс: не қайда', ru: 'Собрание: что где' },
+  helpHouseT:{ kz: 'Менің ЖК: не істеу керек', ru: 'Мой ЖК: что делать' },
+  helpIcons: { kz: 'Есіктегі белгілер', ru: 'Значки у дверей' },
+});
+const HELP_TOUR = [
+  [{ kz: 'Қалай ойнау', ru: 'Как играть' }, { kz: 'Есіктерге барып қағ. Көршіге ұнайтын дәлел таңда — сонда ол «иә» дейді.', ru: 'Подходи к дверям и стучи. Выбирай довод, который нравится соседу, — тогда он скажет «за».' }],
+  [{ kz: 'КҮН 5/60', ru: 'ДЕНЬ 5/60' }, { kz: 'Жиналысқа дейін қанша күн қалды.', ru: 'Сколько дней осталось до собрания.' }],
+  [{ kz: 'ИӘ 19/26', ru: 'ЗА 19/26' }, { kz: 'Қанша көрші «иә» деді / қанша керек.', ru: 'Сколько соседей уже «за» / сколько нужно.' }],
+  [{ kz: 'Жолақ 30/51', ru: 'Полоска 30/51' }, { kz: 'Кворум: қанша адам дауыс берді (иә, қарсы, қалыс). 51 болмаса — жиналыс өтпейді.', ru: 'Кворум: сколько всего проголосовало (за, против, воздержались). Меньше 51 — собрание не состоится.' }],
+  [{ kz: 'E-KNOT 59 %', ru: 'E-KNOT 59 %' }, { kz: '«Иә» дауыстардың қаншасы қосымша арқылы келді. +5 −1 — онлайн «иә» және «қарсы».', ru: 'Какая часть голосов «за» пришла через приложение. +5 −1 — онлайн «за» и «против».', app: true }],
+  [{ kz: 'БЮЛЛЕТЕНЬ', ru: 'БЮЛЛЕТЕНЬ' }, { kz: 'Барлық пәтерлер кестесі: жасыл — «иә», қызыл — «қарсы».', ru: 'Таблица всех квартир: зелёные — «за», красные — «против».' }],
+  [{ kz: 'ЕНОТ', ru: 'ЕНОТ' }, { kz: 'E-KNOT көмекшісі: көршілерге хабарлама жібереді, қоңырау шалады, үй чатында жазады.', ru: 'Помощник E-KNOT: шлёт соседям уведомления, обзванивает, пишет в чат дома.', app: true }],
+];
+const HELP_ICONS = [['yes', { kz: 'иә', ru: 'за' }], ['no', { kz: 'қарсы', ru: 'против' }], ['abstain', { kz: 'қалыс', ru: 'воздерж.' }], ['thinking', { kz: 'ойланады', ru: 'думает' }],
+  ['online', { kz: 'онлайн', ru: 'онлайн' }], ['paper', { kz: 'қағазбен', ru: 'бумагой' }], ['proxy', { kz: 'сенімхат', ru: 'доверенн.' }], ['novote', { kz: 'дауыс жоқ', ru: 'не голосует' }]];
+const HELP_HOUSE = [
+  [{ kz: 'Сары «!»', ru: 'Жёлтый «!»' }, { kz: 'Мұны жөндеуге болады, ақша жетеді. Белгіні бас.', ru: 'Это можно починить, денег хватает. Нажми на значок.' }],
+  [{ kz: 'Сұр «!»', ru: 'Серый «!»' }, { kz: 'Ақша әзірге жетпейді. Жиналыстарды ұтып, квиздерден өт.', ru: 'Пока не хватает денег. Выигрывай собрания и проходи квизы.' }],
+  [{ kz: '«?»', ru: '«?»' }, { kz: 'Алдымен жиналыс керек: председатель сайланғаннан кейін ашылады.', ru: 'Сначала нужно собрание: откроется, когда выберут председателя.' }],
+  [{ kz: 'Бюджет', ru: 'Бюджет' }, { kz: 'Үйдің ақшасы. Жиналыстағы жеңістен және квиздерден келеді.', ru: 'Деньги дома. Приходят за победы в собраниях и за квизы.' }],
+  [{ kz: 'ЖИНАЛЫСТАР', ru: 'СОБРАНИЯ' }, { kz: 'Келесі жиналысқа бару.', ru: 'Перейти к следующему собранию.' }],
+  [{ kz: 'ПОДЪЕЗД', ru: 'ПОДЪЕЗД' }, { kz: 'Подъезді ішінен қарау: жөндеу жасалған жерлер көрінеді.', ru: 'Посмотреть подъезд изнутри: видно, что уже отремонтировано.' }],
 ];
 
 /* Көршілер / Соседи — согласованные реплики героев (для Әмины)
@@ -2371,7 +2409,8 @@ const MockServer = (() => {
       const prof = db.profiles[u.userId] || (db.profiles[u.userId] = {}); prof.quizPaid = prof.quizPaid || {}; prof.quizBest = prof.quizBest || {};
       // «знания экономят деньги»: +20 000 ₸ за верный ответ с первой попытки, +5 000 со второй, расчётный +50 000 — только за первый проход квиза тура
       const paidBefore = !!(tour && prof.quizPaid[tour.id]);
-      const coins = suspicious || !tour || paidBefore ? 0 : (first - hard) * 20000 + hard * 50000 + second * 5000;
+      const trips = clamp(body.trips | 0, 0, 200);   // споткнулся о преграду — −1 000 ₸
+      const coins = suspicious || !tour || paidBefore ? 0 : Math.max(0, (first - hard) * 20000 + hard * 50000 + second * 5000 - trips * 1000);
       if (tour && !suspicious) { prof.quizPaid[tour.id] = true; prof.quizBest[tour.id] = Math.max(prof.quizBest[tour.id] || 0, first / Math.max(1, total)); }
       prof.coins = (prof.coins || 0) + coins;
       let reward = null; db.rewards[u.userId] = db.rewards[u.userId] || [];
@@ -2813,21 +2852,25 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
   // палитра подъезда по референсу: оливково-серый верх, сине-зелёная панель снизу, чёрные перекрытия
   const C = { up: '#5a6652', upL: '#677359', upD: '#4c5746', low: '#365350', lowL: '#40605b', lowD: '#2b4441', line: '#22302b', core: '#6b725e', coreL: '#7a8169', coreD: '#5a6150',
     slab: '#131713', slabT: '#3a4234', step: '#1a201b', stepT: '#4a5444', rail: '#0c0f0d', pipe: '#3c4842', pipeL: '#56645b' };
+  // ремонт стен: свежая краска — светлее и чище, та же гамма (тёплый верх, сине-зелёная панель)
+  const FRESH = fixed.has('walls');
+  if (FRESH) Object.assign(C, { up: '#8f9a7e', upL: '#9aa588', upD: '#869076', low: '#3f6a64', lowL: '#4a756e', lowD: '#38605a', line: '#2c4a44', core: '#a2a68f', coreL: '#aaae97', coreD: '#999d86' });
+  const DIRT = FRESH ? .25 : 1;   // грязь и подтёки после ремонта почти исчезают
   return makeCanvas(SW, WH, (P) => {
     const { r, p, line, g } = P, R = rng(41);
     r(0, 0, SW, WH, '#0f1210');
     for (let f = 1; f <= floors; f++) {
       const b = floorBase(f, floors), top = b - FLOOR_H + 8;
       // крылья: верх стены, тень под потолком, полоса краски, низ панели
-      r(0, top, SW, b - top, C.up); dirt(P, 0, top, SW, b - 40 - top, [C.upL, C.upD, C.upD], .06, R);
+      r(0, top, SW, b - top, C.up); dirt(P, 0, top, SW, b - 40 - top, [C.upL, C.upD, C.upD], .06 * DIRT, R);
       for (let i = 0; i < 6; i++) r(0, top + i, SW, 1, `rgba(10,14,10,${(.45 - i * .07).toFixed(2)})`);
-      r(0, b - 40, SW, 40, C.low); dirt(P, 0, b - 40, SW, 40, [C.lowL, C.lowD], .07, R);
+      r(0, b - 40, SW, 40, C.low); dirt(P, 0, b - 40, SW, 40, [C.lowL, C.lowD], .07 * DIRT, R);
       r(0, b - 41, SW, 1, C.line); r(0, b - 40, SW, 1, C.lowL); r(0, b - 3, SW, 3, '#1e2b28');
       // подтёки: вертикальные полосы сверху вниз и «волны» отслоившейся краски на панели
-      for (let i = 0; i < 26; i++) { const x = Math.floor(R() * SW), l = 8 + R() * 40, y = top + R() * 20; for (let k = 0; k < l; k++) if (R() < .8) p(x, y + k, k % 5 === 0 ? C.upL : 'rgba(20,26,20,.35)'); }
-      for (let i = 0; i < 8; i++) { const x = Math.floor(R() * SW), w0 = 10 + R() * 30; for (let k = 0; k < w0; k++) p(x + k, b - 40 + Math.round(Math.sin(k / 3) * 1.5) + 2, C.lowD); }
+      for (let i = 0; i < (FRESH ? 0 : 26); i++) { const x = Math.floor(R() * SW), l = 8 + R() * 40, y = top + R() * 20; for (let k = 0; k < l; k++) if (R() < .8) p(x, y + k, k % 5 === 0 ? C.upL : 'rgba(20,26,20,.35)'); }
+      for (let i = 0; i < (FRESH ? 0 : 8); i++) { const x = Math.floor(R() * SW), w0 = 10 + R() * 30; for (let k = 0; k < w0; k++) p(x + k, b - 40 + Math.round(Math.sin(k / 3) * 1.5) + 2, C.lowD); }
       // центральная клетка: светлее, свой низ панели, пилястры по краям
-      r(CORE_L, top, CORE_R - CORE_L, b - 40 - top, C.core); dirt(P, CORE_L, top, CORE_R - CORE_L, b - 40 - top, [C.coreL, C.coreD], .07, R);
+      r(CORE_L, top, CORE_R - CORE_L, b - 40 - top, C.core); dirt(P, CORE_L, top, CORE_R - CORE_L, b - 40 - top, [C.coreL, C.coreD], .07 * DIRT, R);
       for (let i = 0; i < 6; i++) r(CORE_L, top + i, CORE_R - CORE_L, 1, `rgba(10,14,10,${(.45 - i * .07).toFixed(2)})`);
       for (const [px, dir] of [[CORE_L - 7, 1], [CORE_R, -1]]) { r(px, top, 7, b - top, '#4a5444'); r(px + (dir > 0 ? 0 : 6), top, 1, b - top, '#626d58'); r(px + (dir > 0 ? 6 : 0), top, 1, b - top, '#2c332a');
         dirt(P, px, top, 7, b - top, ['#545e4c', '#3e463a'], .12, R); r(px, b - 40, 7, 1, C.line); }
@@ -2843,6 +2886,16 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
       // объявления: пачки бумажек, как на референсе
       for (const [nx, ny] of [[141, top + 14], [95, top + 22], [397, top + 30]].slice(0, 1 + (f % 3))) {
         for (let i = 0; i < 3; i++) { const qx = nx + (i % 2) * 5 - 2, qy = ny + i * 4; r(qx, qy, 6, 7, i === 1 ? '#c9c2ae' : '#d8d2bf'); r(qx + 1, qy + 2, 4, 1, '#8a8472'); r(qx + 1, qy + 4, 3, 1, '#8a8472'); r(qx + 2, qy - 1, 2, 1, 'rgba(220,206,150,.8)'); } }
+      // после ремонта стен — картины в рамках между дверями (простые пейзажи: степь, горы, город)
+      if (FRESH) for (const [px, k] of [[95, f], [397, f + 1]]) { const py = top + 9, v = k % 3;   // выше номеров квартир
+        r(px - 1, py - 1, 22, 16, '#5a3e26'); r(px, py, 20, 14, '#e8dcc0');
+        if (v === 0) { r(px + 1, py + 1, 18, 7, '#8fc0d8'); r(px + 1, py + 8, 18, 5, '#c9a95a'); r(px + 13, py + 3, 3, 3, '#f2d27a'); }
+        else if (v === 1) { r(px + 1, py + 1, 18, 12, '#a8c8d8'); for (let i = 0; i < 9; i++) { r(px + 2 + i, py + 12 - i, 1, i + 1, '#5a7a8a'); r(px + 18 - i, py + 12 - i * .7, 1, i * .7 + 1, '#4a6a7a'); } r(px + 9, py + 4, 2, 1, '#f4f3ee'); }
+        else { r(px + 1, py + 1, 18, 12, '#2e3a5a'); for (const [bx, bh] of [[2, 6], [5, 9], [9, 7], [12, 10], [16, 5]]) { r(px + bx, py + 13 - bh, 3, bh, '#1a2238'); p(px + bx + 1, py + 14 - bh + 1, '#f2d27a'); } }
+        r(px + 9, py - 4, 2, 3, '#2a2a2a'); }
+      // камеры под потолком: у лестницы и у лифта, с красным огоньком
+      if (fixed.has('cameras')) for (const cx0 of [CORE_L + 6, CORE_R - 14]) { const cy = top + 7;
+        r(cx0 + 3, cy - 2, 2, 3, '#2a2e30'); r(cx0, cy + 1, 9, 5, '#d8d6c8'); r(cx0, cy + 5, 9, 1, '#a8a69a'); r(cx0 + (cx0 < 240 ? 8 : -2), cy + 2, 3, 3, '#2a2e30'); p(cx0 + 2, cy + 2, '#e04a3a'); }
       // стояки: отопление (рыжий) и холодная вода (серо-синий) в углах крыльев, с вентилями и счётчиком
       for (const [sx, col, colL] of [[10, '#7a4a32', '#9a6248'], [16, '#4a5e6a', '#6a8090'], [SW - 16, '#7a4a32', '#9a6248'], [SW - 22, '#4a5e6a', '#6a8090']]) {
         r(sx, top - 8, 3, FLOOR_H, col); r(sx, top - 8, 1, FLOOR_H, colL); r(sx - 1, top + 30, 5, 2, '#2a302a'); }
@@ -3401,7 +3454,7 @@ const ICONS = {}; for (const k of ['yes', 'no', 'thinking', 'away', 'noanswer', 
 /* ---------- Mock API: тот же набор запросов, что будет у настоящего сервера ---------- */
 let USER = null, SAVE = null;
 const DEFAULT_LOOK = { body: 'm', bottom: 'pants', skin: '#e3ad86', hair: 'short', hairCol: '#2b2420', top: 'hoodie', topCol: '#2f8577', hat: null };
-function persist() { API.save(SAVE).catch(() => toast('E-KNOT', L(UI.netSaveFail), 2400)); }
+function persist() { API.save(SAVE).catch(() => toast(L(UI.tipT), L(UI.netSaveFail), 2400)); }
 const NEW_SAVE = () => ({ created: false, coins: 0, tours: {}, trust: {} });
 // индикатор связи с сервером: крутится в углу, пока идёт запрос дольше 0,3 с
 let netShownAt = 0;
@@ -3491,6 +3544,23 @@ function dlgDraw() {
 }
 
 /* ---------- плавающие подписи (над дверями) ---------- */
+/* окно подсказки «?»: строки «надпись — что значит» и значки у дверей; true — закрыли */
+function drawHelp(title, rows, icons = null) {
+  rect(0, 0, W, H, 'rgba(8,10,18,.6)');
+  const lw = Math.max(...rows.map(([a]) => textW(L(a), 6))) + 8, dw = 372 - lw - 20;
+  const R = rows.map(([a, b]) => [L(a), wrapText(L(b), dw, 6)]);
+  const hRows = R.reduce((m, [, ls]) => m + ls.length * 8 + 3, 0), hIc = icons ? 11 + Math.ceil(icons.length / 4) * 11 : 0;
+  const h = 18 + hRows + hIc + 24, y0 = Math.max(4, Math.round((H - h) / 2));
+  frameBox(8, y0, 384, h, .98); text(title, W / 2, y0 + 6, { align: 'center', col: '#9fd9c2', size: 6 });
+  let y = y0 + 18;
+  R.forEach(([a, ls]) => { text(a, 18, y, { col: '#f2c94c', size: 6 }); ls.forEach((l, i) => text(l, 18 + lw, y + i * 8, { col: '#e4e8f0', size: 6 })); y += ls.length * 8 + 3; });
+  if (icons) { text(L(UI.helpIcons), 18, y + 1, { col: '#9fd9c2', size: 6 }); y += 10;
+    icons.forEach(([k, lbl], i) => { const x = 18 + (i % 4) * 92, yy = y + Math.floor(i / 4) * 11; sprite(ICONS[k], x, yy); text(L(lbl), x + 12, yy + 1, { col: '#e4e8f0', size: 6 }); });
+    y += Math.ceil(icons.length / 4) * 11; }
+  const ok = button(L(UI.helpOk), W / 2, y + 2, 'primary') || hit('act') || hit('back');
+  if (clicks.length) clicks.length = 0;
+  return ok;
+}
 const POPS = [];
 function pop(x, y, s, col = '#f4f3ee') { POPS.push({ x, y, s, col, t: 0 }); }
 function drawPops(dt, ox = 0, oy = 0) {
@@ -3688,7 +3758,13 @@ scenes.tour = {
       if (!r.A.renter && !r.A.notOwner && !r.A.noVote && RR() < (REFUSE[r.arch] || 0) * (1 - repaired * .1)) r.refuser = true;
       if (app && r.A.onlineOk && !r.A.paperOnly && !r.A.renter && !r.A.notOwner && RR() < .12) r.selfAt = tour.start + tour.duration * (.08 + RR() * .8);
     }
-    this.app = app; this.onYes = 0; this.onNo = 0; this.onFlash = 0;
+    this.app = app && !!SAVE.racIntro; this.onYes = 0; this.onNo = 0; this.onFlash = 0;
+    // собрание 2: про E-KNOT рассказывает сосед Данияр — надо зайти к нему; до этого Енота нет
+    this.dan = null;
+    if (app && !SAVE.racIntro) { const hf = Math.ceil(tour.heroApt / DOOR_X.length);
+      const cand = Object.values(this.res).filter(r => !isStorage(r.apt) && !r.refuser && !r.A.renter && !r.A.notOwner && !r.A.noVote && r.apt !== tour.heroApt)
+        .sort((a, b) => Math.abs(a.floor - hf) - Math.abs(b.floor - hf) || (a.arch === 'it' ? -1 : 1));
+      const r = cand[0]; if (r) { this.dan = r; r.dan = true; r.name = 'Данияр'; r.look = { ...ARCH.it.look }; r.away = false; r.sleeping = false; } }
     // подростки курят на лестнице, пока нет камер; «нехорошая квартира» — пока нет домофона с доступом из E-KNOT
     const fl = 3 + Math.floor(RR() * 9);
     this.teens = this.fixed.has('cameras') ? null : { floor: fl === Math.ceil(tour.heroApt / tour.perFloor) ? fl + 1 : fl, x: 150 + RR() * 40, st: 'here', backAt: 0, t: 0 };
@@ -3710,14 +3786,15 @@ scenes.tour = {
     this.helper = { state: 'hidden', floor: 2, x: 397, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
     this.rats = this.fixed.has('basement') ? [] : [{ x: 80, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 380, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
     this.liftPick = false; this.drops = []; this.paused = false;
-    this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
+    this.help = false; this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
     this.run = null; API.tourStart(tour.id).then(r => this.run = r).catch(() => {});
     this.plan = null;
     // повестка собрания: какая жалоба и сколько подписей нужно
     const runId = this.runId = (this.runId || 0) + 1, here = () => scene === scenes.tour && this.runId === runId && !this.over;
     setTimeout(() => { if (!here()) return; toast(L(UI.meetingT).replace('{n}', tour.n), L(UI.meetingB).replace('{t}', L(tour.title)).replace('{r}', ruleText(tour)), 5200);
-      if (tour.n === 1) setTimeout(() => here() && toast('E-KNOT', L(UI.tutTap)), 4600);
-      if (tour.n >= 2 && !SAVE.racIntro) setTimeout(() => here() && this.racIntro(), 5400); }, 500);
+      if (tour.n === 1) setTimeout(() => here() && toast(L(UI.tipT), L(UI.tutTap)), 4600);
+      if (!SAVE.helpTour) setTimeout(() => { if (here() && !DLG.open) { toasts.length = 0; this.help = true; } }, 1200);
+      if (this.dan) setTimeout(() => here() && toast(L(UI.danT), L(UI.danB).replace('{apt}', aptNo(this.dan.apt)).replace('{f}', this.dan.floor), 6000), 5600); }, 500);
     setTouch({ move: true });
   },
   focus() { return { x: this.hero.x - this.camX, y: this.hero.y - this.camY - 14 }; },
@@ -3734,15 +3811,15 @@ scenes.tour = {
   // игровой день 1…60: время тура растянуто на 60 дней
   day() { const T = this.tour; return clamp(Math.floor((this.minute - T.start) / T.duration * T.days) + 1, 1, T.days); },
   // после первого собрания сосед рассказывает про приложение E-KNOT и енота
-  async racIntro() {
-    if (this.busy || DLG.open) return setTimeout(() => scene === this && !this.over && !SAVE.racIntro && this.racIntro(), 1500);
-    this.busy = true; this.plan = null;
-    const look = ARCH.it.look, h = this.hero, side = h.x + 26 < WALK_MAX ? 1 : -1;
-    this.racNpc = { x: h.x + side * 26, floor: h.floor, look }; h.dir = side;
+  // Данияр у своей двери рассказывает про E-KNOT; после этого появляется Енот, а сам Данияр — «за»
+  async racIntro(r) {
+    const look = r.look;
     dlgOpen('Данияр', e => portrait(look, e), ARCH.it.voice);
     await say(L(PRO.rac1), 'happy'); await say(L(PRO.rac2));
     dlgOpen('E-KNOT', () => RACCOON_PORT, 900); await say(L(RAC_INTRO.notify), 'happy'); await say(L(UI.racMenuHint), 'happy'); dlgClose();
-    SAVE.racIntro = true; SAVE.racSeen = { ...(SAVE.racSeen || {}), notify: true }; persist(); this.busy = false; this.racNpc.leaving = 1;
+    SAVE.racIntro = true; SAVE.racSeen = { ...(SAVE.racSeen || {}), notify: true }; persist();
+    this.app = true; r.dan = false; this.dan = null;
+    if (r.status !== 'yes') { r.status = 'yes'; this.signed(r, 'door'); }
   },
   // обещал проголосовать онлайн: голос придёт позже, через несколько игровых дней
   goOnline(r, via) { r.status = 'online'; r.channel = via; r.onlineAt = this.minute + 4 + Math.random() * this.tour.duration * .25; this.events.push({ t: 'online', apt: r.apt, via }); },
@@ -3793,6 +3870,7 @@ scenes.tour = {
     if (this.over) return;
     // пауза: время стоит, можно продолжить или выйти из уровня
     if (this.paused) { setTouch({}); if (hit('back')) this.paused = false; return; }
+    if (this.help) return;   // открыта подсказка «?» — игра стоит
     if (hit('back') && !this.busy && !DLG.open && !this.ballot && !this.liftPick) { this.paused = true; return; }
     dlgUpdate(dt);
     const h = this.hero, T = this.tour;
@@ -3846,7 +3924,7 @@ scenes.tour = {
       } else if (Math.abs(h.x - P.x) > 1.5) dir = Math.sign(P.x - h.x);
       else {
         this.plan = null; h.moving = false;
-        if (P.door) { if (P.door === T.heroApt) toast('E-KNOT', L(UI.yourDoor), 2400); else if (isStorage(P.door)) toast(aptNo(P.door), L(UI.storage), 2200); else this.visit(this.res[P.door]); this.updateCam(dt); return; }
+        if (P.door) { if (P.door === T.heroApt) toast(L(UI.tipT), L(UI.yourDoor), 2400); else if (isStorage(P.door)) toast(aptNo(P.door), L(UI.storage), 2200); else this.visit(this.res[P.door]); this.updateCam(dt); return; }
         if (P.npc) { this.runHelper(); this.updateCam(dt); return; }
         if (P.lift) { this.useLift(); this.updateCam(dt); return; }
       }
@@ -3864,7 +3942,7 @@ scenes.tour = {
     setTouch({ act: npc ? L(UI.talk) : door ? L(UI.knock) : lift ? L(UI.lift) : null, up: onStairs && h.floor < T.floors, down: onStairs && h.floor > 1, move: true });
     if (hit('act')) {
       if (npc === 'helper') this.runHelper();
-      else if (door === T.heroApt) toast('E-KNOT', L(UI.yourDoor), 2400);
+      else if (door === T.heroApt) toast(L(UI.tipT), L(UI.yourDoor), 2400);
       else if (door && isStorage(door)) toast(aptNo(door), L(UI.storage), 2200);
       else if (door) this.visit(this.res[door]);
       else if (lift) this.useLift();
@@ -3961,6 +4039,10 @@ scenes.tour = {
   fmt(r, v) { const T = this.tour; return fmtLine(typeof v === 'string' ? v : L(v), { f: r.floor, apt: aptNo(r.apt), g: T.goal, q: T.quorum || '' }).replace('{n}', this.signatures()); },
   async visit(r) {
     this.busy = true; const h = this.hero, T = this.tour;
+    if (r.dan) {   // Данияр сразу открывает: он сам звал
+      let side = h.x <= DOOR_X[r.d] ? -1 : 1; if (DOOR_X[r.d] + side * 23 < WALK_MIN) side = 1; if (DOOR_X[r.d] + side * 23 > WALK_MAX) side = -1;
+      await this.walkTo(DOOR_X[r.d] + side * 23); h.dir = -side; h.knockT = 700; sfx.knock(); await wait(600);
+      await tweenDoor(r, 1); await this.racIntro(r); await tweenDoor(r, 0); this.busy = false; return; }
     // встаём сбоку от двери, чтобы жилец вышел на порог, а не «в» героя
     let side = h.x <= DOOR_X[r.d] ? -1 : 1; if (DOOR_X[r.d] + side * 23 < WALK_MIN) side = 1; if (DOOR_X[r.d] + side * 23 > WALK_MAX) side = -1;
     await this.walkTo(DOOR_X[r.d] + side * 23); h.dir = -side;
@@ -3969,11 +4051,11 @@ scenes.tour = {
     const m = this.minute, A = r.A;
     if (r.status === 'online') { pop(DOOR_X[r.d], this.base(r.floor) - 70, L(UI.st.online), '#9fd9c2'); this.busy = false; return; }
     const away = r.away && m < r.returnAt;
-    if (away) { r.status = r.status === 'unknown' ? 'away' : r.status; r.knocks++; pop(DOOR_X[r.d], this.base(r.floor) - 70, '...', '#9fb0cc'); toast('E-KNOT', L(UI.nobody), 2400); this.busy = false; return; }
+    if (away) { r.status = r.status === 'unknown' ? 'away' : r.status; r.knocks++; pop(DOOR_X[r.d], this.base(r.floor) - 70, '...', '#9fb0cc'); toast(L(UI.tipT), L(UI.nobody), 2400); this.busy = false; return; }
     // бумажный голос или доверенность ждут героя — открывают сразу
     const expecting = ['paper', 'proxy'].includes(r.status);
     const pNo = expecting ? 0 : (r.sleeping ? .5 : A.deaf) * Math.pow(.45, r.knocks);
-    if (Math.random() < pNo) { r.knocks++; if (r.status === 'unknown' || r.status === 'away') r.status = 'noanswer'; pop(DOOR_X[r.d], this.base(r.floor) - 70, '...', '#8f949c'); toast('E-KNOT', L(UI.noOpen), 2400); this.busy = false; return; }
+    if (Math.random() < pNo) { r.knocks++; if (r.status === 'unknown' || r.status === 'away') r.status = 'noanswer'; pop(DOOR_X[r.d], this.base(r.floor) - 70, '...', '#8f949c'); toast(L(UI.tipT), L(UI.noOpen), 2400); this.busy = false; return; }
     // открывают
     sfx.door(); await tweenDoor(r, 1);
     if (r.sleeping) { r.mood -= 8; r.sleeping = false; }
@@ -4156,7 +4238,7 @@ scenes.tour = {
   },
   checkGoal(delay = 0) {
     if (this.goalShown || !this.goalMet()) return; this.goalShown = true;
-    setTimeout(() => toast('E-KNOT', L(UI.goalDone), 4200), delay);
+    setTimeout(() => toast(L(UI.tipT), L(UI.goalDone), 4200), delay);
   },
   /* ---- енот E-KNOT: 4 действия по очереди (уведомление → обзвон → дожатие → чат дома), между применениями — пауза ---- */
   racReady(k) { const R = this.rac, i = RAC_ACTS.indexOf(k); if (i > R.open) return { ok: false, why: 'locked' };
@@ -4231,7 +4313,7 @@ scenes.tour = {
   /* ---- конец тура ---- */
   async finish(timeUp) {
     if (this.over) return; this.over = true; setTouch({});
-    if (timeUp) toast('E-KNOT', L(UI.timeUp), 2000);
+    if (timeUp) toast(L(UI.tipT), L(UI.timeUp), 2000);
     // онлайн-подписи приходят к концу тура
     for (const r of Object.values(this.res)) if (r.status === 'online') this.resolveOnline(r);
     let result;
@@ -4292,6 +4374,8 @@ scenes.tour = {
           ctx.beginPath(); ctx.moveTo(x - 13, b); ctx.lineTo(x + 13, b); ctx.lineTo(x + 34, b + 1); ctx.lineTo(x - 34, b + 1); ctx.fill();
           ctx.fillRect(x - 40, b - 2, 80, 2); ctx.restore();
         }
+        if (r.dan) { const k = Math.floor(t / 400) % 2; rect(x + 6, b - 66 - k, 15, 11, '#1b1a21'); rect(x + 7, b - 65 - k, 13, 9, '#7fc4a8'); rect(x + 9, b - 56 - k, 2, 2, '#1b1a21');
+          text('...', x + 13.5, b - 64 - k, { col: '#0e111c', size: 6, align: 'center' }); continue; }
         const ic = ICONS[r.status]; if (ic) { rect(x + 8, b - 62, 11, 11, 'rgba(10,12,16,.55)'); sprite(ic, x + 9, b - 61); }
       }
     }
@@ -4354,6 +4438,7 @@ scenes.tour = {
     if (this.rac.menu && !this.busy && !DLG.open) this.drawRacMenu();
     dlgDraw();
     if (this.ballot) this.drawBallot();
+    if (this.help && drawHelp(L(UI.helpTourT), HELP_TOUR.filter(([, b]) => !b.app || this.app), HELP_ICONS)) { this.help = false; SAVE.helpTour = true; persist(); }
     if (this.paused) {
       rect(0, 0, W, H, 'rgba(11,10,20,.65)'); frameBox(120, 50, 160, 120);
       text(L(UI.pause), W / 2, 62, { align: 'center', col: '#f4f3ee' });
@@ -4402,8 +4487,10 @@ scenes.tour = {
     frameBox(214, 22, 182, 92, .97);
     text(L(UI.raccoon), 222, 28, { col: '#9fd9c2', size: 6 });
     RAC_ACTS.forEach((k, i) => { const st = this.racReady(k), y = 38 + i * 18;
-      const lbl = L(UI['rac_' + k]) + (st.ok ? (st.bonus ? ' +1' : '') : st.why === 'locked' ? ' 🔒' : ` · ${st.days} ${L(UI.daysShort)}`);
-      if (button(lbl, 305, y, st.ok ? 'alt' : 'off', { w: 176 })) this.useRac(k); });
+      // название в кнопке, пауза — отдельной подписью справа, чтобы не вылезало
+      const lbl = L(UI['rac_' + k]) + (st.ok && st.bonus ? ' +1' : '');
+      if (button(lbl, 0, y, st.ok ? 'alt' : 'off', { left: 220, w: st.ok ? 170 : 126 })) this.useRac(k);
+      if (!st.ok) text(st.why === 'locked' ? L(UI.racSoon) : `${st.days} ${L(UI.daysShort)}`, 390, y + 5, { col: '#8792ad', size: 6, align: 'right' }); });
     if (clicks.length) clicks.length = 0;
   },
   drawHUD() {
@@ -4415,15 +4502,16 @@ scenes.tour = {
       text(`${L(UI.day)} ${this.day()}/${T.days}`, 22, 3, { col: late ? '#e98f6f' : '#f4f3ee', size: 6 });
       rect(22, 12, 56, 3, '#2b2a33'); rect(22, 12, Math.round(56 * clamp(left / T.duration, 0, 1)), 3, late ? '#e98f6f' : '#7fc4a8'); }
     // «За X / нужно Y», кворум (в туре 1 без таймера — счётчик слева, подпись после него)
-    const n = this.votes(), o = this.outcome(), x0 = T.noTimer ? 22 : 84;
+    const n = this.votes(), o = this.outcome(), x0 = T.noTimer ? 22 : 30 + Math.max(56, textW(`${L(UI.day)} ${this.day()}/${T.days}`, 6));
     if (T.noTimer) text(L(UI.noTimerHud), x0 + textW(`${L(UI.yesShort)} ${n}/${o.need}`, 6) + 10, 7, { col: '#8792ad', size: 6 });
-    text(`${L(UI.yesShort)} ${n}/${o.need}`, x0, T.rule === 'quorum' ? 3 : 7, { col: n >= o.need ? '#4caf6e' : '#f2c94c', size: 6 });
+    { const yy = T.rule === 'quorum' ? 3 : 7, lb = L(UI.yesShort) + ' '; text(lb, x0, yy, { col: '#4caf6e', size: 6 }); text(`${n}/${o.need}`, x0 + textW(lb, 6), yy, { col: n >= o.need ? '#4caf6e' : '#f4f3ee', size: 6 }); }
     if (T.rule === 'quorum') { const k = clamp(o.turnout / T.quorum, 0, 1); rect(x0, 12, 40, 3, '#2b2a33'); rect(x0, 12, Math.round(40 * k), 3, o.turnout >= T.quorum ? '#4caf6e' : '#9fb0cc');
       text(`${o.turnout}/${T.quorum}`, x0 + 43, 10, { col: '#9fb0cc', size: 6 }); }
     // доля E-KNOT и онлайн-голоса
-    if (this.app) { const ox = 172, fl = this.onFlash > 0 && Math.floor(this.onFlash / 120) % 2;
+    if (this.app) { const ox = 166, fl = this.onFlash > 0 && Math.floor(this.onFlash / 120) % 2;
       rect(ox, 4, 6, 11, fl ? '#f4f3ee' : '#7fc4a8'); rect(ox + 1, 5, 4, 7, '#0e111c'); rect(ox + 2, 13, 2, 1, '#0e111c');
       text(`E-KNOT ${this.appShare()}%`, ox + 9, 3, { col: '#9fd9c2', size: 6 }); text('+' + this.onYes + ' −' + this.onNo, ox + 9, 11, { col: '#8792ad', size: 6 }); }
+    if (button('?', 0, 1, 'alt', { left: 236, w: 14 }) && !DLG.open) { this.help = !this.help; this.rac.menu = false; this.ballot = false; }
     if (button(L(UI.ballot), 0, 1, 'dark', { left: 252 }) && !this.busy && !DLG.open) this.ballot = !this.ballot;
     if (this.app && button(L(UI.raccoon), 0, 1, this.rac.menu ? 'primary' : 'alt', { left: 338 }) && !this.busy && !DLG.open) { this.rac.menu = !this.rac.menu; if (this.rac.menu) toasts.length = 0; }
     const pend = Object.values(this.res).filter(r => r.status === 'online').length, papers = Object.values(this.res).filter(r => r.status === 'paper').length;
@@ -4446,9 +4534,11 @@ scenes.tour = {
         const apt = (f - 1) * nd + d + 1, x = 66 + d * (cw + 3), r = this.res[apt];
         rect(x, y, cw, ch, '#e2d9c2'); rect(x, y + ch - 1, cw, 1, '#cfc3a5');
         const ty = y + Math.round(ch / 2) - 3;
-        text(aptNo(apt), x + 2, ty, { col: isStorage(apt) ? INK_MUTED : INK, size: 6 });
+        const st = isStorage(apt) ? 'novote' : apt === T.heroApt ? 'me' : r.status === 'renter' ? 'novote' : r.status;
+        // «за» — зелёная клетка, «против» — красная
+        if (['yes', 'me'].includes(st)) rect(x, y, cw, ch, 'rgba(76,175,110,.28)'); else if (st === 'no') rect(x, y, cw, ch, 'rgba(184,68,63,.25)');
+        text(aptNo(apt), x + 2, ty, { col: isStorage(apt) ? INK_MUTED : st === 'yes' ? '#2e6a4a' : st === 'no' ? INK_RED : INK, size: 6 });
         if (isStorage(apt)) { rect(x, y, cw, ch, 'rgba(120,110,90,.18)'); sprite(ICONS.novote, x + cw - 9, y); continue; }
-        const st = apt === T.heroApt ? 'me' : r.status === 'renter' ? 'novote' : r.status;
         if (ICONS[st]) sprite(ICONS[st], x + cw - 9, y);
       }
     }
@@ -4521,16 +4611,19 @@ scenes.result = {
     const addr = L(UI.protEntrance) + ' · ' + L(UI.day) + ' ' + (d.day || 1);
     if (!ekn) text(addr, W / 2, 20, { align: 'center', col: INK_MUTED, size: 6 });
     // повестка — одной строкой (длинная сокращается), итог крупно
-    let ag = L(UI.protAgenda) + ' ' + tourTitle(TT); while (textW(ag, 6) > 292 && ag.length > 10) ag = ag.slice(0, -2).trimEnd() + '…';
-    text(ag, W / 2, 30, { align: 'center', col: INK, size: 6 });
+    let ag = L(UI.protAgenda) + ' ' + tourTitle(TT); while (textW(ag, 6) > 236 && ag.length > 10) ag = ag.slice(0, -2).trimEnd() + '…';
+    text(ag, 54, 30, { col: INK, size: 6 });   // справа от повестки — место для штампа
     const quorumFail = TT.rule === 'quorum' && (d.turnout || 0) < TT.quorum;
     text(d.success ? L(TT.winT) : quorumFail ? L(UI.noQuorum) : L(UI.lose), W / 2, 41, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
     // четыре цифры: явка, «за», «против», «воздержались»
     const need = d.need || TT.goal, src = d.src || {}, tw = 70;
     const tiles = [[L(UI.protQuorum), `${d.turnout || 0}`, TT.quorum ? '≥' + TT.quorum : '/100', TT.quorum ? (quorumFail ? INK_RED : INK_TEAL) : INK],
       [L(UI.yesShort), String(d.signatures), '≥' + need, d.signatures >= need ? INK_TEAL : INK_RED],
-      [L(UI.rAgainst), String(d.against || 0), '', INK], [L(UI.protAbstain), String(d.abstain || 0), '', INK]];
-    tiles.forEach(([lbl, big, sub, c], i) => { const x = 54 + i * (tw + 4);
+      [L(UI.rAgainst), String(d.against || 0), '', (d.against || 0) ? INK_RED : INK], [L(UI.protAbstain), String(d.abstain || 0), '', INK]];
+    // ширина клетки — по самой длинной надписи, остаток делим поровну
+    const need0 = tiles.map(([lbl, big, sub]) => Math.max(textW(lbl, 6), textW(big) + (sub ? textW(sub, 6) + 2 : 0)) + 10), extra = Math.max(0, (292 - 12 - need0.reduce((a, b) => a + b, 0)) / 4);
+    let tx = 54;
+    tiles.forEach(([lbl, big, sub, c], i) => { const tw = Math.round(need0[i] + extra), x = tx; tx += tw + 4;
       rect(x, 58, tw, 32, 'rgba(120,100,60,.08)'); rect(x, 58, tw, 1, '#e2d9c2'); rect(x, 89, tw, 1, '#e2d9c2');
       text(big, x + 5, 61, { col: c }); if (sub) text(sub, x + 7 + textW(big), 63, { col: INK_MUTED, size: 6 });
       wrapText(lbl, tw - 8, 6).slice(0, 2).forEach((l, k) => text(l, x + 5, 73 + k * 7, { col: INK_MUTED, size: 6 })); });
@@ -4562,9 +4655,9 @@ scenes.result = {
       let rt = '★ ' + b + ' · +' + d.reward.points; while (textW(rt, 6) > 292 && rt.length > 8) rt = rt.slice(0, -2);
       y += 2; text(rt, W / 2, y, { align: 'center', col: d.reward.status === 'sent' ? INK_TEAL : INK_GOLD, size: 6 }); y += 8; }
     // подписи — мелко внизу
-    text(ekn ? L(UI.protSign) : L(UI.protSign1).replace('{n}', d.signatures), W / 2, 188, { align: 'center', col: '#b5a888', size: 6 });
-    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(324, 47); ctx.rotate(-.15); ctx.scale(s, s); ctx.globalAlpha = k;
-      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-24, -9, 48, 18); text(d.tourId === 'L1' ? 'ОСИ' : ['ИӘ', 'ЗА'][LI()] || 'ЗА', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
+    { let sg = ekn ? L(UI.protSign) : L(UI.protSign1).replace('{n}', d.signatures); while (textW(sg, 6) > 292 && sg.length > 8) sg = sg.slice(0, -2).trimEnd() + '…'; text(sg, 54, 190, { col: '#b5a888', size: 6 }); }
+    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(326, 38); ctx.rotate(-.15); ctx.scale(s, s); ctx.globalAlpha = k;   // зелёный штамп внизу справа, не на цифрах
+      ctx.strokeStyle = '#2e8a5a'; ctx.lineWidth = 2; ctx.strokeRect(-24, -9, 48, 18); text(d.tourId === 'L1' ? 'ОСИ' : ['ИӘ', 'ЗА'][LI()] || 'ЗА', 0, -4, { col: '#2e8a5a', align: 'center' }); ctx.restore(); }
     const bw = 84;
     if (button(L(UI.toHouse), 108, 200, 'primary', { w: bw })) irisTo(108, 194, () => go('house', { focus: null }));
     if (button(L(UI.rating), 200, 200, 'alt', { w: bw })) irisTo(200, 194, () => go('leaderboard', { from: 'result' }));
@@ -4694,7 +4787,8 @@ scenes.interlude = {
       rect(0, 0, W, H, 'rgba(10,12,20,.55)');
       // календарь: листы улетают
       const n = this.kind === 'years' ? 24 : 6, k = Math.min(n, Math.floor(this.t / (4200 / n)));
-      paper(150, 40, 100, 70, 5); text(L(this.kind === 'years' ? UI.twoYears : UI.sixMonths), W / 2, 50, { align: 'center', col: INK_RED });
+      const ttl = L(this.kind === 'years' ? UI.twoYears : UI.sixMonths), pw = Math.max(100, textW(ttl) + 24);   // лист шире надписи
+      paper(Math.round(W / 2 - pw / 2), 40, pw, 70, 5); text(ttl, W / 2, 50, { align: 'center', col: INK_RED });
       text(String(k), W / 2, 70, { align: 'center', col: INK, size: 16 }); text(L(this.kind === 'years' ? UI.monthsWord : UI.monthsWord), W / 2, 94, { align: 'center', col: INK_MUTED, size: 6 });
       // бюджет полугодия: пришёл после прошлой победы
       const prev = LEVELS[T.n - 2], inc = prev ? prev.income : 0;
@@ -4816,10 +4910,8 @@ function buildRoom() {
         if (y === 89 || y === 109) rug(y, x0 + 2, x1 - 2, '#c8a870'); else if (y > 89 && y < 109) { p(x0 + 2, y, '#c8a870'); p(x1 - 3, y, '#c8a870'); } }
       for (let i = 0; i < 4; i++) { const cx = 76 + i * 18, cy = 99; r(cx - 1, cy - 1, 3, 3, '#c8a870');
         for (const sx of [-1, 1]) { p(cx + sx * 3, cy - 3, '#c8a870'); p(cx + sx * 4, cy - 2, '#c8a870'); p(cx + sx * 4, cy - 1, '#c8a870'); p(cx + sx * 3, cy + 3, '#c8a870'); p(cx + sx * 4, cy + 2, '#c8a870'); p(cx + sx * 2, cy - 3, '#c8a870'); } } }
-    // подушка-корпе и вентилятор на полу
+    // подушка-корпе на полу (вентилятор убран — герой проходил сквозь него)
     r(122, 92, 18, 5, '#8a3a3a'); r(123, 91, 16, 1, '#a04a46'); r(122, 97, 18, 1, '#5a2626'); p(130, 94, '#c8a870');
-    r(165, 96, 2, 8, '#2a3a40'); ell(166, 104, 6, 1, '#2a3a40'); ell(166, 90, 7, 7, '#2a3a40'); ell(166, 90, 6, 6, '#4a6a72'); ell(166, 90, 5, 5, '#22343a');
-    for (let k = -4; k <= 4; k += 2) { p(166 + k, 85, '#3a565e'); p(166 + k, 95, '#3a565e'); p(161, 90 + k, '#3a565e'); p(171, 90 + k, '#3a565e'); } p(166, 82, '#5a8088');
     // виньетка: края комнаты темнее
     for (let i = 0; i < 18; i++) { g.fillStyle = `rgba(6,14,18,${(.04 * (18 - i) / 18 * 3).toFixed(3)})`; g.fillRect(i, 0, 1, 113); g.fillRect(199 - i, 0, 1, 113); }
     for (let i = 0; i < 10; i++) { g.fillStyle = `rgba(6,14,18,${(.05 * (10 - i) / 10 * 3).toFixed(3)})`; g.fillRect(0, 112 - i, 200, 1); }
@@ -5125,8 +5217,6 @@ scenes.prologue = {
     // экран монитора слегка мерцает, маятник часов качается
     rect(137, 51, 15, 9, Math.sin(t / 700) > .9 ? '#2f5f6a' : '#2a5560');
     { const a = Math.sin(t / 500) * .35, px = 189, py = 21; for (let i = 0; i < 7; i++) rect(Math.round(px + Math.sin(a) * i), py + i, 1, 1, '#8a9a8a'); rect(Math.round(px + Math.sin(a) * 7) - 1, py + 7, 3, 3, '#c9a95a'); }
-    // вентилятор крутится
-    { const cx = 166, cy = 90; for (let i = 0; i < 3; i++) { const a = t / 90 + i * 2.09; rect(Math.round(cx + Math.cos(a) * 3) - 1, Math.round(cy + Math.sin(a) * 3) - 1, 2, 2, '#5a8088'); } rect(cx - 1, cy - 1, 2, 2, '#2a3a40'); }
     // герой
     const fr = this.heroFrame(this.moving, this.walkT);
     sprite(personSprite(SAVE.look, fr), Math.round(this.fx) - 9, 101 - PH, this.fgoal < this.fx);
@@ -5465,7 +5555,8 @@ function gearSprite(size, step) {
 scenes.house = {
   enter(d) { this.t = 0; this.sel = null; this.anim = null; this.busy = false; setTouch({}); this.refresh(); if (d && d.focus) this.sel = d.focus;
     // подсказка — один раз, пока ничего не отремонтировано
-    if (!HOUSE_STATE.fixed.length && !this.hinted) { this.hinted = true; setTimeout(() => toast('E-KNOT', L(UI.hHint), 4200), 500); } },
+    this.help = !SAVE.helpHouse;   // первый раз — сразу объясняем, что здесь делать
+  },
   refresh() { API.house().then(h => { HOUSE_STATE = h; SAVE.coins = h.coins; }).catch(() => {}); },
   // что можно сделать с вещью сейчас
   status(id) {
@@ -5491,15 +5582,16 @@ scenes.house = {
       this.anim = { id, t: 0 }; this.sel = null; sfx.stamp();
       setTimeout(() => { HOUSE_STATE = h; SAVE.coins = h.coins; persist(); }, 1300);
       const p = PROBLEMS.find(x => x.id === id);
-      setTimeout(() => { toast('E-KNOT', p ? L(UI.hFixedToast).replace('{p}', L(p.name)) : L(UI.hDecorToast), 3600); this.anim = null; }, 2800);
-    } catch (e) { toast('E-KNOT', L(e.code === 'no_money' ? UI.hNoMoney : UI.netFail), 2600); }
+      setTimeout(() => { toast(L(UI.tipT), p ? L(UI.hFixedToast).replace('{p}', L(p.name)) : L(UI.hDecorToast), 3600); this.anim = null; }, 2800);
+    } catch (e) { toast(L(UI.tipT), L(e.code === 'no_money' ? UI.hNoMoney : UI.netFail), 2600); }
     this.busy = false;
   },
   update(dt) {
     this.t += dt; if (this.anim) this.anim.t += dt;
     if (hit('back')) irisTo(W / 2, 120, () => go('title'));
   },
-  draw(dt) {
+  draw(dt) { this.drawMain(dt); this.drawHelpIfOpen(); },
+  drawMain(dt) {
     drawHouseMap(this.t, this.anim);
     // маркеры: «!» — можно действовать, замок — пока закрыто
     const ids = [...PROBLEMS.map(p => p.id), ...DECOR.map(d => d.id)];
@@ -5516,13 +5608,16 @@ scenes.house = {
     // верхняя панель
     rect(0, 0, W, 19, '#0e111c'); rect(0, 19, W, 1, '#55607c');
     text(`${L(UI.budget)} ${money(HOUSE_STATE.coins)}`, 6, 5, { col: '#f2c94c', size: 6 });
-    text(`★${HOUSE_STATE.score}`, 128, 5, { col: '#9fd9c2' });
-    if (button(L(UI.meetings), 0, 1, 'primary', { left: 176 })) irisTo(W / 2, 120, () => go('levels'));
-    if (button(L(UI.menu), 0, 1, 'dark', { left: 344 })) irisTo(W / 2, 120, () => go('title'));
+    text(`★${HOUSE_STATE.score}`, 10 + textW(`${L(UI.budget)} ${money(HOUSE_STATE.coins)}`, 6), 5, { col: '#9fd9c2', size: 6 });
+    { const wm = textW(L(UI.meetings)) + 12, wi = textW(L(UI.insideBtn)) + 12, wn = textW(L(UI.menu)) + 12, xn = W - wn - 4;
+      if (button(L(UI.menu), 0, 1, 'dark', { left: xn })) irisTo(W / 2, 120, () => go('title'));
+      if (button('?', 0, 1, 'alt', { left: xn - 18, w: 14 })) this.help = !this.help;
+      if (button(L(UI.insideBtn), 0, 1, 'dark', { left: xn - 22 - wi })) irisTo(W / 2, 120, () => go('inside'));
+      if (button(L(UI.meetings), 0, 1, 'primary', { left: xn - 26 - wi - wm })) irisTo(W / 2, 120, () => go('levels')); }
     if (HOUSE_STATE.claimable && button(`${L(UI.bonusDay)} +${HOUSE_STATE.bonus}`, 0, 34, 'alt', { left: 6 }))
       API.claim().then(r => { HOUSE_STATE = r.house; toast('E-KNOT', L(r.reward.status === 'sent' ? UI.rRewardSent : UI.rRewardGuest).replace('{n}', r.reward.points), 3200); }).catch(() => {});
     // выбор вещи на карте
-    if (!this.anim && !this.busy) {
+    if (!this.anim && !this.busy && !this.help) {
       // нажатие: берём ближайшую вещь к пальцу (зона не меньше 30×30), чтобы маленькие цели тоже нажимались
       const c = clicks.find(c => c.y > 22 && (!this.sel || c.y < 150));
       if (c) { let best = null, bd = 1e9;
@@ -5555,6 +5650,7 @@ scenes.house = {
       if (button(L(UI.hGoVote), bx, 178, 'primary', { w: 120 })) irisTo(W / 2, 120, () => go('tour', { tour: st.level }));
     } else if (st.kind === 'locked') wrapText(st.text, 360, 6).slice(0, 2).forEach((l, i) => text(l, 16, 196 + i * 9, { col: '#8792ad', size: 6 }));
   },
+  drawHelpIfOpen() { if (this.help && drawHelp(L(UI.helpHouseT), HELP_HOUSE)) { this.help = false; SAVE.helpHouse = true; persist(); } },
 };
 
 /* ---------- список собраний ---------- */
@@ -5585,6 +5681,58 @@ scenes.levels = {
       text(L(UI.qzMenu), x + 22, y + 2, { col: '#f4f3ee', size: 6 }); text(L(UI.qzMenuSub), x + 22, y + 11, { col: '#9fd9c2', size: 6 });
       if (button(L(UI.qzPlay), x + 306, y + 2, 'alt', { w: 60 })) irisTo(W / 2, 120, () => go('quiz')); }
     if (button(L(UI.back), W / 2, 200, 'alt')) irisTo(W / 2, 120, () => go('house'));
+  },
+};
+
+/* ---------- «Подъезд изнутри»: со страницы дома видно, как ремонты изменили подъезд ---------- */
+const INSIDE_ITEMS = ['light', 'walls', 'cameras', 'door', 'lift'];   // то, что видно внутри
+scenes.inside = {
+  enter() {
+    this.fixed = new Set(HOUSE_STATE.fixed); this.floors = HOUSE.floors;
+    const R = rng(hashStr(USER.userId) + 9), look = {};
+    for (let apt = 1; apt <= HOUSE.floors * HOUSE.perFloor; apt++) look[apt] = pick(R, DOOR_STYLES);
+    look[HOUSE.heroApt] = { col: '#2f6f62', kind: 'metal' };
+    this.bg = drawStairwell(this.floors, a => look[a], this.fixed);
+    const heroF = Math.ceil(HOUSE.heroApt / HOUSE.perFloor);
+    this.camY = clamp(floorBase(heroF, this.floors) - 150, 0, this.bg.height - H); this.camX = 0; this.vy = 0; this.vx = 0; this.drag = null;
+    setTouch({ up: true, down: true });
+  },
+  update(dt) {
+    const k = dt / 16;
+    if (keys.up) this.camY -= 4 * k; if (keys.down) this.camY += 4 * k;
+    if (keys.left) this.camX -= 4 * k; if (keys.right) this.camX += 4 * k;
+    // палец/мышь: тянем подъезд
+    if (pointer.down && pointer.y > 20) { if (!this.drag) this.drag = { x: pointer.x, y: pointer.y, cx: this.camX, cy: this.camY };
+      else { this.camY = this.drag.cy - (pointer.y - this.drag.y); this.camX = this.drag.cx - (pointer.x - this.drag.x); } }
+    else this.drag = null;
+    this.camY = clamp(this.camY, 0, this.bg.height - H); this.camX = clamp(this.camX, 0, SW - W);
+    if (hit('back')) irisTo(W / 2, 120, () => go('house'));
+  },
+  draw(dt) {
+    const cy = Math.round(this.camY), cx = Math.round(this.camX), t = performance.now(), light = this.fixed.has('light');
+    rect(0, 0, W, H, '#0f1210');
+    ctx.save(); ctx.translate(-cx, 0); ctx.drawImage(this.bg, 0, -cy);
+    for (let f = 1; f <= this.floors; f++) { const b = floorBase(f, this.floors) - cy; if (b < -10 || b > H + 110) continue;
+      for (const [li, lx] of [[0, 49], [1, 141], [2, 351], [3, 443]]) {
+        const broken = !light && (f * 7 + li * 3) % 5 === 0, on = light || (!broken && Math.sin(t / 97 + f * 13 + li * 5) > -.75);
+        rect(lx, b - 94, 1, 6, '#0e1011'); rect(lx - 5, b - 88, 11, 4, '#1c1f24'); rect(lx - 3, b - 85, 7, 3, on ? '#fff1b8' : '#4b4f4c');
+        if (on) { if (!this.glow) this.glow = makeCanvas(220, 94, ({ g }) => { const gr = g.createRadialGradient(110, 10, 2, 110, 44, 110); gr.addColorStop(0, 'rgba(255,214,140,.30)'); gr.addColorStop(.5, 'rgba(255,190,110,.10)'); gr.addColorStop(1, 'rgba(255,190,110,0)'); g.fillStyle = gr; g.fillRect(0, 0, 220, 94); });
+          ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = light ? 1 : .8; ctx.drawImage(this.glow, lx - 110, b - 94); ctx.restore(); } }
+      text(`${f}`, cx + 6, b - 92, { col: 'rgba(244,243,238,.55)', size: 6 }); }
+    ctx.restore();
+    if (!light) { ctx.fillStyle = 'rgba(5,8,6,.28)'; ctx.fillRect(0, 0, W, H); }
+    // верх: назад и название
+    rect(0, 0, W, 19, '#0e111c'); rect(0, 19, W, 1, '#55607c');
+    if (button(L(UI.back), 0, 1, 'dark', { left: 2 })) irisTo(W / 2, 120, () => go('house'));
+    text(L(UI.insideT), W / 2, 6, { align: 'center', col: '#f4f3ee', size: 6 });
+    // список: что уже сделано внутри
+    const rows = INSIDE_ITEMS.map(id => PROBLEMS.find(p => p.id === id)).filter(Boolean);
+    const pw = Math.max(...rows.map(p => textW(L(p.name), 6))) + 24, ph = rows.length * 10 + 18;
+    frameBox(W - pw - 4, 24, pw, ph, .9); text(L(UI.insideDone), W - pw + 4, 29, { col: '#9fd9c2', size: 6 });
+    rows.forEach((p, i) => { const ok = this.fixed.has(p.id), y = 40 + i * 10;
+      rect(W - pw + 4, y + 1, 6, 6, ok ? '#4caf6e' : '#3a3f52'); if (ok) { rect(W - pw + 5, y + 4, 1, 1, '#0e111c'); rect(W - pw + 6, y + 5, 1, 1, '#0e111c'); rect(W - pw + 7, y + 2, 1, 3, '#0e111c'); }
+      text(L(p.name), W - pw + 14, y, { col: ok ? '#f4f3ee' : '#8792ad', size: 6 }); });
+    if (!isTouch) text(L(UI.insideHint), W / 2, H - 10, { align: 'center', col: 'rgba(244,243,238,.7)', size: 6 });
   },
 };
 
@@ -5823,7 +5971,7 @@ const QZ_SPEED = .13, QZ_JUMP = -.42, QZ_G = .0012;
 scenes.quiz = {
   async enter(data = {}) {
     buildQuizArt(); setTouch({ act: L(UI.qzJump) });
-    this.state = 'loading'; this.t = 0; this.coins = 0; this.first = 0; this.second = 0; this.hardFirst = 0; this.done = 0; this.wrong = 0; this.paused = false; this.result = null; this.dust = [];
+    this.state = 'loading'; this.t = 0; this.coins = 0; this.trips = 0; this.first = 0; this.second = 0; this.hardFirst = 0; this.done = 0; this.wrong = 0; this.paused = false; this.result = null; this.dust = [];
     this.look = Object.assign({}, DEFAULT_LOOK, SAVE.look || {});
     // квиз перед туром (5 вопросов тура, минимум один расчётный) или общий «Знаток ЖКХ» (все вопросы)
     this.tourId = data.tour || null; this.then = data.then || null;
@@ -5883,7 +6031,7 @@ scenes.quiz = {
         if (o.kind === 'rat' && !o.hit && o.x + o.mx - this.hx < 220 && o.mx > -50) o.mx -= .03 * dt;
         const img = QZ.obs[o.kind === 'rat' ? 'rat0' : o.kind], ox = o.x + o.mx;
         if (o.hit || this.hx + 35 < ox + 5 || this.hx + 16 > ox + img.width - 5) continue;
-        if (-this.jy < img.height - 6) { o.hit = true; this.trip = 480; this.coins = Math.max(0, this.coins - 2); beep(180, .12, 'sawtooth', .05); }
+        if (-this.jy < img.height - 6) { o.hit = true; this.trip = 480; this.trips = (this.trips || 0) + 1; this.coins = Math.max(0, this.coins - 1000); pop(this.hx + 10, QZ.GY - 70, '−1 000 ₸', '#e88a7a'); beep(180, .12, 'sawtooth', .05); }
       }
       const g = this.segs[this.segs.length - 1];
       if (this.hx > g.x0 + 60 && !this.bRun) { this.bRun = 1; beep(330, .1, 'square', .04); }
@@ -5929,17 +6077,17 @@ scenes.quiz = {
     if (this.state === 'end') return; this.state = 'end'; setTouch({});
     const sec = Math.round((Date.now() - this.startedAt) / 1000), ratio = this.total ? this.first / this.total : 0, title = ratio >= (this.cfg.titleThreshold ?? .8);
     let res = { coins: this.coins, badge: title ? 'zhkh_expert' : null, offline: true };
-    try { res = await API.quizFinish({ tourId: this.tourId, firstTry: this.first, second: this.second, hardFirst: this.hardFirst, total: this.total, wrong: this.wrong, seconds: sec }); HOUSE_STATE = await API.house(); SAVE.coins = HOUSE_STATE.coins; } catch (e) {}
+    try { res = await API.quizFinish({ tourId: this.tourId, firstTry: this.first, second: this.second, hardFirst: this.hardFirst, total: this.total, wrong: this.wrong, trips: this.trips || 0, seconds: sec }); HOUSE_STATE = await API.house(); SAVE.coins = HOUSE_STATE.coins; } catch (e) {}
     // ≥ 80 % верных с первой попытки в квизе тура — +1 «дожатие» у Енота в этом туре
     if (this.tourId && ratio >= .8) { SAVE.quizBonus = SAVE.quizBonus || {}; SAVE.quizBonus[this.tourId] = true; }
     if (this.tourId) { SAVE.quizDone = SAVE.quizDone || {}; SAVE.quizDone[this.tourId] = Math.max(SAVE.quizDone[this.tourId] || 0, Math.round(ratio * 100)); }
     persist();
-    this.result = { ...res, first: this.first, total: this.total, title: !!res.badge, bonus: this.tourId && ratio >= .8, sec };
+    this.result = { ...res, first: this.first, total: this.total, trips: this.trips || 0, title: !!res.badge, bonus: this.tourId && ratio >= .8, sec };
     try { notifyApp('result', { version: 1, game: 'korshiler', token: LAUNCH.token, runId: 'quiz-' + this.startedAt, tour: null, tourCode: 'quiz', success: true,
       quiz: { firstTry: this.first, total: this.total, wrong: this.wrong }, coins: res.coins, badges: res.badge ? [res.badge] : [], startedAt: new Date(this.startedAt).toISOString(),
       finishedAt: new Date().toISOString(), lang: LANG, clientVersion: CLIENT_VERSION }); } catch (e) {}
   },
-  drawWorld() {
+  drawWorld(dt = 16) {
     const cx = Math.round(this.cam), GY = QZ.GY, t = this.t;
     for (let x = -(cx % 240); x < W; x += 240) ctx.drawImage(QZ.wall, x, 0);
     // декор по модулям 240 px: окно / объявления / щиток — по хешу номера модуля
@@ -5964,7 +6112,7 @@ scenes.quiz = {
   draw(dt) {
     if (this.state === 'loading') { rect(0, 0, W, H, '#0b0c10'); return; }
     const cx = Math.round(this.cam), GY = QZ.GY, t = this.t;
-    this.drawWorld();
+    this.drawWorld(dt);
     // двери-ответы с табличками и лампой над дверью; выбранная открывается
     for (const s of this.segs) {
       if (s.type === 'door') s.doors.forEach((dx, i) => { const x = dx - cx; if (x < -40 || x > W + 40) return;
@@ -5989,6 +6137,7 @@ scenes.quiz = {
         if (sx > -40 && sx < W + 40) { sprite(img, sx, GY - img.height + 1, o.kind === 'rat', o.hit ? .45 : 1);
           ctx.save(); ctx.globalAlpha = .14; ctx.translate(Math.round(sx), GY + img.height); ctx.scale(1, -1); if (o.kind === 'rat') { ctx.translate(img.width, 0); ctx.scale(-1, 1); } ctx.drawImage(img, 0, 0); ctx.restore(); } }
     }
+    drawPops(dt, cx, 0);   // «−1 000 ₸» над героем, когда споткнулся
     // герой: отражение в полу, полосы скорости, пыль
     const fr = this.trip > 0 ? 'trip' : this.jy < 0 ? 'jump' : ['run', 'go'].includes(this.state) ? 'run' + ((t / 90 | 0) % 4) : 'idle';
     const alpha = this.state === 'enter' ? clamp(1 - (this.et - 300) / 320, 0, 1) : ['feedback', 'trans'].includes(this.state) ? 0 : this.trip > 0 && (t / 80 | 0) % 2 ? .5 : 1;
@@ -6008,7 +6157,7 @@ scenes.quiz = {
     rect(0, 0, W, 20, 'rgba(14,16,20,.88)');
     if (button('II', 0, 2, 'dark', { left: 2, w: 16 })) this.paused = true;
     for (let i = 0; i < this.total; i++) sprite(QZ.page, 24 + i * 11, 4, false, i < this.done ? 1 : .22);
-    text(`₸${this.coins}`, 24 + this.total * 11 + 6, 6, { col: '#f2c94c', size: 6 });
+    text(money(this.coins), 24 + this.total * 11 + 6, 6, { col: '#f2c94c', size: 6 });
     const prog = clamp(this.hx / this.totalLen(), 0, 1), bx = 250, bw = 140;
     text(L(UI.qzPath), bx - 4, 6, { col: '#9fb0cc', size: 6, align: 'right' });
     rect(bx, 8, bw, 4, '#2b2a33'); rect(bx, 8, Math.round(bw * prog), 4, '#7fc4a8'); rect(bx + bw - 2, 5, 4, 10, '#2e6a5a');
@@ -6047,7 +6196,7 @@ scenes.quiz = {
     if (!f.ok) { text(L(UI.qzLonger), W / 2, y, { align: 'center', col: '#f2c94c', size: 6 }); y += 11; }
     // статья закона — ссылка на adilet.zan.kz на языке игры
     if (law.length) { law.forEach((l, i) => text(l, W / 2, y + 2 + i * 9, { align: 'center', col: '#9fd9c2', size: 6 }));
-      if (clickIn(40, y, 320, law.length * 9 + 4)) { try { window.open(L(f.law.url), '_blank', 'noopener'); } catch (e) {} } y += law.length * 9 + 6; }
+      y += law.length * 9 + 6; }
     if (button(L(UI.next), W / 2, 30 + h - 20, 'primary') || hit('act')) this.next();
   },
   drawIntro() {
@@ -6063,11 +6212,11 @@ scenes.quiz = {
     const r = this.result;
     rect(0, 0, W, H, 'rgba(10,12,20,.55)'); paper(70, 24, 260, 178, 7);
     text(L(UI.qzDone), W / 2, 34, { align: 'center', col: '#2e6a5a' });
-    const rows = [[L(UI.qzFirst), `${r.first}/${r.total}`], [L(UI.qzWrongN), String(this.wrong)], [L(UI.rBudget), '+' + money(r.coins ?? 0)]];
+    const rows = [[L(UI.qzFirst), `${r.first}/${r.total}`], [L(UI.qzWrongN), String(this.wrong)], ...(r.trips ? [[L(UI.qzTrips), `${r.trips} × −1 000 ₸`]] : []), [L(UI.rBudget), '+' + money(r.coins ?? 0)]];
     rows.forEach(([a, b], i) => { text(a, 86, 54 + i * 13, { col: INK }); text(b, 314, 54 + i * 13, { col: INK, align: 'right' }); rect(86, 63 + i * 13, 228, 1, '#e2d9c2'); });
-    if (r.paidBefore) text(L(UI.qzPaidBefore), W / 2, 90, { align: 'center', col: INK_MUTED, size: 6 });
-    const note = this.tourId ? (r.bonus ? L(UI.qzBonus) : L(UI.qzNoBonus)) : r.title ? L(UI.qzTitleGot) : L(UI.qzTitleNeed);
-    wrapText(note, 220, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, 98 + i * 9, { align: 'center', col: r.title ? INK_TEAL : INK, size: 6 }));
+    let ny = 58 + rows.length * 13; if (r.paidBefore) { text(L(UI.qzPaidBefore), W / 2, ny, { align: 'center', col: INK_MUTED, size: 6 }); ny += 10; }
+    const note = this.tourId ? (TOURS[this.tourId].n < 2 ? '' : r.bonus ? L(UI.qzBonus) : L(UI.qzNoBonus)) : r.title ? L(UI.qzTitleGot) : L(UI.qzTitleNeed);
+    wrapText(note, 220, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, ny + i * 9, { align: 'center', col: r.title ? INK_TEAL : INK, size: 6 }));
     if (r.title) { ctx.save(); ctx.translate(W / 2, 138); ctx.rotate(-.08); ctx.strokeStyle = '#2e6a5a'; ctx.lineWidth = 2; ctx.strokeRect(-62, -10, 124, 20); text(L(TITLES.zhkh_expert).toUpperCase(), 0, -4, { col: '#2e6a5a', align: 'center' }); ctx.restore(); }
     if (button(L(UI.again), W / 2 - 66, 176, 'alt')) irisTo(W / 2, 120, () => go('quiz', { tour: this.tourId, then: this.then }));
     if (this.then) { if (button(L(UI.toMeeting), W / 2 + 66, 176, 'primary')) irisTo(W / 2, 120, () => go('tour', { tour: this.then, skipInter: true })); }

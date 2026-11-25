@@ -5,7 +5,7 @@
 /* ---------- Mock API: тот же набор запросов, что будет у настоящего сервера ---------- */
 let USER = null, SAVE = null;
 const DEFAULT_LOOK = { body: 'm', bottom: 'pants', skin: '#e3ad86', hair: 'short', hairCol: '#2b2420', top: 'hoodie', topCol: '#2f8577', hat: null };
-function persist() { API.save(SAVE).catch(() => toast('E-KNOT', L(UI.netSaveFail), 2400)); }
+function persist() { API.save(SAVE).catch(() => toast(L(UI.tipT), L(UI.netSaveFail), 2400)); }
 const NEW_SAVE = () => ({ created: false, coins: 0, tours: {}, trust: {} });
 // индикатор связи с сервером: крутится в углу, пока идёт запрос дольше 0,3 с
 let netShownAt = 0;
@@ -95,6 +95,23 @@ function dlgDraw() {
 }
 
 /* ---------- плавающие подписи (над дверями) ---------- */
+/* окно подсказки «?»: строки «надпись — что значит» и значки у дверей; true — закрыли */
+function drawHelp(title, rows, icons = null) {
+  rect(0, 0, W, H, 'rgba(8,10,18,.6)');
+  const lw = Math.max(...rows.map(([a]) => textW(L(a), 6))) + 8, dw = 372 - lw - 20;
+  const R = rows.map(([a, b]) => [L(a), wrapText(L(b), dw, 6)]);
+  const hRows = R.reduce((m, [, ls]) => m + ls.length * 8 + 3, 0), hIc = icons ? 11 + Math.ceil(icons.length / 4) * 11 : 0;
+  const h = 18 + hRows + hIc + 24, y0 = Math.max(4, Math.round((H - h) / 2));
+  frameBox(8, y0, 384, h, .98); text(title, W / 2, y0 + 6, { align: 'center', col: '#9fd9c2', size: 6 });
+  let y = y0 + 18;
+  R.forEach(([a, ls]) => { text(a, 18, y, { col: '#f2c94c', size: 6 }); ls.forEach((l, i) => text(l, 18 + lw, y + i * 8, { col: '#e4e8f0', size: 6 })); y += ls.length * 8 + 3; });
+  if (icons) { text(L(UI.helpIcons), 18, y + 1, { col: '#9fd9c2', size: 6 }); y += 10;
+    icons.forEach(([k, lbl], i) => { const x = 18 + (i % 4) * 92, yy = y + Math.floor(i / 4) * 11; sprite(ICONS[k], x, yy); text(L(lbl), x + 12, yy + 1, { col: '#e4e8f0', size: 6 }); });
+    y += Math.ceil(icons.length / 4) * 11; }
+  const ok = button(L(UI.helpOk), W / 2, y + 2, 'primary') || hit('act') || hit('back');
+  if (clicks.length) clicks.length = 0;
+  return ok;
+}
 const POPS = [];
 function pop(x, y, s, col = '#f4f3ee') { POPS.push({ x, y, s, col, t: 0 }); }
 function drawPops(dt, ox = 0, oy = 0) {
@@ -292,7 +309,13 @@ scenes.tour = {
       if (!r.A.renter && !r.A.notOwner && !r.A.noVote && RR() < (REFUSE[r.arch] || 0) * (1 - repaired * .1)) r.refuser = true;
       if (app && r.A.onlineOk && !r.A.paperOnly && !r.A.renter && !r.A.notOwner && RR() < .12) r.selfAt = tour.start + tour.duration * (.08 + RR() * .8);
     }
-    this.app = app; this.onYes = 0; this.onNo = 0; this.onFlash = 0;
+    this.app = app && !!SAVE.racIntro; this.onYes = 0; this.onNo = 0; this.onFlash = 0;
+    // собрание 2: про E-KNOT рассказывает сосед Данияр — надо зайти к нему; до этого Енота нет
+    this.dan = null;
+    if (app && !SAVE.racIntro) { const hf = Math.ceil(tour.heroApt / DOOR_X.length);
+      const cand = Object.values(this.res).filter(r => !isStorage(r.apt) && !r.refuser && !r.A.renter && !r.A.notOwner && !r.A.noVote && r.apt !== tour.heroApt)
+        .sort((a, b) => Math.abs(a.floor - hf) - Math.abs(b.floor - hf) || (a.arch === 'it' ? -1 : 1));
+      const r = cand[0]; if (r) { this.dan = r; r.dan = true; r.name = 'Данияр'; r.look = { ...ARCH.it.look }; r.away = false; r.sleeping = false; } }
     // подростки курят на лестнице, пока нет камер; «нехорошая квартира» — пока нет домофона с доступом из E-KNOT
     const fl = 3 + Math.floor(RR() * 9);
     this.teens = this.fixed.has('cameras') ? null : { floor: fl === Math.ceil(tour.heroApt / tour.perFloor) ? fl + 1 : fl, x: 150 + RR() * 40, st: 'here', backAt: 0, t: 0 };
@@ -314,14 +337,15 @@ scenes.tour = {
     this.helper = { state: 'hidden', floor: 2, x: 397, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
     this.rats = this.fixed.has('basement') ? [] : [{ x: 80, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 380, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
     this.liftPick = false; this.drops = []; this.paused = false;
-    this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
+    this.help = false; this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
     this.run = null; API.tourStart(tour.id).then(r => this.run = r).catch(() => {});
     this.plan = null;
     // повестка собрания: какая жалоба и сколько подписей нужно
     const runId = this.runId = (this.runId || 0) + 1, here = () => scene === scenes.tour && this.runId === runId && !this.over;
     setTimeout(() => { if (!here()) return; toast(L(UI.meetingT).replace('{n}', tour.n), L(UI.meetingB).replace('{t}', L(tour.title)).replace('{r}', ruleText(tour)), 5200);
-      if (tour.n === 1) setTimeout(() => here() && toast('E-KNOT', L(UI.tutTap)), 4600);
-      if (tour.n >= 2 && !SAVE.racIntro) setTimeout(() => here() && this.racIntro(), 5400); }, 500);
+      if (tour.n === 1) setTimeout(() => here() && toast(L(UI.tipT), L(UI.tutTap)), 4600);
+      if (!SAVE.helpTour) setTimeout(() => { if (here() && !DLG.open) { toasts.length = 0; this.help = true; } }, 1200);
+      if (this.dan) setTimeout(() => here() && toast(L(UI.danT), L(UI.danB).replace('{apt}', aptNo(this.dan.apt)).replace('{f}', this.dan.floor), 6000), 5600); }, 500);
     setTouch({ move: true });
   },
   focus() { return { x: this.hero.x - this.camX, y: this.hero.y - this.camY - 14 }; },
@@ -338,15 +362,15 @@ scenes.tour = {
   // игровой день 1…60: время тура растянуто на 60 дней
   day() { const T = this.tour; return clamp(Math.floor((this.minute - T.start) / T.duration * T.days) + 1, 1, T.days); },
   // после первого собрания сосед рассказывает про приложение E-KNOT и енота
-  async racIntro() {
-    if (this.busy || DLG.open) return setTimeout(() => scene === this && !this.over && !SAVE.racIntro && this.racIntro(), 1500);
-    this.busy = true; this.plan = null;
-    const look = ARCH.it.look, h = this.hero, side = h.x + 26 < WALK_MAX ? 1 : -1;
-    this.racNpc = { x: h.x + side * 26, floor: h.floor, look }; h.dir = side;
+  // Данияр у своей двери рассказывает про E-KNOT; после этого появляется Енот, а сам Данияр — «за»
+  async racIntro(r) {
+    const look = r.look;
     dlgOpen('Данияр', e => portrait(look, e), ARCH.it.voice);
     await say(L(PRO.rac1), 'happy'); await say(L(PRO.rac2));
     dlgOpen('E-KNOT', () => RACCOON_PORT, 900); await say(L(RAC_INTRO.notify), 'happy'); await say(L(UI.racMenuHint), 'happy'); dlgClose();
-    SAVE.racIntro = true; SAVE.racSeen = { ...(SAVE.racSeen || {}), notify: true }; persist(); this.busy = false; this.racNpc.leaving = 1;
+    SAVE.racIntro = true; SAVE.racSeen = { ...(SAVE.racSeen || {}), notify: true }; persist();
+    this.app = true; r.dan = false; this.dan = null;
+    if (r.status !== 'yes') { r.status = 'yes'; this.signed(r, 'door'); }
   },
   // обещал проголосовать онлайн: голос придёт позже, через несколько игровых дней
   goOnline(r, via) { r.status = 'online'; r.channel = via; r.onlineAt = this.minute + 4 + Math.random() * this.tour.duration * .25; this.events.push({ t: 'online', apt: r.apt, via }); },
@@ -397,6 +421,7 @@ scenes.tour = {
     if (this.over) return;
     // пауза: время стоит, можно продолжить или выйти из уровня
     if (this.paused) { setTouch({}); if (hit('back')) this.paused = false; return; }
+    if (this.help) return;   // открыта подсказка «?» — игра стоит
     if (hit('back') && !this.busy && !DLG.open && !this.ballot && !this.liftPick) { this.paused = true; return; }
     dlgUpdate(dt);
     const h = this.hero, T = this.tour;
@@ -450,7 +475,7 @@ scenes.tour = {
       } else if (Math.abs(h.x - P.x) > 1.5) dir = Math.sign(P.x - h.x);
       else {
         this.plan = null; h.moving = false;
-        if (P.door) { if (P.door === T.heroApt) toast('E-KNOT', L(UI.yourDoor), 2400); else if (isStorage(P.door)) toast(aptNo(P.door), L(UI.storage), 2200); else this.visit(this.res[P.door]); this.updateCam(dt); return; }
+        if (P.door) { if (P.door === T.heroApt) toast(L(UI.tipT), L(UI.yourDoor), 2400); else if (isStorage(P.door)) toast(aptNo(P.door), L(UI.storage), 2200); else this.visit(this.res[P.door]); this.updateCam(dt); return; }
         if (P.npc) { this.runHelper(); this.updateCam(dt); return; }
         if (P.lift) { this.useLift(); this.updateCam(dt); return; }
       }
@@ -468,7 +493,7 @@ scenes.tour = {
     setTouch({ act: npc ? L(UI.talk) : door ? L(UI.knock) : lift ? L(UI.lift) : null, up: onStairs && h.floor < T.floors, down: onStairs && h.floor > 1, move: true });
     if (hit('act')) {
       if (npc === 'helper') this.runHelper();
-      else if (door === T.heroApt) toast('E-KNOT', L(UI.yourDoor), 2400);
+      else if (door === T.heroApt) toast(L(UI.tipT), L(UI.yourDoor), 2400);
       else if (door && isStorage(door)) toast(aptNo(door), L(UI.storage), 2200);
       else if (door) this.visit(this.res[door]);
       else if (lift) this.useLift();
@@ -565,6 +590,10 @@ scenes.tour = {
   fmt(r, v) { const T = this.tour; return fmtLine(typeof v === 'string' ? v : L(v), { f: r.floor, apt: aptNo(r.apt), g: T.goal, q: T.quorum || '' }).replace('{n}', this.signatures()); },
   async visit(r) {
     this.busy = true; const h = this.hero, T = this.tour;
+    if (r.dan) {   // Данияр сразу открывает: он сам звал
+      let side = h.x <= DOOR_X[r.d] ? -1 : 1; if (DOOR_X[r.d] + side * 23 < WALK_MIN) side = 1; if (DOOR_X[r.d] + side * 23 > WALK_MAX) side = -1;
+      await this.walkTo(DOOR_X[r.d] + side * 23); h.dir = -side; h.knockT = 700; sfx.knock(); await wait(600);
+      await tweenDoor(r, 1); await this.racIntro(r); await tweenDoor(r, 0); this.busy = false; return; }
     // встаём сбоку от двери, чтобы жилец вышел на порог, а не «в» героя
     let side = h.x <= DOOR_X[r.d] ? -1 : 1; if (DOOR_X[r.d] + side * 23 < WALK_MIN) side = 1; if (DOOR_X[r.d] + side * 23 > WALK_MAX) side = -1;
     await this.walkTo(DOOR_X[r.d] + side * 23); h.dir = -side;
@@ -573,11 +602,11 @@ scenes.tour = {
     const m = this.minute, A = r.A;
     if (r.status === 'online') { pop(DOOR_X[r.d], this.base(r.floor) - 70, L(UI.st.online), '#9fd9c2'); this.busy = false; return; }
     const away = r.away && m < r.returnAt;
-    if (away) { r.status = r.status === 'unknown' ? 'away' : r.status; r.knocks++; pop(DOOR_X[r.d], this.base(r.floor) - 70, '...', '#9fb0cc'); toast('E-KNOT', L(UI.nobody), 2400); this.busy = false; return; }
+    if (away) { r.status = r.status === 'unknown' ? 'away' : r.status; r.knocks++; pop(DOOR_X[r.d], this.base(r.floor) - 70, '...', '#9fb0cc'); toast(L(UI.tipT), L(UI.nobody), 2400); this.busy = false; return; }
     // бумажный голос или доверенность ждут героя — открывают сразу
     const expecting = ['paper', 'proxy'].includes(r.status);
     const pNo = expecting ? 0 : (r.sleeping ? .5 : A.deaf) * Math.pow(.45, r.knocks);
-    if (Math.random() < pNo) { r.knocks++; if (r.status === 'unknown' || r.status === 'away') r.status = 'noanswer'; pop(DOOR_X[r.d], this.base(r.floor) - 70, '...', '#8f949c'); toast('E-KNOT', L(UI.noOpen), 2400); this.busy = false; return; }
+    if (Math.random() < pNo) { r.knocks++; if (r.status === 'unknown' || r.status === 'away') r.status = 'noanswer'; pop(DOOR_X[r.d], this.base(r.floor) - 70, '...', '#8f949c'); toast(L(UI.tipT), L(UI.noOpen), 2400); this.busy = false; return; }
     // открывают
     sfx.door(); await tweenDoor(r, 1);
     if (r.sleeping) { r.mood -= 8; r.sleeping = false; }
@@ -760,7 +789,7 @@ scenes.tour = {
   },
   checkGoal(delay = 0) {
     if (this.goalShown || !this.goalMet()) return; this.goalShown = true;
-    setTimeout(() => toast('E-KNOT', L(UI.goalDone), 4200), delay);
+    setTimeout(() => toast(L(UI.tipT), L(UI.goalDone), 4200), delay);
   },
   /* ---- енот E-KNOT: 4 действия по очереди (уведомление → обзвон → дожатие → чат дома), между применениями — пауза ---- */
   racReady(k) { const R = this.rac, i = RAC_ACTS.indexOf(k); if (i > R.open) return { ok: false, why: 'locked' };
@@ -835,7 +864,7 @@ scenes.tour = {
   /* ---- конец тура ---- */
   async finish(timeUp) {
     if (this.over) return; this.over = true; setTouch({});
-    if (timeUp) toast('E-KNOT', L(UI.timeUp), 2000);
+    if (timeUp) toast(L(UI.tipT), L(UI.timeUp), 2000);
     // онлайн-подписи приходят к концу тура
     for (const r of Object.values(this.res)) if (r.status === 'online') this.resolveOnline(r);
     let result;
@@ -896,6 +925,8 @@ scenes.tour = {
           ctx.beginPath(); ctx.moveTo(x - 13, b); ctx.lineTo(x + 13, b); ctx.lineTo(x + 34, b + 1); ctx.lineTo(x - 34, b + 1); ctx.fill();
           ctx.fillRect(x - 40, b - 2, 80, 2); ctx.restore();
         }
+        if (r.dan) { const k = Math.floor(t / 400) % 2; rect(x + 6, b - 66 - k, 15, 11, '#1b1a21'); rect(x + 7, b - 65 - k, 13, 9, '#7fc4a8'); rect(x + 9, b - 56 - k, 2, 2, '#1b1a21');
+          text('...', x + 13.5, b - 64 - k, { col: '#0e111c', size: 6, align: 'center' }); continue; }
         const ic = ICONS[r.status]; if (ic) { rect(x + 8, b - 62, 11, 11, 'rgba(10,12,16,.55)'); sprite(ic, x + 9, b - 61); }
       }
     }
@@ -958,6 +989,7 @@ scenes.tour = {
     if (this.rac.menu && !this.busy && !DLG.open) this.drawRacMenu();
     dlgDraw();
     if (this.ballot) this.drawBallot();
+    if (this.help && drawHelp(L(UI.helpTourT), HELP_TOUR.filter(([, b]) => !b.app || this.app), HELP_ICONS)) { this.help = false; SAVE.helpTour = true; persist(); }
     if (this.paused) {
       rect(0, 0, W, H, 'rgba(11,10,20,.65)'); frameBox(120, 50, 160, 120);
       text(L(UI.pause), W / 2, 62, { align: 'center', col: '#f4f3ee' });
@@ -1006,8 +1038,10 @@ scenes.tour = {
     frameBox(214, 22, 182, 92, .97);
     text(L(UI.raccoon), 222, 28, { col: '#9fd9c2', size: 6 });
     RAC_ACTS.forEach((k, i) => { const st = this.racReady(k), y = 38 + i * 18;
-      const lbl = L(UI['rac_' + k]) + (st.ok ? (st.bonus ? ' +1' : '') : st.why === 'locked' ? ' 🔒' : ` · ${st.days} ${L(UI.daysShort)}`);
-      if (button(lbl, 305, y, st.ok ? 'alt' : 'off', { w: 176 })) this.useRac(k); });
+      // название в кнопке, пауза — отдельной подписью справа, чтобы не вылезало
+      const lbl = L(UI['rac_' + k]) + (st.ok && st.bonus ? ' +1' : '');
+      if (button(lbl, 0, y, st.ok ? 'alt' : 'off', { left: 220, w: st.ok ? 170 : 126 })) this.useRac(k);
+      if (!st.ok) text(st.why === 'locked' ? L(UI.racSoon) : `${st.days} ${L(UI.daysShort)}`, 390, y + 5, { col: '#8792ad', size: 6, align: 'right' }); });
     if (clicks.length) clicks.length = 0;
   },
   drawHUD() {
@@ -1019,15 +1053,16 @@ scenes.tour = {
       text(`${L(UI.day)} ${this.day()}/${T.days}`, 22, 3, { col: late ? '#e98f6f' : '#f4f3ee', size: 6 });
       rect(22, 12, 56, 3, '#2b2a33'); rect(22, 12, Math.round(56 * clamp(left / T.duration, 0, 1)), 3, late ? '#e98f6f' : '#7fc4a8'); }
     // «За X / нужно Y», кворум (в туре 1 без таймера — счётчик слева, подпись после него)
-    const n = this.votes(), o = this.outcome(), x0 = T.noTimer ? 22 : 84;
+    const n = this.votes(), o = this.outcome(), x0 = T.noTimer ? 22 : 30 + Math.max(56, textW(`${L(UI.day)} ${this.day()}/${T.days}`, 6));
     if (T.noTimer) text(L(UI.noTimerHud), x0 + textW(`${L(UI.yesShort)} ${n}/${o.need}`, 6) + 10, 7, { col: '#8792ad', size: 6 });
-    text(`${L(UI.yesShort)} ${n}/${o.need}`, x0, T.rule === 'quorum' ? 3 : 7, { col: n >= o.need ? '#4caf6e' : '#f2c94c', size: 6 });
+    { const yy = T.rule === 'quorum' ? 3 : 7, lb = L(UI.yesShort) + ' '; text(lb, x0, yy, { col: '#4caf6e', size: 6 }); text(`${n}/${o.need}`, x0 + textW(lb, 6), yy, { col: n >= o.need ? '#4caf6e' : '#f4f3ee', size: 6 }); }
     if (T.rule === 'quorum') { const k = clamp(o.turnout / T.quorum, 0, 1); rect(x0, 12, 40, 3, '#2b2a33'); rect(x0, 12, Math.round(40 * k), 3, o.turnout >= T.quorum ? '#4caf6e' : '#9fb0cc');
       text(`${o.turnout}/${T.quorum}`, x0 + 43, 10, { col: '#9fb0cc', size: 6 }); }
     // доля E-KNOT и онлайн-голоса
-    if (this.app) { const ox = 172, fl = this.onFlash > 0 && Math.floor(this.onFlash / 120) % 2;
+    if (this.app) { const ox = 166, fl = this.onFlash > 0 && Math.floor(this.onFlash / 120) % 2;
       rect(ox, 4, 6, 11, fl ? '#f4f3ee' : '#7fc4a8'); rect(ox + 1, 5, 4, 7, '#0e111c'); rect(ox + 2, 13, 2, 1, '#0e111c');
       text(`E-KNOT ${this.appShare()}%`, ox + 9, 3, { col: '#9fd9c2', size: 6 }); text('+' + this.onYes + ' −' + this.onNo, ox + 9, 11, { col: '#8792ad', size: 6 }); }
+    if (button('?', 0, 1, 'alt', { left: 236, w: 14 }) && !DLG.open) { this.help = !this.help; this.rac.menu = false; this.ballot = false; }
     if (button(L(UI.ballot), 0, 1, 'dark', { left: 252 }) && !this.busy && !DLG.open) this.ballot = !this.ballot;
     if (this.app && button(L(UI.raccoon), 0, 1, this.rac.menu ? 'primary' : 'alt', { left: 338 }) && !this.busy && !DLG.open) { this.rac.menu = !this.rac.menu; if (this.rac.menu) toasts.length = 0; }
     const pend = Object.values(this.res).filter(r => r.status === 'online').length, papers = Object.values(this.res).filter(r => r.status === 'paper').length;
@@ -1050,9 +1085,11 @@ scenes.tour = {
         const apt = (f - 1) * nd + d + 1, x = 66 + d * (cw + 3), r = this.res[apt];
         rect(x, y, cw, ch, '#e2d9c2'); rect(x, y + ch - 1, cw, 1, '#cfc3a5');
         const ty = y + Math.round(ch / 2) - 3;
-        text(aptNo(apt), x + 2, ty, { col: isStorage(apt) ? INK_MUTED : INK, size: 6 });
+        const st = isStorage(apt) ? 'novote' : apt === T.heroApt ? 'me' : r.status === 'renter' ? 'novote' : r.status;
+        // «за» — зелёная клетка, «против» — красная
+        if (['yes', 'me'].includes(st)) rect(x, y, cw, ch, 'rgba(76,175,110,.28)'); else if (st === 'no') rect(x, y, cw, ch, 'rgba(184,68,63,.25)');
+        text(aptNo(apt), x + 2, ty, { col: isStorage(apt) ? INK_MUTED : st === 'yes' ? '#2e6a4a' : st === 'no' ? INK_RED : INK, size: 6 });
         if (isStorage(apt)) { rect(x, y, cw, ch, 'rgba(120,110,90,.18)'); sprite(ICONS.novote, x + cw - 9, y); continue; }
-        const st = apt === T.heroApt ? 'me' : r.status === 'renter' ? 'novote' : r.status;
         if (ICONS[st]) sprite(ICONS[st], x + cw - 9, y);
       }
     }
@@ -1125,16 +1162,19 @@ scenes.result = {
     const addr = L(UI.protEntrance) + ' · ' + L(UI.day) + ' ' + (d.day || 1);
     if (!ekn) text(addr, W / 2, 20, { align: 'center', col: INK_MUTED, size: 6 });
     // повестка — одной строкой (длинная сокращается), итог крупно
-    let ag = L(UI.protAgenda) + ' ' + tourTitle(TT); while (textW(ag, 6) > 292 && ag.length > 10) ag = ag.slice(0, -2).trimEnd() + '…';
-    text(ag, W / 2, 30, { align: 'center', col: INK, size: 6 });
+    let ag = L(UI.protAgenda) + ' ' + tourTitle(TT); while (textW(ag, 6) > 236 && ag.length > 10) ag = ag.slice(0, -2).trimEnd() + '…';
+    text(ag, 54, 30, { col: INK, size: 6 });   // справа от повестки — место для штампа
     const quorumFail = TT.rule === 'quorum' && (d.turnout || 0) < TT.quorum;
     text(d.success ? L(TT.winT) : quorumFail ? L(UI.noQuorum) : L(UI.lose), W / 2, 41, { align: 'center', col: d.success ? INK_TEAL : INK_RED });
     // четыре цифры: явка, «за», «против», «воздержались»
     const need = d.need || TT.goal, src = d.src || {}, tw = 70;
     const tiles = [[L(UI.protQuorum), `${d.turnout || 0}`, TT.quorum ? '≥' + TT.quorum : '/100', TT.quorum ? (quorumFail ? INK_RED : INK_TEAL) : INK],
       [L(UI.yesShort), String(d.signatures), '≥' + need, d.signatures >= need ? INK_TEAL : INK_RED],
-      [L(UI.rAgainst), String(d.against || 0), '', INK], [L(UI.protAbstain), String(d.abstain || 0), '', INK]];
-    tiles.forEach(([lbl, big, sub, c], i) => { const x = 54 + i * (tw + 4);
+      [L(UI.rAgainst), String(d.against || 0), '', (d.against || 0) ? INK_RED : INK], [L(UI.protAbstain), String(d.abstain || 0), '', INK]];
+    // ширина клетки — по самой длинной надписи, остаток делим поровну
+    const need0 = tiles.map(([lbl, big, sub]) => Math.max(textW(lbl, 6), textW(big) + (sub ? textW(sub, 6) + 2 : 0)) + 10), extra = Math.max(0, (292 - 12 - need0.reduce((a, b) => a + b, 0)) / 4);
+    let tx = 54;
+    tiles.forEach(([lbl, big, sub, c], i) => { const tw = Math.round(need0[i] + extra), x = tx; tx += tw + 4;
       rect(x, 58, tw, 32, 'rgba(120,100,60,.08)'); rect(x, 58, tw, 1, '#e2d9c2'); rect(x, 89, tw, 1, '#e2d9c2');
       text(big, x + 5, 61, { col: c }); if (sub) text(sub, x + 7 + textW(big), 63, { col: INK_MUTED, size: 6 });
       wrapText(lbl, tw - 8, 6).slice(0, 2).forEach((l, k) => text(l, x + 5, 73 + k * 7, { col: INK_MUTED, size: 6 })); });
@@ -1166,9 +1206,9 @@ scenes.result = {
       let rt = '★ ' + b + ' · +' + d.reward.points; while (textW(rt, 6) > 292 && rt.length > 8) rt = rt.slice(0, -2);
       y += 2; text(rt, W / 2, y, { align: 'center', col: d.reward.status === 'sent' ? INK_TEAL : INK_GOLD, size: 6 }); y += 8; }
     // подписи — мелко внизу
-    text(ekn ? L(UI.protSign) : L(UI.protSign1).replace('{n}', d.signatures), W / 2, 188, { align: 'center', col: '#b5a888', size: 6 });
-    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(324, 47); ctx.rotate(-.15); ctx.scale(s, s); ctx.globalAlpha = k;
-      ctx.strokeStyle = '#b8443f'; ctx.lineWidth = 2; ctx.strokeRect(-24, -9, 48, 18); text(d.tourId === 'L1' ? 'ОСИ' : ['ИӘ', 'ЗА'][LI()] || 'ЗА', 0, -4, { col: '#b8443f', align: 'center' }); ctx.restore(); }
+    { let sg = ekn ? L(UI.protSign) : L(UI.protSign1).replace('{n}', d.signatures); while (textW(sg, 6) > 292 && sg.length > 8) sg = sg.slice(0, -2).trimEnd() + '…'; text(sg, 54, 190, { col: '#b5a888', size: 6 }); }
+    if (d.success && this.t > 500) { const k = Math.min(1, (this.t - 500) / 200), s = 1 + (1 - k) * 1.5; ctx.save(); ctx.translate(326, 38); ctx.rotate(-.15); ctx.scale(s, s); ctx.globalAlpha = k;   // зелёный штамп внизу справа, не на цифрах
+      ctx.strokeStyle = '#2e8a5a'; ctx.lineWidth = 2; ctx.strokeRect(-24, -9, 48, 18); text(d.tourId === 'L1' ? 'ОСИ' : ['ИӘ', 'ЗА'][LI()] || 'ЗА', 0, -4, { col: '#2e8a5a', align: 'center' }); ctx.restore(); }
     const bw = 84;
     if (button(L(UI.toHouse), 108, 200, 'primary', { w: bw })) irisTo(108, 194, () => go('house', { focus: null }));
     if (button(L(UI.rating), 200, 200, 'alt', { w: bw })) irisTo(200, 194, () => go('leaderboard', { from: 'result' }));

@@ -193,21 +193,25 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
   // палитра подъезда по референсу: оливково-серый верх, сине-зелёная панель снизу, чёрные перекрытия
   const C = { up: '#5a6652', upL: '#677359', upD: '#4c5746', low: '#365350', lowL: '#40605b', lowD: '#2b4441', line: '#22302b', core: '#6b725e', coreL: '#7a8169', coreD: '#5a6150',
     slab: '#131713', slabT: '#3a4234', step: '#1a201b', stepT: '#4a5444', rail: '#0c0f0d', pipe: '#3c4842', pipeL: '#56645b' };
+  // ремонт стен: свежая краска — светлее и чище, та же гамма (тёплый верх, сине-зелёная панель)
+  const FRESH = fixed.has('walls');
+  if (FRESH) Object.assign(C, { up: '#8f9a7e', upL: '#9aa588', upD: '#869076', low: '#3f6a64', lowL: '#4a756e', lowD: '#38605a', line: '#2c4a44', core: '#a2a68f', coreL: '#aaae97', coreD: '#999d86' });
+  const DIRT = FRESH ? .25 : 1;   // грязь и подтёки после ремонта почти исчезают
   return makeCanvas(SW, WH, (P) => {
     const { r, p, line, g } = P, R = rng(41);
     r(0, 0, SW, WH, '#0f1210');
     for (let f = 1; f <= floors; f++) {
       const b = floorBase(f, floors), top = b - FLOOR_H + 8;
       // крылья: верх стены, тень под потолком, полоса краски, низ панели
-      r(0, top, SW, b - top, C.up); dirt(P, 0, top, SW, b - 40 - top, [C.upL, C.upD, C.upD], .06, R);
+      r(0, top, SW, b - top, C.up); dirt(P, 0, top, SW, b - 40 - top, [C.upL, C.upD, C.upD], .06 * DIRT, R);
       for (let i = 0; i < 6; i++) r(0, top + i, SW, 1, `rgba(10,14,10,${(.45 - i * .07).toFixed(2)})`);
-      r(0, b - 40, SW, 40, C.low); dirt(P, 0, b - 40, SW, 40, [C.lowL, C.lowD], .07, R);
+      r(0, b - 40, SW, 40, C.low); dirt(P, 0, b - 40, SW, 40, [C.lowL, C.lowD], .07 * DIRT, R);
       r(0, b - 41, SW, 1, C.line); r(0, b - 40, SW, 1, C.lowL); r(0, b - 3, SW, 3, '#1e2b28');
       // подтёки: вертикальные полосы сверху вниз и «волны» отслоившейся краски на панели
-      for (let i = 0; i < 26; i++) { const x = Math.floor(R() * SW), l = 8 + R() * 40, y = top + R() * 20; for (let k = 0; k < l; k++) if (R() < .8) p(x, y + k, k % 5 === 0 ? C.upL : 'rgba(20,26,20,.35)'); }
-      for (let i = 0; i < 8; i++) { const x = Math.floor(R() * SW), w0 = 10 + R() * 30; for (let k = 0; k < w0; k++) p(x + k, b - 40 + Math.round(Math.sin(k / 3) * 1.5) + 2, C.lowD); }
+      for (let i = 0; i < (FRESH ? 0 : 26); i++) { const x = Math.floor(R() * SW), l = 8 + R() * 40, y = top + R() * 20; for (let k = 0; k < l; k++) if (R() < .8) p(x, y + k, k % 5 === 0 ? C.upL : 'rgba(20,26,20,.35)'); }
+      for (let i = 0; i < (FRESH ? 0 : 8); i++) { const x = Math.floor(R() * SW), w0 = 10 + R() * 30; for (let k = 0; k < w0; k++) p(x + k, b - 40 + Math.round(Math.sin(k / 3) * 1.5) + 2, C.lowD); }
       // центральная клетка: светлее, свой низ панели, пилястры по краям
-      r(CORE_L, top, CORE_R - CORE_L, b - 40 - top, C.core); dirt(P, CORE_L, top, CORE_R - CORE_L, b - 40 - top, [C.coreL, C.coreD], .07, R);
+      r(CORE_L, top, CORE_R - CORE_L, b - 40 - top, C.core); dirt(P, CORE_L, top, CORE_R - CORE_L, b - 40 - top, [C.coreL, C.coreD], .07 * DIRT, R);
       for (let i = 0; i < 6; i++) r(CORE_L, top + i, CORE_R - CORE_L, 1, `rgba(10,14,10,${(.45 - i * .07).toFixed(2)})`);
       for (const [px, dir] of [[CORE_L - 7, 1], [CORE_R, -1]]) { r(px, top, 7, b - top, '#4a5444'); r(px + (dir > 0 ? 0 : 6), top, 1, b - top, '#626d58'); r(px + (dir > 0 ? 6 : 0), top, 1, b - top, '#2c332a');
         dirt(P, px, top, 7, b - top, ['#545e4c', '#3e463a'], .12, R); r(px, b - 40, 7, 1, C.line); }
@@ -223,6 +227,16 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
       // объявления: пачки бумажек, как на референсе
       for (const [nx, ny] of [[141, top + 14], [95, top + 22], [397, top + 30]].slice(0, 1 + (f % 3))) {
         for (let i = 0; i < 3; i++) { const qx = nx + (i % 2) * 5 - 2, qy = ny + i * 4; r(qx, qy, 6, 7, i === 1 ? '#c9c2ae' : '#d8d2bf'); r(qx + 1, qy + 2, 4, 1, '#8a8472'); r(qx + 1, qy + 4, 3, 1, '#8a8472'); r(qx + 2, qy - 1, 2, 1, 'rgba(220,206,150,.8)'); } }
+      // после ремонта стен — картины в рамках между дверями (простые пейзажи: степь, горы, город)
+      if (FRESH) for (const [px, k] of [[95, f], [397, f + 1]]) { const py = top + 9, v = k % 3;   // выше номеров квартир
+        r(px - 1, py - 1, 22, 16, '#5a3e26'); r(px, py, 20, 14, '#e8dcc0');
+        if (v === 0) { r(px + 1, py + 1, 18, 7, '#8fc0d8'); r(px + 1, py + 8, 18, 5, '#c9a95a'); r(px + 13, py + 3, 3, 3, '#f2d27a'); }
+        else if (v === 1) { r(px + 1, py + 1, 18, 12, '#a8c8d8'); for (let i = 0; i < 9; i++) { r(px + 2 + i, py + 12 - i, 1, i + 1, '#5a7a8a'); r(px + 18 - i, py + 12 - i * .7, 1, i * .7 + 1, '#4a6a7a'); } r(px + 9, py + 4, 2, 1, '#f4f3ee'); }
+        else { r(px + 1, py + 1, 18, 12, '#2e3a5a'); for (const [bx, bh] of [[2, 6], [5, 9], [9, 7], [12, 10], [16, 5]]) { r(px + bx, py + 13 - bh, 3, bh, '#1a2238'); p(px + bx + 1, py + 14 - bh + 1, '#f2d27a'); } }
+        r(px + 9, py - 4, 2, 3, '#2a2a2a'); }
+      // камеры под потолком: у лестницы и у лифта, с красным огоньком
+      if (fixed.has('cameras')) for (const cx0 of [CORE_L + 6, CORE_R - 14]) { const cy = top + 7;
+        r(cx0 + 3, cy - 2, 2, 3, '#2a2e30'); r(cx0, cy + 1, 9, 5, '#d8d6c8'); r(cx0, cy + 5, 9, 1, '#a8a69a'); r(cx0 + (cx0 < 240 ? 8 : -2), cy + 2, 3, 3, '#2a2e30'); p(cx0 + 2, cy + 2, '#e04a3a'); }
       // стояки: отопление (рыжий) и холодная вода (серо-синий) в углах крыльев, с вентилями и счётчиком
       for (const [sx, col, colL] of [[10, '#7a4a32', '#9a6248'], [16, '#4a5e6a', '#6a8090'], [SW - 16, '#7a4a32', '#9a6248'], [SW - 22, '#4a5e6a', '#6a8090']]) {
         r(sx, top - 8, 3, FLOOR_H, col); r(sx, top - 8, 1, FLOOR_H, colL); r(sx - 1, top + 30, 5, 2, '#2a302a'); }

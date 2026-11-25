@@ -17,7 +17,7 @@ for row in csv.DictReader(open('voice/voice_lines.csv', encoding='utf-8-sig'), d
         if '{' in t: vtpl[lang][t] = row['id']
         else: vids[lang].setdefault(vnorm(t), row['id'])
 voice_js = 'const VOICE_IDS = ' + json.dumps(vids, ensure_ascii=False) + ';\nconst VOICE_TPL = ' + json.dumps(vtpl, ensure_ascii=False) + ';\n'
-order = ['engine', 'music', 'content', 'scen_texts', 'scen_glue', 'voice', 'api', 'art_head', 'art_world', 'art_night', 'art_portraits', 'game', 'interlude', 'prologue', 'house']
+order = ['engine', 'music', 'content', 'scen_texts', 'scen_glue', 'voice', 'api', 'art_head', 'art_world', 'art_night', 'art_portraits', 'game', 'interlude', 'prologue', 'house', 'inside']
 js = voice_js + '\n'.join(open(f'src/{n}.js').read() for n in order)
 js += '\nconst QUIZ_BUILTIN = ' + json.dumps(quiz, ensure_ascii=False) + ';\n' + open('src/quiz.js').read()
 open('index.html', 'w').write(shell.replace('/*@@SCRIPT@@*/', js))

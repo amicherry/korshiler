@@ -99,10 +99,8 @@ function buildRoom() {
         if (y === 89 || y === 109) rug(y, x0 + 2, x1 - 2, '#c8a870'); else if (y > 89 && y < 109) { p(x0 + 2, y, '#c8a870'); p(x1 - 3, y, '#c8a870'); } }
       for (let i = 0; i < 4; i++) { const cx = 76 + i * 18, cy = 99; r(cx - 1, cy - 1, 3, 3, '#c8a870');
         for (const sx of [-1, 1]) { p(cx + sx * 3, cy - 3, '#c8a870'); p(cx + sx * 4, cy - 2, '#c8a870'); p(cx + sx * 4, cy - 1, '#c8a870'); p(cx + sx * 3, cy + 3, '#c8a870'); p(cx + sx * 4, cy + 2, '#c8a870'); p(cx + sx * 2, cy - 3, '#c8a870'); } } }
-    // подушка-корпе и вентилятор на полу
+    // подушка-корпе на полу (вентилятор убран — герой проходил сквозь него)
     r(122, 92, 18, 5, '#8a3a3a'); r(123, 91, 16, 1, '#a04a46'); r(122, 97, 18, 1, '#5a2626'); p(130, 94, '#c8a870');
-    r(165, 96, 2, 8, '#2a3a40'); ell(166, 104, 6, 1, '#2a3a40'); ell(166, 90, 7, 7, '#2a3a40'); ell(166, 90, 6, 6, '#4a6a72'); ell(166, 90, 5, 5, '#22343a');
-    for (let k = -4; k <= 4; k += 2) { p(166 + k, 85, '#3a565e'); p(166 + k, 95, '#3a565e'); p(161, 90 + k, '#3a565e'); p(171, 90 + k, '#3a565e'); } p(166, 82, '#5a8088');
     // виньетка: края комнаты темнее
     for (let i = 0; i < 18; i++) { g.fillStyle = `rgba(6,14,18,${(.04 * (18 - i) / 18 * 3).toFixed(3)})`; g.fillRect(i, 0, 1, 113); g.fillRect(199 - i, 0, 1, 113); }
     for (let i = 0; i < 10; i++) { g.fillStyle = `rgba(6,14,18,${(.05 * (10 - i) / 10 * 3).toFixed(3)})`; g.fillRect(0, 112 - i, 200, 1); }
@@ -408,8 +406,6 @@ scenes.prologue = {
     // экран монитора слегка мерцает, маятник часов качается
     rect(137, 51, 15, 9, Math.sin(t / 700) > .9 ? '#2f5f6a' : '#2a5560');
     { const a = Math.sin(t / 500) * .35, px = 189, py = 21; for (let i = 0; i < 7; i++) rect(Math.round(px + Math.sin(a) * i), py + i, 1, 1, '#8a9a8a'); rect(Math.round(px + Math.sin(a) * 7) - 1, py + 7, 3, 3, '#c9a95a'); }
-    // вентилятор крутится
-    { const cx = 166, cy = 90; for (let i = 0; i < 3; i++) { const a = t / 90 + i * 2.09; rect(Math.round(cx + Math.cos(a) * 3) - 1, Math.round(cy + Math.sin(a) * 3) - 1, 2, 2, '#5a8088'); } rect(cx - 1, cy - 1, 2, 2, '#2a3a40'); }
     // герой
     const fr = this.heroFrame(this.moving, this.walkT);
     sprite(personSprite(SAVE.look, fr), Math.round(this.fx) - 9, 101 - PH, this.fgoal < this.fx);

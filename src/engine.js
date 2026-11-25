@@ -81,7 +81,8 @@ function setTouch({ act = null, up = false, down = false, move = false } = {}) {
 let clicks = [];
 const pointer = { x: -1, y: -1 };
 function toLogical(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
-cv.addEventListener('pointerdown', e => { audioUnlock(); const p = toLogical(e); clicks.push(p); });
+cv.addEventListener('pointerdown', e => { audioUnlock(); const p = toLogical(e); clicks.push(p); pointer.down = true; pointer.x = p.x; pointer.y = p.y; });
+addEventListener('pointerup', () => { pointer.down = false; }); addEventListener('pointercancel', () => { pointer.down = false; });
 cv.addEventListener('pointermove', e => { const p = toLogical(e); pointer.x = p.x; pointer.y = p.y; });
 const TAP_PAD = isTouch ? 3 : 0;   // палец толще курсора: зона нажатия чуть больше кнопки
 function clickIn(x, y, w, h) {

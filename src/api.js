@@ -107,7 +107,8 @@ const MockServer = (() => {
       const prof = db.profiles[u.userId] || (db.profiles[u.userId] = {}); prof.quizPaid = prof.quizPaid || {}; prof.quizBest = prof.quizBest || {};
       // «знания экономят деньги»: +20 000 ₸ за верный ответ с первой попытки, +5 000 со второй, расчётный +50 000 — только за первый проход квиза тура
       const paidBefore = !!(tour && prof.quizPaid[tour.id]);
-      const coins = suspicious || !tour || paidBefore ? 0 : (first - hard) * 20000 + hard * 50000 + second * 5000;
+      const trips = clamp(body.trips | 0, 0, 200);   // споткнулся о преграду — −1 000 ₸
+      const coins = suspicious || !tour || paidBefore ? 0 : Math.max(0, (first - hard) * 20000 + hard * 50000 + second * 5000 - trips * 1000);
       if (tour && !suspicious) { prof.quizPaid[tour.id] = true; prof.quizBest[tour.id] = Math.max(prof.quizBest[tour.id] || 0, first / Math.max(1, total)); }
       prof.coins = (prof.coins || 0) + coins;
       let reward = null; db.rewards[u.userId] = db.rewards[u.userId] || [];

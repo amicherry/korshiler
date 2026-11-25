@@ -317,7 +317,8 @@ function gearSprite(size, step) {
 scenes.house = {
   enter(d) { this.t = 0; this.sel = null; this.anim = null; this.busy = false; setTouch({}); this.refresh(); if (d && d.focus) this.sel = d.focus;
     // подсказка — один раз, пока ничего не отремонтировано
-    if (!HOUSE_STATE.fixed.length && !this.hinted) { this.hinted = true; setTimeout(() => toast('E-KNOT', L(UI.hHint), 4200), 500); } },
+    this.help = !SAVE.helpHouse;   // первый раз — сразу объясняем, что здесь делать
+  },
   refresh() { API.house().then(h => { HOUSE_STATE = h; SAVE.coins = h.coins; }).catch(() => {}); },
   // что можно сделать с вещью сейчас
   status(id) {
@@ -343,15 +344,16 @@ scenes.house = {
       this.anim = { id, t: 0 }; this.sel = null; sfx.stamp();
       setTimeout(() => { HOUSE_STATE = h; SAVE.coins = h.coins; persist(); }, 1300);
       const p = PROBLEMS.find(x => x.id === id);
-      setTimeout(() => { toast('E-KNOT', p ? L(UI.hFixedToast).replace('{p}', L(p.name)) : L(UI.hDecorToast), 3600); this.anim = null; }, 2800);
-    } catch (e) { toast('E-KNOT', L(e.code === 'no_money' ? UI.hNoMoney : UI.netFail), 2600); }
+      setTimeout(() => { toast(L(UI.tipT), p ? L(UI.hFixedToast).replace('{p}', L(p.name)) : L(UI.hDecorToast), 3600); this.anim = null; }, 2800);
+    } catch (e) { toast(L(UI.tipT), L(e.code === 'no_money' ? UI.hNoMoney : UI.netFail), 2600); }
     this.busy = false;
   },
   update(dt) {
     this.t += dt; if (this.anim) this.anim.t += dt;
     if (hit('back')) irisTo(W / 2, 120, () => go('title'));
   },
-  draw(dt) {
+  draw(dt) { this.drawMain(dt); this.drawHelpIfOpen(); },
+  drawMain(dt) {
     drawHouseMap(this.t, this.anim);
     // маркеры: «!» — можно действовать, замок — пока закрыто
     const ids = [...PROBLEMS.map(p => p.id), ...DECOR.map(d => d.id)];
@@ -368,13 +370,16 @@ scenes.house = {
     // верхняя панель
     rect(0, 0, W, 19, '#0e111c'); rect(0, 19, W, 1, '#55607c');
     text(`${L(UI.budget)} ${money(HOUSE_STATE.coins)}`, 6, 5, { col: '#f2c94c', size: 6 });
-    text(`★${HOUSE_STATE.score}`, 128, 5, { col: '#9fd9c2' });
-    if (button(L(UI.meetings), 0, 1, 'primary', { left: 176 })) irisTo(W / 2, 120, () => go('levels'));
-    if (button(L(UI.menu), 0, 1, 'dark', { left: 344 })) irisTo(W / 2, 120, () => go('title'));
+    text(`★${HOUSE_STATE.score}`, 10 + textW(`${L(UI.budget)} ${money(HOUSE_STATE.coins)}`, 6), 5, { col: '#9fd9c2', size: 6 });
+    { const wm = textW(L(UI.meetings)) + 12, wi = textW(L(UI.insideBtn)) + 12, wn = textW(L(UI.menu)) + 12, xn = W - wn - 4;
+      if (button(L(UI.menu), 0, 1, 'dark', { left: xn })) irisTo(W / 2, 120, () => go('title'));
+      if (button('?', 0, 1, 'alt', { left: xn - 18, w: 14 })) this.help = !this.help;
+      if (button(L(UI.insideBtn), 0, 1, 'dark', { left: xn - 22 - wi })) irisTo(W / 2, 120, () => go('inside'));
+      if (button(L(UI.meetings), 0, 1, 'primary', { left: xn - 26 - wi - wm })) irisTo(W / 2, 120, () => go('levels')); }
     if (HOUSE_STATE.claimable && button(`${L(UI.bonusDay)} +${HOUSE_STATE.bonus}`, 0, 34, 'alt', { left: 6 }))
       API.claim().then(r => { HOUSE_STATE = r.house; toast('E-KNOT', L(r.reward.status === 'sent' ? UI.rRewardSent : UI.rRewardGuest).replace('{n}', r.reward.points), 3200); }).catch(() => {});
     // выбор вещи на карте
-    if (!this.anim && !this.busy) {
+    if (!this.anim && !this.busy && !this.help) {
       // нажатие: берём ближайшую вещь к пальцу (зона не меньше 30×30), чтобы маленькие цели тоже нажимались
       const c = clicks.find(c => c.y > 22 && (!this.sel || c.y < 150));
       if (c) { let best = null, bd = 1e9;
@@ -407,6 +412,7 @@ scenes.house = {
       if (button(L(UI.hGoVote), bx, 178, 'primary', { w: 120 })) irisTo(W / 2, 120, () => go('tour', { tour: st.level }));
     } else if (st.kind === 'locked') wrapText(st.text, 360, 6).slice(0, 2).forEach((l, i) => text(l, 16, 196 + i * 9, { col: '#8792ad', size: 6 }));
   },
+  drawHelpIfOpen() { if (this.help && drawHelp(L(UI.helpHouseT), HELP_HOUSE)) { this.help = false; SAVE.helpHouse = true; persist(); } },
 };
 
 /* ---------- список собраний ---------- */

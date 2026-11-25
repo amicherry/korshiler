@@ -35,13 +35,13 @@ const {chromium}=require('playwright'); const fs=require('fs');
  let jumpShot=0, goalShot=0; for(let i=0;i<300;i++){ await pg.waitForTimeout(400); const st=await pg.evaluate(()=>[scene.state, !!scene.result, scene.jy, scene.bRun]);
    if(!jumpShot && st[2] < -20){ await pg.screenshot({path:'shots/q_jump.png'}); jumpShot=1; } if(!goalShot && st[3]){ await pg.screenshot({path:'shots/q_goal.png'}); goalShot=1; } if(st[0]==='end' && st[1]) break; }
  await pg.waitForTimeout(800); await pg.screenshot({path:'shots/q_end.png'});
- const r = await pg.evaluate(()=>({ state: scene.state, res: scene.result, done: scene.done, total: scene.total, first: scene.first, second: scene.second, hardFirst: scene.hardFirst, hard: scene.hardN, wrong: scene.wrong, lens: window._lens, trips: (window._hits||[]).length, last: window.KORSHILER_LAST }));
+ const r = await pg.evaluate(()=>({ state: scene.state, res: scene.result, done: scene.done, total: scene.total, first: scene.first, second: scene.second, hardFirst: scene.hardFirst, trips: scene.trips || 0, hard: scene.hardN, wrong: scene.wrong, lens: window._lens, trips: (window._hits||[]).length, last: window.KORSHILER_LAST }));
  check('дошёл до конца', r.state, 'end'); check('собраны все страницы', r.done, r.total);
  check('ошибка: путь удлинился', r.lens.length===2 && r.lens[1] > r.lens[0] + 600, true);
  check('ошибка: вопрос вернулся — ответов всего total+1', r.first + r.wrong, r.total);
  check('квиз тура 2: 5 вопросов, есть расчётный', [r.total, r.hard>=1], [5,true]);
- const want = (r.first - r.hardFirst)*20000 + r.hardFirst*50000 + r.second*5000;
- check('оплата: 20 000 ₸ с первой, 5 000 со второй, 50 000 за расчётный', r.res && r.res.coins, want);
+ const want = Math.max(0, (r.first - r.hardFirst)*20000 + r.hardFirst*50000 + r.second*5000 - ((r.res && r.res.trips) || 0)*1000);
+ check('оплата: 20 000 ₸ с первой, 5 000 со второй, 50 000 за расчётный, −1 000 за спотыкание', r.res && r.res.coins, want);
  check('4 из 5 = 80 % → +1 дожатие у Енота', [r.first, r.res && r.res.bonus, await pg.evaluate(()=>!!SAVE.quizBonus.L2)], [4,true,true]);
  check('монеты пришли в бюджет ЖК', await pg.evaluate(()=>HOUSE_STATE.coins) - coins0, want);
  check('результат ушёл в приложение', r.last && r.last.type, 'result');

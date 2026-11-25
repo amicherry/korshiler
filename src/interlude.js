@@ -59,7 +59,8 @@ scenes.interlude = {
       rect(0, 0, W, H, 'rgba(10,12,20,.55)');
       // календарь: листы улетают
       const n = this.kind === 'years' ? 24 : 6, k = Math.min(n, Math.floor(this.t / (4200 / n)));
-      paper(150, 40, 100, 70, 5); text(L(this.kind === 'years' ? UI.twoYears : UI.sixMonths), W / 2, 50, { align: 'center', col: INK_RED });
+      const ttl = L(this.kind === 'years' ? UI.twoYears : UI.sixMonths), pw = Math.max(100, textW(ttl) + 24);   // лист шире надписи
+      paper(Math.round(W / 2 - pw / 2), 40, pw, 70, 5); text(ttl, W / 2, 50, { align: 'center', col: INK_RED });
       text(String(k), W / 2, 70, { align: 'center', col: INK, size: 16 }); text(L(this.kind === 'years' ? UI.monthsWord : UI.monthsWord), W / 2, 94, { align: 'center', col: INK_MUTED, size: 6 });
       // бюджет полугодия: пришёл после прошлой победы
       const prev = LEVELS[T.n - 2], inc = prev ? prev.income : 0;

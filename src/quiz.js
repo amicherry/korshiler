@@ -232,7 +232,7 @@ const QZ_SPEED = .13, QZ_JUMP = -.42, QZ_G = .0012;
 scenes.quiz = {
   async enter(data = {}) {
     buildQuizArt(); setTouch({ act: L(UI.qzJump) });
-    this.state = 'loading'; this.t = 0; this.coins = 0; this.first = 0; this.second = 0; this.hardFirst = 0; this.done = 0; this.wrong = 0; this.paused = false; this.result = null; this.dust = [];
+    this.state = 'loading'; this.t = 0; this.coins = 0; this.trips = 0; this.first = 0; this.second = 0; this.hardFirst = 0; this.done = 0; this.wrong = 0; this.paused = false; this.result = null; this.dust = [];
     this.look = Object.assign({}, DEFAULT_LOOK, SAVE.look || {});
     // квиз перед туром (5 вопросов тура, минимум один расчётный) или общий «Знаток ЖКХ» (все вопросы)
     this.tourId = data.tour || null; this.then = data.then || null;
@@ -292,7 +292,7 @@ scenes.quiz = {
         if (o.kind === 'rat' && !o.hit && o.x + o.mx - this.hx < 220 && o.mx > -50) o.mx -= .03 * dt;
         const img = QZ.obs[o.kind === 'rat' ? 'rat0' : o.kind], ox = o.x + o.mx;
         if (o.hit || this.hx + 35 < ox + 5 || this.hx + 16 > ox + img.width - 5) continue;
-        if (-this.jy < img.height - 6) { o.hit = true; this.trip = 480; this.coins = Math.max(0, this.coins - 2); beep(180, .12, 'sawtooth', .05); }
+        if (-this.jy < img.height - 6) { o.hit = true; this.trip = 480; this.trips = (this.trips || 0) + 1; this.coins = Math.max(0, this.coins - 1000); pop(this.hx + 10, QZ.GY - 70, '−1 000 ₸', '#e88a7a'); beep(180, .12, 'sawtooth', .05); }
       }
       const g = this.segs[this.segs.length - 1];
       if (this.hx > g.x0 + 60 && !this.bRun) { this.bRun = 1; beep(330, .1, 'square', .04); }
@@ -338,17 +338,17 @@ scenes.quiz = {
     if (this.state === 'end') return; this.state = 'end'; setTouch({});
     const sec = Math.round((Date.now() - this.startedAt) / 1000), ratio = this.total ? this.first / this.total : 0, title = ratio >= (this.cfg.titleThreshold ?? .8);
     let res = { coins: this.coins, badge: title ? 'zhkh_expert' : null, offline: true };
-    try { res = await API.quizFinish({ tourId: this.tourId, firstTry: this.first, second: this.second, hardFirst: this.hardFirst, total: this.total, wrong: this.wrong, seconds: sec }); HOUSE_STATE = await API.house(); SAVE.coins = HOUSE_STATE.coins; } catch (e) {}
+    try { res = await API.quizFinish({ tourId: this.tourId, firstTry: this.first, second: this.second, hardFirst: this.hardFirst, total: this.total, wrong: this.wrong, trips: this.trips || 0, seconds: sec }); HOUSE_STATE = await API.house(); SAVE.coins = HOUSE_STATE.coins; } catch (e) {}
     // ≥ 80 % верных с первой попытки в квизе тура — +1 «дожатие» у Енота в этом туре
     if (this.tourId && ratio >= .8) { SAVE.quizBonus = SAVE.quizBonus || {}; SAVE.quizBonus[this.tourId] = true; }
     if (this.tourId) { SAVE.quizDone = SAVE.quizDone || {}; SAVE.quizDone[this.tourId] = Math.max(SAVE.quizDone[this.tourId] || 0, Math.round(ratio * 100)); }
     persist();
-    this.result = { ...res, first: this.first, total: this.total, title: !!res.badge, bonus: this.tourId && ratio >= .8, sec };
+    this.result = { ...res, first: this.first, total: this.total, trips: this.trips || 0, title: !!res.badge, bonus: this.tourId && ratio >= .8, sec };
     try { notifyApp('result', { version: 1, game: 'korshiler', token: LAUNCH.token, runId: 'quiz-' + this.startedAt, tour: null, tourCode: 'quiz', success: true,
       quiz: { firstTry: this.first, total: this.total, wrong: this.wrong }, coins: res.coins, badges: res.badge ? [res.badge] : [], startedAt: new Date(this.startedAt).toISOString(),
       finishedAt: new Date().toISOString(), lang: LANG, clientVersion: CLIENT_VERSION }); } catch (e) {}
   },
-  drawWorld() {
+  drawWorld(dt = 16) {
     const cx = Math.round(this.cam), GY = QZ.GY, t = this.t;
     for (let x = -(cx % 240); x < W; x += 240) ctx.drawImage(QZ.wall, x, 0);
     // декор по модулям 240 px: окно / объявления / щиток — по хешу номера модуля
@@ -373,7 +373,7 @@ scenes.quiz = {
   draw(dt) {
     if (this.state === 'loading') { rect(0, 0, W, H, '#0b0c10'); return; }
     const cx = Math.round(this.cam), GY = QZ.GY, t = this.t;
-    this.drawWorld();
+    this.drawWorld(dt);
     // двери-ответы с табличками и лампой над дверью; выбранная открывается
     for (const s of this.segs) {
       if (s.type === 'door') s.doors.forEach((dx, i) => { const x = dx - cx; if (x < -40 || x > W + 40) return;
@@ -398,6 +398,7 @@ scenes.quiz = {
         if (sx > -40 && sx < W + 40) { sprite(img, sx, GY - img.height + 1, o.kind === 'rat', o.hit ? .45 : 1);
           ctx.save(); ctx.globalAlpha = .14; ctx.translate(Math.round(sx), GY + img.height); ctx.scale(1, -1); if (o.kind === 'rat') { ctx.translate(img.width, 0); ctx.scale(-1, 1); } ctx.drawImage(img, 0, 0); ctx.restore(); } }
     }
+    drawPops(dt, cx, 0);   // «−1 000 ₸» над героем, когда споткнулся
     // герой: отражение в полу, полосы скорости, пыль
     const fr = this.trip > 0 ? 'trip' : this.jy < 0 ? 'jump' : ['run', 'go'].includes(this.state) ? 'run' + ((t / 90 | 0) % 4) : 'idle';
     const alpha = this.state === 'enter' ? clamp(1 - (this.et - 300) / 320, 0, 1) : ['feedback', 'trans'].includes(this.state) ? 0 : this.trip > 0 && (t / 80 | 0) % 2 ? .5 : 1;
@@ -417,7 +418,7 @@ scenes.quiz = {
     rect(0, 0, W, 20, 'rgba(14,16,20,.88)');
     if (button('II', 0, 2, 'dark', { left: 2, w: 16 })) this.paused = true;
     for (let i = 0; i < this.total; i++) sprite(QZ.page, 24 + i * 11, 4, false, i < this.done ? 1 : .22);
-    text(`₸${this.coins}`, 24 + this.total * 11 + 6, 6, { col: '#f2c94c', size: 6 });
+    text(money(this.coins), 24 + this.total * 11 + 6, 6, { col: '#f2c94c', size: 6 });
     const prog = clamp(this.hx / this.totalLen(), 0, 1), bx = 250, bw = 140;
     text(L(UI.qzPath), bx - 4, 6, { col: '#9fb0cc', size: 6, align: 'right' });
     rect(bx, 8, bw, 4, '#2b2a33'); rect(bx, 8, Math.round(bw * prog), 4, '#7fc4a8'); rect(bx + bw - 2, 5, 4, 10, '#2e6a5a');
@@ -456,7 +457,7 @@ scenes.quiz = {
     if (!f.ok) { text(L(UI.qzLonger), W / 2, y, { align: 'center', col: '#f2c94c', size: 6 }); y += 11; }
     // статья закона — ссылка на adilet.zan.kz на языке игры
     if (law.length) { law.forEach((l, i) => text(l, W / 2, y + 2 + i * 9, { align: 'center', col: '#9fd9c2', size: 6 }));
-      if (clickIn(40, y, 320, law.length * 9 + 4)) { try { window.open(L(f.law.url), '_blank', 'noopener'); } catch (e) {} } y += law.length * 9 + 6; }
+      y += law.length * 9 + 6; }
     if (button(L(UI.next), W / 2, 30 + h - 20, 'primary') || hit('act')) this.next();
   },
   drawIntro() {
@@ -472,11 +473,11 @@ scenes.quiz = {
     const r = this.result;
     rect(0, 0, W, H, 'rgba(10,12,20,.55)'); paper(70, 24, 260, 178, 7);
     text(L(UI.qzDone), W / 2, 34, { align: 'center', col: '#2e6a5a' });
-    const rows = [[L(UI.qzFirst), `${r.first}/${r.total}`], [L(UI.qzWrongN), String(this.wrong)], [L(UI.rBudget), '+' + money(r.coins ?? 0)]];
+    const rows = [[L(UI.qzFirst), `${r.first}/${r.total}`], [L(UI.qzWrongN), String(this.wrong)], ...(r.trips ? [[L(UI.qzTrips), `${r.trips} × −1 000 ₸`]] : []), [L(UI.rBudget), '+' + money(r.coins ?? 0)]];
     rows.forEach(([a, b], i) => { text(a, 86, 54 + i * 13, { col: INK }); text(b, 314, 54 + i * 13, { col: INK, align: 'right' }); rect(86, 63 + i * 13, 228, 1, '#e2d9c2'); });
-    if (r.paidBefore) text(L(UI.qzPaidBefore), W / 2, 90, { align: 'center', col: INK_MUTED, size: 6 });
-    const note = this.tourId ? (r.bonus ? L(UI.qzBonus) : L(UI.qzNoBonus)) : r.title ? L(UI.qzTitleGot) : L(UI.qzTitleNeed);
-    wrapText(note, 220, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, 98 + i * 9, { align: 'center', col: r.title ? INK_TEAL : INK, size: 6 }));
+    let ny = 58 + rows.length * 13; if (r.paidBefore) { text(L(UI.qzPaidBefore), W / 2, ny, { align: 'center', col: INK_MUTED, size: 6 }); ny += 10; }
+    const note = this.tourId ? (TOURS[this.tourId].n < 2 ? '' : r.bonus ? L(UI.qzBonus) : L(UI.qzNoBonus)) : r.title ? L(UI.qzTitleGot) : L(UI.qzTitleNeed);
+    wrapText(note, 220, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, ny + i * 9, { align: 'center', col: r.title ? INK_TEAL : INK, size: 6 }));
     if (r.title) { ctx.save(); ctx.translate(W / 2, 138); ctx.rotate(-.08); ctx.strokeStyle = '#2e6a5a'; ctx.lineWidth = 2; ctx.strokeRect(-62, -10, 124, 20); text(L(TITLES.zhkh_expert).toUpperCase(), 0, -4, { col: '#2e6a5a', align: 'center' }); ctx.restore(); }
     if (button(L(UI.again), W / 2 - 66, 176, 'alt')) irisTo(W / 2, 120, () => go('quiz', { tour: this.tourId, then: this.then }));
     if (this.then) { if (button(L(UI.toMeeting), W / 2 + 66, 176, 'primary')) irisTo(W / 2, 120, () => go('tour', { tour: this.then, skipInter: true })); }
