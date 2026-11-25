@@ -3,7 +3,7 @@
 const {chromium}=require('playwright'); const fs=require('fs');
 (async()=>{ const b=await chromium.launch(); const pg=await b.newPage({viewport:{width:1200,height:675}}); const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
  await pg.route('**/fonts.googleapis.com/**', r=>r.abort());
- await pg.addInitScript({content: fs.readFileSync('widefont.js','utf8')+`;localStorage.setItem('d67_lang','ru');localStorage.setItem('d67_save', JSON.stringify({created:true,seenIntro:true,racIntro:true,inter:{L1:1,L2:1,L3:1,L4:1,L5:1,L6:1,L7:1},racSeen:{notify:1,call:1,redial:1,chat:1},name:'Bot',look:{},coins:0,tours:{},trust:{}}));`});
+ await pg.addInitScript({content: fs.readFileSync('widefont.js','utf8')+`;localStorage.setItem('d67_lang','ru');localStorage.setItem('d67_save', JSON.stringify({created:true,seenIntro:true,racIntro:true,helpTour:true,inter:{L1:1,L2:1,L3:1,L4:1,L5:1,L6:1,L7:1},racSeen:{notify:1,call:1,redial:1,chat:1},name:'Bot',look:{},coins:0,tours:{},trust:{}}));`});
  await pg.goto('file://'+process.cwd()+'/index.html?stable'); await pg.waitForTimeout(1600);
  const NOISE=+(process.env.NOISE||0), WALK=+(process.env.WALK||1), RUNS=+(process.env.RUNS||24), IDS=(process.env.IDS||'L1,L2,L3,L4,L5,L6,L7').split(','), RACF=process.env.RAC??'1', ONL=+(process.env.ONL??1);
  const res = await pg.evaluate(async([NOISE,WALK,RUNS,process_ids,process_rac,ONL])=>{

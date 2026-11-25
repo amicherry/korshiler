@@ -24,6 +24,9 @@ const {chromium}=require('playwright'); const fs=require('fs'); const SL=process
  await pg.evaluate(()=>{ scene.help=false; }); await pg.waitForTimeout(300); await shot('house');
  await pg.evaluate(()=>go('inside')); await pg.waitForTimeout(1500); await shot('inside');
  await pg.evaluate(()=>go('tour',{tour:'L3',skipInter:true})); await pg.waitForTimeout(1800); await pg.evaluate(()=>{toasts.length=0;}); await shot('tour_fixed');
+ // чат дома и обиженная апа
+ await pg.evaluate(async()=>{ const s=scene; SAVE.racIntro=true; s.app=true; s.rac.open=3; s.rac.readyDay.chat=0; SAVE.racSeen={notify:1,call:1,redial:1,chat:1}; for (const r of Object.values(s.res)) if (r.status==='unknown' && Math.random()<.3) r.status='yes'; s.useRac('chat'); }); await pg.waitForTimeout(500); await shot('chat_a'); await pg.waitForTimeout(4500); await shot('chat_b');
+ await pg.evaluate(()=>{ scene.chatWin=null; const s=scene; const r=Object.values(s.res).find(r=>r.arch==='obida'); s.hero.floor=r.floor; s.hero.y=s.base(r.floor); s.camY=s.base(r.floor)-150; s.walkTo=async x=>{s.hero.x=x;}; r.away=false; r.sleeping=false; r.refuser=false; s.visit(r); }); await pg.waitForTimeout(4200); await shot('obida');
  // заставка и квиз
  await pg.evaluate(()=>go('interlude',{tour:'L4'})); await pg.waitForTimeout(3000); await shot('months');
  await pg.evaluate(()=>{ go('quiz',{tour:'L3',then:'L3'}); }); await pg.waitForTimeout(1200);

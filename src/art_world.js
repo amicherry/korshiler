@@ -195,7 +195,10 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
     slab: '#131713', slabT: '#3a4234', step: '#1a201b', stepT: '#4a5444', rail: '#0c0f0d', pipe: '#3c4842', pipeL: '#56645b' };
   // ремонт стен: свежая краска — светлее и чище, та же гамма (тёплый верх, сине-зелёная панель)
   const FRESH = fixed.has('walls');
-  if (FRESH) Object.assign(C, { up: '#8f9a7e', upL: '#9aa588', upD: '#869076', low: '#3f6a64', lowL: '#4a756e', lowD: '#38605a', line: '#2c4a44', core: '#a2a68f', coreL: '#aaae97', coreD: '#999d86' });
+  // палитра ремонта — по референсу Әмины: лаванда сверху, бирюзовая панель, мятная полоса, сливовые рамки
+  C.pil = '#4a5444'; C.pilL = '#626d58'; C.pilD = '#2c332a'; C.frame = '#5a3e26';
+  if (FRESH) Object.assign(C, { up: '#8a80be', upL: '#948ac6', upD: '#7f75b2', low: '#3d7f89', lowL: '#468a94', lowD: '#36737d', line: '#6fd9c8',
+    core: '#93a6b6', coreL: '#9badbd', coreD: '#8a9cac', pil: '#5a4a96', pilL: '#7466b0', pilD: '#3c2e70', frame: '#8a3a78' });   // приглушённо: под лампами не выгорает в белый
   const DIRT = FRESH ? .25 : 1;   // грязь и подтёки после ремонта почти исчезают
   return makeCanvas(SW, WH, (P) => {
     const { r, p, line, g } = P, R = rng(41);
@@ -213,8 +216,8 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
       // центральная клетка: светлее, свой низ панели, пилястры по краям
       r(CORE_L, top, CORE_R - CORE_L, b - 40 - top, C.core); dirt(P, CORE_L, top, CORE_R - CORE_L, b - 40 - top, [C.coreL, C.coreD], .07 * DIRT, R);
       for (let i = 0; i < 6; i++) r(CORE_L, top + i, CORE_R - CORE_L, 1, `rgba(10,14,10,${(.45 - i * .07).toFixed(2)})`);
-      for (const [px, dir] of [[CORE_L - 7, 1], [CORE_R, -1]]) { r(px, top, 7, b - top, '#4a5444'); r(px + (dir > 0 ? 0 : 6), top, 1, b - top, '#626d58'); r(px + (dir > 0 ? 6 : 0), top, 1, b - top, '#2c332a');
-        dirt(P, px, top, 7, b - top, ['#545e4c', '#3e463a'], .12, R); r(px, b - 40, 7, 1, C.line); }
+      for (const [px, dir] of [[CORE_L - 7, 1], [CORE_R, -1]]) { r(px, top, 7, b - top, C.pil); r(px + (dir > 0 ? 0 : 6), top, 1, b - top, C.pilL); r(px + (dir > 0 ? 6 : 0), top, 1, b - top, C.pilD);
+        dirt(P, px, top, 7, b - top, FRESH ? [C.pilL, C.pilD] : ['#545e4c', '#3e463a'], .12 * DIRT, R); r(px, b - 40, 7, 1, C.line); }
       // трубы по краям: с хомутами и ржавчиной
       for (const px of [2, SW - 7]) { r(px, top - 8, 5, FLOOR_H, C.pipe); r(px + 1, top - 8, 1, FLOOR_H, C.pipeL); r(px + 4, top - 8, 1, FLOOR_H, '#26302b');
         for (const yy of [top + 18, top + 62]) { r(px - 1, yy, 7, 3, '#2a322d'); r(px - 1, yy, 7, 1, '#4c5a50'); } p(px + 2, top + 40, '#7a3b28'); p(px + 2, top + 41, '#7a3b28'); }
@@ -229,7 +232,7 @@ function drawStairwell(floors, doorLook, fixed = new Set()) {
         for (let i = 0; i < 3; i++) { const qx = nx + (i % 2) * 5 - 2, qy = ny + i * 4; r(qx, qy, 6, 7, i === 1 ? '#c9c2ae' : '#d8d2bf'); r(qx + 1, qy + 2, 4, 1, '#8a8472'); r(qx + 1, qy + 4, 3, 1, '#8a8472'); r(qx + 2, qy - 1, 2, 1, 'rgba(220,206,150,.8)'); } }
       // после ремонта стен — картины в рамках между дверями (простые пейзажи: степь, горы, город)
       if (FRESH) for (const [px, k] of [[95, f], [397, f + 1]]) { const py = top + 9, v = k % 3;   // выше номеров квартир
-        r(px - 1, py - 1, 22, 16, '#5a3e26'); r(px, py, 20, 14, '#e8dcc0');
+        r(px - 1, py - 1, 22, 16, C.frame); r(px, py, 20, 14, '#e8dcc0');
         if (v === 0) { r(px + 1, py + 1, 18, 7, '#8fc0d8'); r(px + 1, py + 8, 18, 5, '#c9a95a'); r(px + 13, py + 3, 3, 3, '#f2d27a'); }
         else if (v === 1) { r(px + 1, py + 1, 18, 12, '#a8c8d8'); for (let i = 0; i < 9; i++) { r(px + 2 + i, py + 12 - i, 1, i + 1, '#5a7a8a'); r(px + 18 - i, py + 12 - i * .7, 1, i * .7 + 1, '#4a6a7a'); } r(px + 9, py + 4, 2, 1, '#f4f3ee'); }
         else { r(px + 1, py + 1, 18, 12, '#2e3a5a'); for (const [bx, bh] of [[2, 6], [5, 9], [9, 7], [12, 10], [16, 5]]) { r(px + bx, py + 13 - bh, 3, bh, '#1a2238'); p(px + bx + 1, py + 14 - bh + 1, '#f2d27a'); } }

@@ -478,6 +478,8 @@ scenes.quiz = {
     let ny = 58 + rows.length * 13; if (r.paidBefore) { text(L(UI.qzPaidBefore), W / 2, ny, { align: 'center', col: INK_MUTED, size: 6 }); ny += 10; }
     const note = this.tourId ? (TOURS[this.tourId].n < 2 ? '' : r.bonus ? L(UI.qzBonus) : L(UI.qzNoBonus)) : r.title ? L(UI.qzTitleGot) : L(UI.qzTitleNeed);
     wrapText(note, 220, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, ny + i * 9, { align: 'center', col: r.title ? INK_TEAL : INK, size: 6 }));
+    { const nl = note ? wrapText(note, 220, 6).slice(0, 3).length : 0, j = QUIZ_JOKES[(this.startedAt >> 3) % QUIZ_JOKES.length];   // шутка в конце
+      wrapText(L(j), 220, 6).slice(0, 2).forEach((l, i) => text(l, W / 2, ny + nl * 9 + 6 + i * 9, { align: 'center', col: '#8a6a3a', size: 6 })); }
     if (r.title) { ctx.save(); ctx.translate(W / 2, 138); ctx.rotate(-.08); ctx.strokeStyle = '#2e6a5a'; ctx.lineWidth = 2; ctx.strokeRect(-62, -10, 124, 20); text(L(TITLES.zhkh_expert).toUpperCase(), 0, -4, { col: '#2e6a5a', align: 'center' }); ctx.restore(); }
     if (button(L(UI.again), W / 2 - 66, 176, 'alt')) irisTo(W / 2, 120, () => go('quiz', { tour: this.tourId, then: this.then }));
     if (this.then) { if (button(L(UI.toMeeting), W / 2 + 66, 176, 'primary')) irisTo(W / 2, 120, () => go('tour', { tour: this.then, skipInter: true })); }

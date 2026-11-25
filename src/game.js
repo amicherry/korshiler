@@ -301,12 +301,12 @@ scenes.tour = {
     this.startedAt = Date.now();
     this.res = makeResidents(tour, hashStr(USER.userId + tour.id) + (SAVE.tours[tour.id]?.tries || 0));
     // каждый сделанный ремонт — доверие к председателю: соседи видят результат
-    const repaired = Math.min(5, HOUSE_STATE.fixed.length); for (const r of Object.values(this.res)) r.mood += repaired * 4;
+    const repaired = Math.min(5, HOUSE_STATE.fixed.length); for (const r of Object.values(this.res)) r.mood += repaired * 4 - (tour.scen === 'tariff' ? 10 : 0);   // повышать взнос не любит никто
     // кто-то откажет сразу на пороге (ворчуны — чаще); ремонты делают отказников реже
     // с собрания 2 (есть E-KNOT) часть соседей сама голосует в приложении — «за» или «против»
     const RR = rng(hashStr(USER.userId + tour.id) + 77 + (SAVE.tours[tour.id]?.tries || 0)), app = tour.n >= 2;
     for (const r of Object.values(this.res)) {
-      if (!r.A.renter && !r.A.notOwner && !r.A.noVote && RR() < (REFUSE[r.arch] || 0) * (1 - repaired * .1)) r.refuser = true;
+      if (!r.A.renter && !r.A.notOwner && !r.A.noVote && RR() < (REFUSE[r.arch] || 0) * (1 - repaired * .1) * (tour.scen === 'tariff' ? 1.5 : 1)) r.refuser = true;
       if (app && r.A.onlineOk && !r.A.paperOnly && !r.A.renter && !r.A.notOwner && RR() < .12) r.selfAt = tour.start + tour.duration * (.08 + RR() * .8);
     }
     this.app = app && !!SAVE.racIntro; this.onYes = 0; this.onNo = 0; this.onFlash = 0;
@@ -337,7 +337,7 @@ scenes.tour = {
     this.helper = { state: 'hidden', floor: 2, x: 397, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
     this.rats = this.fixed.has('basement') ? [] : [{ x: 80, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 380, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
     this.liftPick = false; this.drops = []; this.paused = false;
-    this.help = false; this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
+    this.help = false; this.chatWin = null; this.racAnim = null; this.lampSeed = Math.random() * 1000; this.stepAcc = 0;
     this.run = null; API.tourStart(tour.id).then(r => this.run = r).catch(() => {});
     this.plan = null;
     // повестка собрания: какая жалоба и сколько подписей нужно
@@ -422,6 +422,7 @@ scenes.tour = {
     // пауза: время стоит, можно продолжить или выйти из уровня
     if (this.paused) { setTouch({}); if (hit('back')) this.paused = false; return; }
     if (this.help) return;   // открыта подсказка «?» — игра стоит
+    if (this.chatWin) { this.chatWin.t += dt; return; }   // окно чата дома
     if (hit('back') && !this.busy && !DLG.open && !this.ballot && !this.liftPick) { this.paused = true; return; }
     dlgUpdate(dt);
     const h = this.hero, T = this.tour;
@@ -665,13 +666,15 @@ scenes.tour = {
         this.addTime(1);
         let d = (A.likes[c] || 0) + Math.round((Math.random() - .5) * 6);
         if (c === 'neighbors' && A.likes.neighbors > 0) d += Math.min(14, this.signatures() * 2);
-        r.mood += d;
+        r.mood += d; if (d <= 0) r.bad = (r.bad || 0) + 1;
         await say(Ln(d >= 10 ? 'good' : d <= 0 ? 'bad' : 'meh'), d >= 10 ? 'happy' : d <= 0 ? 'angry' : 'think');
       }
       r.mood = clamp(r.mood, 0, 100);
       if (r.mood >= 70) return this.decide(r, sc, Ln, via);
-      if (r.mood <= 12) return this.refuse(r, Ln);
+      // не тот довод два раза или совсем плохой настрой — отказ (а не вечное «подумаю»)
+      if (r.mood <= 18 || (r.bad >= 2 && r.mood < 45)) return this.refuse(r, Ln);
     }
+    if (r.mood < 40 && r.status !== 'paper') return this.refuse(r, Ln);   // три захода без толку — сосед отказывается
     await say(Ln('think'), 'think'); if (r.status !== 'paper') r.status = 'thinking'; return this.endVisit(r);
   },
   // жилец решился: «за»; но в некоторых турах характер «за» не голосует — только воздерживается или «подумаю»
@@ -834,7 +837,11 @@ scenes.tour = {
     } else if (k === 'chat') {
       // WhatsApp/Telegram: ссылка без установки приложения — отсутствующие хозяева; ИИ-помощник подбирает каждому его довод
       const half = this.signatures() >= T.goal / 2;
+      const pend = () => all.filter(r => r.status === 'online').length;
+      const before = { y: this.signatures() + pend(), n: this.against(), a: this.abstained() };
       for (const r of all) {
+        // в опросе чата кто-то сразу жмёт «против» или «воздержусь»
+        if (undecided(r) && r.A.onlineOk && !r.A.paperOnly && !r.A.renter && !r.A.notOwner && r.mood < 30 && rnd() < .25) { r.status = 'no'; this.events.push({ t: 'no', apt: r.apt, via: 'chat' }); continue; }
         if ((r.A.renter || r.A.notOwner) && ['unknown', 'novote', 'proxy'].includes(r.status) && rnd() < .5 * fat) { this.goOnline(r, 'chat'); r.ownerP = 1; n++; continue; }
         if (!undecided(r) || r.A.renter || r.A.notOwner) continue;
         if (r.status === 'away' && !r.A.paperOnly && rnd() < .35 * fat) { this.goOnline(r, 'chat'); n++; continue; }
@@ -842,7 +849,10 @@ scenes.tour = {
         const best = Math.max(...Object.values(r.A.likes || { x: 0 })); r.mood += Math.round(best * .6 * Math.max(.5, fat));
         if (r.mood >= 70 && !r.A.paperOnly) { this.goOnline(r, 'chat'); r.onlineAt = this.minute + 1; n++; }
       }
-      const ai = AI_CHAT[T.scen]; this.racAnim.chat = ai ? { q: fmtLine(L(ai.q)), a: fmtLine(L(ai.a)) } : null;
+      const ai = AI_CHAT[T.scen], after = { y: this.signatures() + pend(), n: this.against(), a: this.abstained() };
+      const names = all.filter(r => !isStorage(r.apt) && r.name).map(r => r.name), jk = [...CHAT_JOKES].sort(() => rnd() - .5).slice(0, 2);
+      this.racAnim = null;   // чат — отдельное окно, игра на паузе, пока читаешь
+      this.chatWin = { t: 0, before, after, jokes: jk.map((j, i) => ({ who: names[Math.floor(rnd() * names.length)] || '—', t: L(j) })), ai: ai ? { q: fmtLine(L(ai.q)), a: fmtLine(L(ai.a)), who: names[Math.floor(rnd() * names.length)] || '—' } : null };
       body = fmtLine(L(RAC.chatMsg).replace('{t}', tourTitle(T)).replace('{n}', this.signatures()).replace('{g}', T.goal));
     }
     this.events.push({ t: 'broadcast', via: k }); this.broadcasts++;
@@ -989,6 +999,7 @@ scenes.tour = {
     if (this.rac.menu && !this.busy && !DLG.open) this.drawRacMenu();
     dlgDraw();
     if (this.ballot) this.drawBallot();
+    if (this.chatWin) this.drawChat();
     if (this.help && drawHelp(L(UI.helpTourT), HELP_TOUR.filter(([, b]) => !b.app || this.app), HELP_ICONS)) { this.help = false; SAVE.helpTour = true; persist(); }
     if (this.paused) {
       rect(0, 0, W, H, 'rgba(11,10,20,.65)'); frameBox(120, 50, 160, 120);
@@ -1034,6 +1045,38 @@ scenes.tour = {
     sprite(RACCOON, rx, ry);
   },
   // меню енота: 4 действия, открываются по очереди; у каждого — пауза в днях
+  // чат дома: опрос с растущими полосками, сообщения соседей, вопрос и ответ ИИ-помощника
+  drawChat() {
+    const C = this.chatWin, t = C.t, T = this.tour;
+    rect(0, 0, W, H, 'rgba(8,10,18,.55)');
+    const x0 = 40, w = 320, y0 = 22, h = 200;
+    rect(x0, y0, w, h, '#e6ddd0'); rect(x0, y0, w, 1, '#1b1a21'); rect(x0, y0 + h - 1, w, 1, '#1b1a21'); rect(x0, y0, 1, h, '#1b1a21'); rect(x0 + w - 1, y0, 1, h, '#1b1a21');
+    rect(x0 + 1, y0 + 1, w - 2, 14, '#2f8577'); text(L(UI.chatHead), x0 + 8, y0 + 5, { col: '#f4f3ee', size: 6 });
+    text(`${Object.values(this.res).filter(r => !isStorage(r.apt)).length}`, x0 + w - 8, y0 + 5, { col: '#cdeee2', size: 6, align: 'right' });
+    let y = y0 + 20;
+    // опрос: карточка от E-KNOT
+    const k = clamp((t - 300) / 2200, 0, 1), ease = 1 - Math.pow(1 - k, 3);
+    const v = { y: Math.round(lerp(C.before.y, C.after.y, ease)), n: Math.round(lerp(C.before.n, C.after.n, ease)), a: Math.round(lerp(C.before.a, C.after.a, ease)) };
+    const tot = Math.max(1, v.y + v.n + v.a);
+    rect(x0 + 6, y, 230, 56, '#ffffff'); rect(x0 + 6, y + 56, 230, 1, '#c9bfae');
+    let tt = L(UI.chatPoll) + ': ' + tourTitle(T); while (textW(tt, 6) > 218 && tt.length > 6) tt = tt.slice(0, -2) + '…';
+    text(tt, x0 + 12, y + 4, { col: INK, size: 6 });
+    [[UI.chatYes, v.y, '#4caf6e'], [UI.chatNo, v.n, '#d0574f'], [UI.chatAb, v.a, '#a99fc8']].forEach(([lb, n, c], i) => { const yy = y + 15 + i * 11;
+      text(L(lb), x0 + 12, yy, { col: INK, size: 6 }); rect(x0 + 76, yy + 1, 130, 6, '#ece6da'); rect(x0 + 76, yy + 1, Math.round(130 * n / tot), 6, c); text(String(n), x0 + 230, yy, { col: INK, size: 6, align: 'right' }); });
+    text(L(UI.chatVoted).replace('{n}', v.y + v.n + v.a), x0 + 12, y + 48, { col: INK_MUTED, size: 6 });
+    y += 62;
+    // сообщения соседей — по одному
+    C.jokes.forEach((j, i) => { if (t < 1200 + i * 900) return; const ls = wrapText(j.t, 250, 6).slice(0, 2), bh = 10 + ls.length * 8;
+      rect(x0 + 6, y, 262, bh, '#ffffff'); text(j.who, x0 + 11, y + 2, { col: ['#8a4a9a', '#2f6f9a', '#b8643f'][i % 3], size: 6 });
+      ls.forEach((l, k2) => text(l, x0 + 11, y + 10 + k2 * 8, { col: INK, size: 6 })); y += bh + 4; });
+    // вопрос жителя и ответ ИИ-помощника справа
+    if (C.ai && t > 3000) { const q = wrapText(C.ai.q, 250, 6).slice(0, 2), qh = 10 + q.length * 8;
+      rect(x0 + 6, y, 262, qh, '#ffffff'); text(C.ai.who, x0 + 11, y + 2, { col: '#2f6f9a', size: 6 }); q.forEach((l, i) => text(l, x0 + 11, y + 10 + i * 8, { col: INK, size: 6 })); y += qh + 4;
+      if (t > 3800) { const a = wrapText(C.ai.a, 250, 6).slice(0, 3), ah = 10 + a.length * 8;
+        rect(x0 + w - 268, y, 262, ah, '#cdeee2'); text(L(UI.aiName), x0 + w - 263, y + 2, { col: '#2f8577', size: 6 }); a.forEach((l, i) => text(l, x0 + w - 263, y + 10 + i * 8, { col: INK, size: 6 })); } }
+    if (button(L(UI.close), x0 + w - 6 - (textW(L(UI.close)) + 12) / 2, y0 + 20, 'primary') || hit('act') || hit('back')) { this.chatWin = null; }
+    if (clicks.length) clicks.length = 0;
+  },
   drawRacMenu() {
     frameBox(214, 22, 182, 92, .97);
     text(L(UI.raccoon), 222, 28, { col: '#9fd9c2', size: 6 });
@@ -1059,7 +1102,7 @@ scenes.tour = {
     if (T.rule === 'quorum') { const k = clamp(o.turnout / T.quorum, 0, 1); rect(x0, 12, 40, 3, '#2b2a33'); rect(x0, 12, Math.round(40 * k), 3, o.turnout >= T.quorum ? '#4caf6e' : '#9fb0cc');
       text(`${o.turnout}/${T.quorum}`, x0 + 43, 10, { col: '#9fb0cc', size: 6 }); }
     // доля E-KNOT и онлайн-голоса
-    if (this.app) { const ox = 166, fl = this.onFlash > 0 && Math.floor(this.onFlash / 120) % 2;
+    if (this.app) { const ox = 158, fl = this.onFlash > 0 && Math.floor(this.onFlash / 120) % 2;
       rect(ox, 4, 6, 11, fl ? '#f4f3ee' : '#7fc4a8'); rect(ox + 1, 5, 4, 7, '#0e111c'); rect(ox + 2, 13, 2, 1, '#0e111c');
       text(`E-KNOT ${this.appShare()}%`, ox + 9, 3, { col: '#9fd9c2', size: 6 }); text('+' + this.onYes + ' −' + this.onNo, ox + 9, 11, { col: '#8792ad', size: 6 }); }
     if (button('?', 0, 1, 'alt', { left: 236, w: 14 }) && !DLG.open) { this.help = !this.help; this.rac.menu = false; this.ballot = false; }
@@ -1099,7 +1142,7 @@ scenes.tour = {
     if (button(L(UI.close), W / 2, 190, 'alt')) this.ballot = false;
   },
 };
-const REFUSE = { grump: .4, business: .15, night: .1, mom: .04, apa: .04, ata: .03, teacher: .05, dad: .06, it: .08, novosel: .02 };
+const REFUSE = { obida: .35, grump: .4, business: .15, night: .1, mom: .04, apa: .04, ata: .03, teacher: .05, dad: .06, it: .08, novosel: .02 };
 const RAC_ACTS = ['notify', 'call', 'redial', 'chat'], RAC_PAUSE = { notify: 5, call: 7, redial: 5, chat: 7 };
 // каналы, через которые голос собрало приложение E-KNOT (в протоколе — доля E-KNOT)
 const APP_VIA = ['online', 'notify', 'call', 'redial', 'chat', 'owner'];
@@ -1124,6 +1167,7 @@ function varyLook(a, R) {
     case 'teacher': Object.assign(L, { body: 'f', old: true, hair: any(['bun', 'bun', 'short', 'curly']), hairCol: ch(.6) ? any(HAIR_O) : any(['#6a2a2a', '#4a2e22', '#8a4a3a']), glasses: ch(.75), top: ch(.6) ? 'jacket' : 'shirt', bottom: ch(.7) ? 'skirt' : 'pants', skirtCol: any(SKIRT_C) }); break;
     case 'mom': youngF(); L.top = any(['shirt', 'hoodie', 'shirt', 'jacket']); break;
     case 'dad': youngM(); Object.assign(L, { beard: ch(.4), top: any(['hoodie', 'shirt', 'leather']) }); if (ch(.25)) Object.assign(L, { hat: 'cap', capCol: any(['#b8443f', '#3f6f8c', '#2b2a33']) }); break;
+    case 'obida': Object.assign(L, { body: 'f', old: true, hair: 'bun', hairCol: any(HAIR_O), glasses: ch(.6), top: any(['jacket', 'shirt']), topCol: any(['#5a3a4a', '#4a4a5a', '#6a4a3a']), bottom: 'skirt', skirtCol: any(SKIRT_C) }); break;
     case 'novosel': youngF(); L.top = any(['shirt', 'jacket', 'hoodie']); break;
     case 'renter': youngF(); L.top = any(['hoodie', 'shirt']); L.headphones = ch(.25); break;
     case 'shady': youngM(); Object.assign(L, { top: 'leather', topCol: any(['#2b2a33', '#3a2a2a']), beard: ch(.5) }); break;
