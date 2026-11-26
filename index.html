@@ -3623,11 +3623,10 @@ function dlgDraw() {
   ctx.drawImage(dlgDraw.bg, px + 1, py + 1);
   if (DLG.port) sprite(DLG.port(DLG.expr), px + 2, py + 3);
   rect(px + 1, py + 42, 42, 1, '#1c2036');
-  // имя — табличка под портретом
-  { const nm = DLG.name || '', small = textW(nm) > 50, lines = small ? nm.split(' ').slice(0, 2).map(t => t.slice(0, 10)) : [nm], tw = Math.min(56, Math.max(...lines.map(t => textW(t, small ? 6 : 8))) + 8), th = small ? 17 : 11;
-    const nc = Math.max(px + 22, x + 4 + tw / 2);   // табличка не вылезает за рамку окна
-    rect(nc - tw / 2, py + 47, tw, th, '#f2c94c'); rect(nc - tw / 2, py + 47 + th - 1, tw, 1, '#a8822a');
-    lines.forEach((t, i) => text(t, nc, py + 49 + i * 8, { align: 'center', col: '#1a1424', size: small ? 6 : 8 })); }
+  // имя — табличка-вкладка над окном: один шрифт и одна высота у всех, ширина по имени (всегда влезает)
+  { const nm = DLG.name || '', tw = textW(nm) + 14, tx = x + 6;
+    rect(tx + 1, y - 10, tw, 12, 'rgba(4,5,10,.5)'); rect(tx, y - 11, tw, 12, '#f2c94c'); rect(tx, y - 1, tw, 1, '#a8822a'); rect(tx, y - 11, tw, 1, '#f8dc7a');
+    text(nm, tx + 7, y - 9, { col: '#1a1424' }); }
   // текст
   if (!DLG.choices) wrapText(DLG.text.slice(0, Math.floor(DLG.shown)), DLG_TW).slice(0, DLG_LINES).forEach((l, i) => text(l, x + 58, y + 9 + i * 12));
   if (!DLG.choices && DLG.shown >= DLG.text.length && DLG.resolve) { const bob = Math.floor(performance.now() / 250) % 2; rect(x + w - 15, y + h - 13 + bob, 7, 1, '#f2c94c'); rect(x + w - 14, y + h - 12 + bob, 5, 1, '#f2c94c'); rect(x + w - 13, y + h - 11 + bob, 3, 1, '#f2c94c'); p0(x + w - 12, y + h - 10 + bob); }   // мигающий «дальше»
