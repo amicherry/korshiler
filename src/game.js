@@ -76,11 +76,13 @@ function dlgDraw() {
     // варианты — крупные кнопки в две колонки, нажимаются пальцем
     const rowsN = Math.ceil(DLG.choices.length / 2), y0 = y + Math.round((h - rowsN * CH.rowH) / 2) + 1;
     CH.y0 = y0;
+    // один размер шрифта на всё меню: если хоть одна надпись не влезает — все мельче, чтобы не было разнобоя
+    const msz = DLG.choices.some(c => textW(c.label) > CH.bw - 8) ? 6 : 8;
     DLG.choices.forEach((c, i) => {
       const cx = CH.x0 + (i % 2) * CH.colW, cy = y0 + Math.floor(i / 2) * CH.rowH, sel = i === DLG.cursor;
       rect(cx, cy, CH.bw, CH.bh, sel ? '#f2c94c' : '#1d2130'); rect(cx, cy + CH.bh - 2, CH.bw, 2, sel ? '#b8902a' : '#11141d');
       rect(cx, cy, CH.bw, 1, sel ? '#ffe28a' : '#3a4157');
-      const sz = textW(c.label) > CH.bw - 8 ? 6 : 8;
+      const sz = msz;
       text(c.label, cx + CH.bw / 2, cy + Math.round((CH.bh - (sz === 8 ? 9 : 7)) / 2), { align: 'center', size: sz, col: sel ? '#1b1a21' : (c.dim ? '#7d8394' : '#f4f3ee') });
     });
   }
@@ -245,7 +247,7 @@ scenes.creator = {
       const v = this.look[k] ?? null;
       if (k === 'skin' || k === 'hairCol' || k === 'topCol') { rect(322, y, 44, 12, OUT); rect(323, y + 1, 42, 10, v); }
       else { const names = { short: 'Қысқа|Короткие|Short', long: 'Ұзын|Длинные|Long', bun: 'Түйін|Пучок|Bun', bald: 'Жоқ|Нет|None', curly: 'Бұйра|Кудри|Curly', leather: 'Күртеше|Куртка|Jacket', hoodie: 'Худи|Худи|Hoodie', shirt: 'Көйлек|Рубашка|Shirt', jacket: 'Пиджак|Пиджак|Blazer', chapan: 'Шапан|Чапан|Chapan', tyube: 'Тақия|Тюбетейка|Takiya', cap: 'Кепка|Кепка|Cap', null: '—|—|—', m: 'Ер|Парень|Guy', f: 'Қыз|Девушка|Girl', pants: 'Шалбар|Брюки|Trousers', skirt: 'Юбка|Юбка|Skirt' };
-        const s = (names[v] || '—|—|—').split('|')[LI()]; text(s, 344, y + 2, { align: 'center', col: '#9fd9c2', size: s.length > 6 ? 6 : 8 }); }
+        const s = (names[v] || '—|—|—').split('|')[LI()]; text(s, 344, y + 3, { align: 'center', col: '#9fd9c2', size: 6 }); }   // всегда одного размера
     });
     if (button(L(UI.ready), 296, 190, 'primary', { selected: this.row === OPT_ROWS.length })) this.done();
   },

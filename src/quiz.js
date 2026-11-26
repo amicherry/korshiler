@@ -431,7 +431,7 @@ scenes.quiz = {
   drawCard(q) {
     // длинный ответ переносится на 2 строки (казахский длиннее); если и так не влезает — мельче шрифт
     const lines = wrapText(L(q.q), 364, 8).slice(0, 3);
-    const rows = q.answers.map(a => { const s = L(a); let sz = 8, ls = wrapText(s, 344, 8); if (ls.length > 2) { sz = 6; ls = wrapText(s, 344, 6).slice(0, 3); } return { sz, ls, h: Math.max(13, ls.length * (sz === 8 ? 10 : 8) + 4) }; });
+    const rows = q.answers.map(a => { const sz = 8, ls = wrapText(L(a), 344, 8).slice(0, 3); return { sz, ls, h: Math.max(13, ls.length * 10 + 4) }; });   // всегда один шрифт, длинный ответ — в 2–3 строки
     const h = 12 + lines.length * 11 + rows.reduce((m, r) => m + r.h + 2, 0) + 4;
     frameBox(8, 24, 384, h, .95);
     lines.forEach((l, i) => text(l, 18, 30 + i * 11, { col: '#f4f3ee' }));

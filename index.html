@@ -144,7 +144,7 @@ document.querySelectorAll('[data-k]').forEach(b => {
 const touchBtn = k => document.querySelector(`[data-k="${k}"]`);
 // какие экранные кнопки нужны сейчас: стрелки «влево/вправо» — только там, где герой ходит
 function setTouch({ act = null, up = false, down = false, move = false } = {}) {
-  const a = touchBtn('act'); if (a) { a.hidden = act === null; if (act !== null && a.textContent !== act) { a.textContent = act; a.style.fontSize = act.length <= 3 ? '24px' : act.length > 13 ? '8px' : act.length > 9 ? '9px' : ''; } }
+  const a = touchBtn('act'); if (a) { a.hidden = act === null; if (act !== null && a.textContent !== act) { a.textContent = act; a.style.fontSize = /^[^\p{L}\d]+$/u.test(act) ? '24px' : act.length > 13 ? '8px' : act.length > 9 ? '9px' : ''; } }   // крупно — только значки вроде ▸▸
   const u = touchBtn('up'), d = touchBtn('down'); if (u) u.hidden = !up; if (d) d.hidden = !down;
   for (const k of ['left', 'right']) { const b = touchBtn(k); if (b) b.hidden = !move; }
 }
@@ -612,7 +612,7 @@ const UI = {
   talker1:    { kz: 'О, жаңа көрші! Тоқта-тоқта. Білесің бе, 2003 жылы осы баспалдақта...', ru: 'О, новый сосед! Стой-стой. Знаешь, в 2003 году на этой лестнице...' },
   tListen:    { kz: 'Тыңдау (−3 мин)', ru: 'Выслушать (−3 мин)' },
   tLater:     { kz: '«Кейін айтасыз»', ru: '«Расскажете потом»' },
-  tChat:      { kz: '«Үй чатына жазыңыз»', ru: '«Напишите в чат дома»' },
+  tChat:      { kz: '«Чатқа жазыңыз»', ru: '«Пишите в чат»' },
   talkerListen:{ kz: '...міне, сондықтан жарық керек! Жарайды, бүкіл қабатқа айтамын: сен дұрыс адамсың.', ru: '...вот поэтому свет и нужен! Ладно, скажу всему этажу: ты нормальный.' },
   talkerLater:{ kz: 'Хм. Жастар әрқашан асығады.', ru: 'Хм. Молодёжь вечно спешит.' },
   talkerChat: { kz: 'Чат? E-KNOT-та ма? Жарайды, сонда фото салайын.', ru: 'Чат? В E-KNOT? Ладно, выложу туда фотки.' },
@@ -1021,7 +1021,7 @@ const PRO = {
 
 /* ---------- подписи интерфейса для 7 туров, Енота, протокола и заставок (kz, ru) ---------- */
 Object.assign(UI, {
-  aInvite:     { kz: 'Иесіне E-KNOT-қа шақыру', ru: 'Пригласить хозяйку в E-KNOT' },
+  aInvite:     { kz: 'Иесін шақыру', ru: 'Позвать хозяйку' },
   aProxy:      { kz: 'Сенімхат', ru: 'Доверенность' },
   bata:        { kz: 'Ақсақал бата берді — көршілер жылырақ.', ru: 'Ақсақал дал бата — соседи теплее.' },
   racMenuHint: { kz: 'ЕНОТ батырмасы — төрт әрекет: хабарлама, қоңырау, қайта қоңырау, үй чаты. Бірінен соң бірі ашылады.', ru: 'Кнопка ЕНОТ — четыре действия: уведомление, обзвон, дожатие, чат дома. Открываются по очереди.' },
@@ -3576,11 +3576,13 @@ function dlgDraw() {
     // варианты — крупные кнопки в две колонки, нажимаются пальцем
     const rowsN = Math.ceil(DLG.choices.length / 2), y0 = y + Math.round((h - rowsN * CH.rowH) / 2) + 1;
     CH.y0 = y0;
+    // один размер шрифта на всё меню: если хоть одна надпись не влезает — все мельче, чтобы не было разнобоя
+    const msz = DLG.choices.some(c => textW(c.label) > CH.bw - 8) ? 6 : 8;
     DLG.choices.forEach((c, i) => {
       const cx = CH.x0 + (i % 2) * CH.colW, cy = y0 + Math.floor(i / 2) * CH.rowH, sel = i === DLG.cursor;
       rect(cx, cy, CH.bw, CH.bh, sel ? '#f2c94c' : '#1d2130'); rect(cx, cy + CH.bh - 2, CH.bw, 2, sel ? '#b8902a' : '#11141d');
       rect(cx, cy, CH.bw, 1, sel ? '#ffe28a' : '#3a4157');
-      const sz = textW(c.label) > CH.bw - 8 ? 6 : 8;
+      const sz = msz;
       text(c.label, cx + CH.bw / 2, cy + Math.round((CH.bh - (sz === 8 ? 9 : 7)) / 2), { align: 'center', size: sz, col: sel ? '#1b1a21' : (c.dim ? '#7d8394' : '#f4f3ee') });
     });
   }
@@ -3745,7 +3747,7 @@ scenes.creator = {
       const v = this.look[k] ?? null;
       if (k === 'skin' || k === 'hairCol' || k === 'topCol') { rect(322, y, 44, 12, OUT); rect(323, y + 1, 42, 10, v); }
       else { const names = { short: 'Қысқа|Короткие|Short', long: 'Ұзын|Длинные|Long', bun: 'Түйін|Пучок|Bun', bald: 'Жоқ|Нет|None', curly: 'Бұйра|Кудри|Curly', leather: 'Күртеше|Куртка|Jacket', hoodie: 'Худи|Худи|Hoodie', shirt: 'Көйлек|Рубашка|Shirt', jacket: 'Пиджак|Пиджак|Blazer', chapan: 'Шапан|Чапан|Chapan', tyube: 'Тақия|Тюбетейка|Takiya', cap: 'Кепка|Кепка|Cap', null: '—|—|—', m: 'Ер|Парень|Guy', f: 'Қыз|Девушка|Girl', pants: 'Шалбар|Брюки|Trousers', skirt: 'Юбка|Юбка|Skirt' };
-        const s = (names[v] || '—|—|—').split('|')[LI()]; text(s, 344, y + 2, { align: 'center', col: '#9fd9c2', size: s.length > 6 ? 6 : 8 }); }
+        const s = (names[v] || '—|—|—').split('|')[LI()]; text(s, 344, y + 3, { align: 'center', col: '#9fd9c2', size: 6 }); }   // всегда одного размера
     });
     if (button(L(UI.ready), 296, 190, 'primary', { selected: this.row === OPT_ROWS.length })) this.done();
   },
@@ -6272,7 +6274,7 @@ scenes.quiz = {
   drawCard(q) {
     // длинный ответ переносится на 2 строки (казахский длиннее); если и так не влезает — мельче шрифт
     const lines = wrapText(L(q.q), 364, 8).slice(0, 3);
-    const rows = q.answers.map(a => { const s = L(a); let sz = 8, ls = wrapText(s, 344, 8); if (ls.length > 2) { sz = 6; ls = wrapText(s, 344, 6).slice(0, 3); } return { sz, ls, h: Math.max(13, ls.length * (sz === 8 ? 10 : 8) + 4) }; });
+    const rows = q.answers.map(a => { const sz = 8, ls = wrapText(L(a), 344, 8).slice(0, 3); return { sz, ls, h: Math.max(13, ls.length * 10 + 4) }; });   // всегда один шрифт, длинный ответ — в 2–3 строки
     const h = 12 + lines.length * 11 + rows.reduce((m, r) => m + r.h + 2, 0) + 4;
     frameBox(8, 24, 384, h, .95);
     lines.forEach((l, i) => text(l, 18, 30 + i * 11, { col: '#f4f3ee' }));
