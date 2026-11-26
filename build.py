@@ -11,7 +11,7 @@ open('quiz.json', 'w').write(json.dumps(quiz, ensure_ascii=False, indent=1))
 import csv
 def vnorm(t): return re.sub(r'[^0-9a-zа-яәіңғүұқөһ]+', '', t.lower().replace('ё', 'е'))
 vids, vtpl = {'kz': {}, 'ru': {}}, {'kz': {}, 'ru': {}}
-for row in csv.DictReader(open('voice/voice_lines.csv', encoding='utf-8-sig'), delimiter=';'):
+for row in [*csv.DictReader(open('voice/voice_lines.csv', encoding='utf-8-sig'), delimiter=';'), *csv.DictReader(open('voice/voice_extra.csv', encoding='utf-8-sig'), delimiter=';')]:   # таблица Виталия + реплики героя, которых в ней нет
     for lang in ('kz', 'ru'):
         t = row[lang].strip()
         if '{' in t: vtpl[lang][t] = row['id']

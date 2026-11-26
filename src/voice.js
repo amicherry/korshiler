@@ -15,11 +15,11 @@ function voiceId(t) {
   return null;
 }
 function voiceStop() { if (VOICE.cur) { try { VOICE.cur.pause(); } catch (e) {} VOICE.cur = null; } VOICE.playing = false; }
-function voicePlay(t) {
+function voicePlay(t, heroG = null) {   // heroG: 'f'/'m' — реплика героя, ищем в out/<lang>/hero_f или hero_m
   voiceStop();
   if (!SND.on || typeof Audio === 'undefined') return false;
   const id = voiceId(t); if (!id) return false;
-  const src = `out/${LANG === 'ru' ? 'ru' : 'kz'}/${id}.mp3`;
+  const src = `out/${LANG === 'ru' ? 'ru' : 'kz'}/${heroG ? 'hero_' + heroG + '/' : ''}${id}.mp3`;
   if (VOICE.missing.has(src)) return false;
   const a = new Audio(src); a.volume = .95; VOICE.cur = a;
   a.addEventListener('playing', () => { if (VOICE.cur === a) { VOICE.playing = true; VOICE.ok.add(src); } });

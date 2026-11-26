@@ -49,7 +49,8 @@ def main():
         for lg in a.lang.split(","):
             tag = "" if a.no_tags else TAGS.get(r["ключ"], "")
             text = (tag + " " + r[lg]).strip()
-            out = os.path.join("out", lg, r["id"] + ".mp3")
+            sub = r["герой"] if r["герой"] in ("hero_f", "hero_m") else ""   # героиня и герой — в своих папках
+            out = os.path.join("out", lg, sub, r["id"] + ".mp3")
             print(f"{lg} {r['id']} [{r['герой']}] → {text}")
             if a.dry or (os.path.exists(out) and not a.force): continue
             vid = voices.get(r["герой"])

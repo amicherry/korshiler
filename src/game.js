@@ -20,13 +20,16 @@ function drawNet(dt) {
 
 /* ---------- Диалоги в стиле Undertale ---------- */
 const DLG = { open: false, name: '', port: null, voice: 400, text: '', shown: 0, choices: null, cursor: 0, resolve: null, expr: 'neutral', mood: null, blipAt: 0 };
-function dlgOpen(name, port, voice = 400, mood = null) { setTouch({ act: L(UI.next) }); Object.assign(DLG, { open: true, name, port, voice, mood, text: '', shown: 0, choices: null }); }
+function dlgOpen(name, port, voice = 400, mood = null, female = null) { setTouch({ act: L(UI.next) }); Object.assign(DLG, { open: true, name, port, voice, mood, female, hero: false, text: '', shown: 0, choices: null }); }
+// «подписал(а)» → «подписала» для женщины, «подписал» для мужчины (в казахском рода нет — ничего не меняется)
+const gform = (t, female) => String(t).replace(/([А-Яа-яЁё]+)\(а\)/g, (m, w) => female ? w + 'а' : w);
 function dlgClose() { voiceStop(); DLG.open = false; DLG.choices = null; DLG.resolve = null; }
 // длинная реплика делится на страницы по 5 строк — ничего не обрезается
 const DLG_LINES = 5, DLG_TW = 320;
 function sayPage(t, expr) { setTouch({ act: L(UI.next) }); return new Promise(res => Object.assign(DLG, { text: t, shown: 0, choices: null, expr, resolve: res })); }
 async function say(t, expr = 'neutral') {
-  voicePlay(t);   // есть mp3 — играет голос, нет — обычный «писк»
+  voicePlay(t, DLG.hero ? (DLG.female ? 'f' : 'm') : null);   // есть mp3 — играет голос, нет — обычный «писк»; у героя — голос его пола
+  t = gform(t, !!DLG.female);
   const lines = wrapText(t, DLG_TW);
   for (let i = 0; i < lines.length; i += DLG_LINES) await sayPage(lines.slice(i, i + DLG_LINES).join(' '), expr);
 }
@@ -118,6 +121,7 @@ function drawLamp(lx, b, on, fixedLight) {   // после ремонта све
   if (fixedLight) { rect(lx - 7, b - 94, 15, 2, '#d8d4cc'); rect(lx - 6, b - 92, 13, 3, on ? '#fff6d8' : '#cfcac0'); rect(lx - 4, b - 89, 9, 1, on ? '#ffe9a8' : '#b8b2a6'); rect(lx - 7, b - 94, 15, 1, '#9a958c'); return; }
   rect(lx, b - 94, 1, 6, '#0e1011'); rect(lx - 5, b - 88, 11, 4, '#1c1f24'); rect(lx - 3, b - 85, 7, 3, on ? '#fff1b8' : '#4b4f4c');
 }
+const heroVoice = () => SAVE.look && SAVE.look.body === 'f' ? 440 : 330;   // писк героя тоже по полу
 const POPS = [];
 function pop(x, y, s, col = '#f4f3ee') { POPS.push({ x, y, s, col, t: 0 }); }
 function drawPops(dt, ox = 0, oy = 0) {
@@ -158,7 +162,7 @@ scenes.title = {
     text(L(UI.by), 18, 64, { col: '#9fd9c2', size: 6, shadow: '#0b0c10' });
     if (this.settings) return this.drawSettings();
     // панель меню в рамке
-    let bw = Math.max(textW(L(UI.cont)), textW(L(UI.settings)), textW(L(UI.rating)), 96) + 16; const py = 104;
+    let bw = Math.max(textW(L(UI.cont)), textW(L(UI.settings)), textW(L(UI.rating)), textW(L(UI.lookBtn)), 96) + 16; const py = 104;
     let nm = SAVE && SAVE.name ? SAVE.name : ''; if (nm.length > 12) nm = nm.slice(0, 11) + '…';
     // имя и уровень — первой строкой, ЖК и звание — второй; длинное обрезаем, чтобы панель не закрывала дом
     const fit = (s, w) => { if (textW(s, 6) <= w) return s; while (s.length > 1 && textW(s + '…', 6) > w) s = s.slice(0, -1); return s + '…'; };
@@ -169,9 +173,11 @@ scenes.title = {
     frameBox(12, py, bw + 12, 104);
     if (who) text(who, 18, py + 6, { col: '#cfd6e4', size: 6 });
     text(sub, 18, py + 16, { col: USER.guest ? '#8792ad' : '#9fd9c2', size: 6 });
-    if (button(SAVE && SAVE.created ? L(UI.cont) : L(UI.play), 0, 132, 'primary', { left: 18, w: bw })) this.start();
-    if (button(L(UI.rating), 0, 154, 'alt', { left: 18, w: bw })) irisTo(40, 162, () => go('leaderboard', { from: 'title' }));
-    if (button(L(UI.settings), 0, 176, 'alt', { left: 18, w: bw })) { this.settings = true; this.sure = false; }
+    const made = SAVE && SAVE.created, ys = made ? [129, 148, 167, 186] : [132, 0, 154, 176];
+    if (button(made ? L(UI.cont) : L(UI.play), 0, ys[0], 'primary', { left: 18, w: bw })) this.start();
+    if (made && button(L(UI.lookBtn), 0, ys[1], 'alt', { left: 18, w: bw })) irisTo(40, 150, () => go('creator', { edit: true }));   // сменить образ в любой момент
+    if (button(L(UI.rating), 0, ys[2], 'alt', { left: 18, w: bw })) irisTo(40, 162, () => go('leaderboard', { from: 'title' }));
+    if (button(L(UI.settings), 0, ys[3], 'alt', { left: 18, w: bw })) { this.settings = true; this.sure = false; }
   },
   drawSettings() {
     rect(0, 0, W, H, 'rgba(11,12,16,.55)');
@@ -195,18 +201,28 @@ function setLang(l) { LANG = l === 'ru' ? 'ru' : 'kz'; saveStr('d67_lang', l); d
    ============================================================ */
 const OPT = {
   body: ['m', 'f'],
-  bottom: ['pants', 'skirt'],
-  skin: ['#f1c7a3', '#e3ad86', '#c98e66', '#9a6748'],
+  skin: ['#f6d5b8', '#f1c7a3', '#e3ad86', '#c98e66', '#9a6748', '#7a4e36'],
   hair: ['short', 'long', 'bun', 'curly', 'bald'],
-  hairCol: ['#2b2420', '#4a2e22', '#a5503c', '#d9b43a', '#8f949c'],
+  hairCol: ['#1b1a21', '#2b2420', '#4a2e22', '#a5503c', '#c97a5a', '#d9b43a', '#8f949c', '#6a4a8a'],
+  glasses: [false, true],
+  beard: [false, true],
   top: ['hoodie', 'shirt', 'jacket', 'leather', 'chapan'],
-  topCol: ['#2f8577', '#3f6f8c', '#b8443f', '#c79a3b', '#5d6b5a', '#7d4f8a'],
-  hat: [null, 'tyube', 'cap'],
+  topCol: ['#2f8577', '#3f6f8c', '#b8443f', '#c79a3b', '#5d6b5a', '#7d4f8a', '#2b2a33', '#d98aa0', '#e8e4dc', '#4a6ab0'],
+  bottom: ['pants', 'skirt'],
+  bottomCol: ['#2f3a52', '#2b2a33', '#4a4a52', '#5a4a3a', '#3f6f8c', '#7d4f8a', '#b8443f', '#6a7a4a'],
+  hat: [null, 'cap', 'tyube', 'scarf'],
+  headphones: [false, true],
 };
-const OPT_ROWS = ['body', 'skin', 'hair', 'hairCol', 'top', 'topCol', 'bottom', 'hat'];
+// две вкладки: внешность и одежда (по 6 строк — влезает на экран телефона)
+const OPT_TABS = { look: ['body', 'skin', 'hair', 'hairCol', 'glasses', 'beard'], wear: ['top', 'topCol', 'bottom', 'bottomCol', 'hat', 'headphones'] };
+const OPT_NAMES = { short: 'Қысқа|Короткие', long: 'Ұзын|Длинные', bun: 'Түйін|Пучок', bald: 'Жоқ|Нет', curly: 'Бұйра|Кудри', leather: 'Күртеше|Куртка', hoodie: 'Худи|Худи',
+  shirt: 'Жейде|Рубашка', jacket: 'Пиджак|Пиджак', chapan: 'Шапан|Чапан', pants: 'Шалбар|Брюки', skirt: 'Юбка|Юбка', m: 'Ер|Мужской', f: 'Әйел|Женский',
+  cap: 'Кепка|Кепка', tyube: 'Тақия|Тюбетейка', scarf: 'Орамал|Платок', true: 'Иә|Да', false: 'Жоқ|Нет', null: 'Жоқ|Нет' };
+const OPT_COLORS = ['skin', 'hairCol', 'topCol', 'bottomCol'];
 scenes.creator = {
-  enter() {
-    this.look = Object.assign({}, DEFAULT_LOOK, SAVE.look || {}); this.row = 0; this.t = 0;
+  enter(data) {
+    this.look = Object.assign({}, DEFAULT_LOOK, SAVE.look || {}); this.row = 0; this.t = 0; this.tab = 'look'; this.edit = !!(data && data.edit);
+    this.look.bottomCol = this.look.bottom === 'skirt' ? (this.look.skirtCol || OPT.bottomCol[0]) : (this.look.pants || OPT.bottomCol[0]);
     const box = document.getElementById('nameBox'), inp = document.getElementById('nameInput');
     inp.value = SAVE.name || USER.name || ''; inp.placeholder = ['Атың', 'Имя', 'Name'][LI()]; box.hidden = false;
     setTouch({ act: L(UI.ready), up: true, down: true, move: true });
@@ -218,19 +234,25 @@ scenes.creator = {
     const box = document.getElementById('nameBox'), r = cv.getBoundingClientRect();
     box.style.left = (r.left + r.width * (282 / W)) + 'px'; box.style.top = (r.top + r.height * (30 / H)) + 'px';
     document.getElementById('nameInput').style.width = Math.round(r.width * (200 / W)) + 'px';
-    if (hit('up')) { this.row = (this.row + OPT_ROWS.length) % (OPT_ROWS.length + 1); sfx.select(); }
-    if (hit('down')) { this.row = (this.row + 1) % (OPT_ROWS.length + 1); sfx.select(); }
-    if (this.row < OPT_ROWS.length) { if (hit('left')) this.change(OPT_ROWS[this.row], -1); if (hit('right')) this.change(OPT_ROWS[this.row], 1); }
-    if (hit('act') && (this.row === OPT_ROWS.length || isTouch || document.activeElement === document.getElementById('nameInput'))) this.done();
+    const ROWS = OPT_TABS[this.tab];
+    if (hit('up')) { this.row = (this.row + ROWS.length) % (ROWS.length + 1); sfx.select(); }
+    if (hit('down')) { this.row = (this.row + 1) % (ROWS.length + 1); sfx.select(); }
+    if (this.row < ROWS.length) { if (hit('left')) this.change(ROWS[this.row], -1); if (hit('right')) this.change(ROWS[this.row], 1); }
+    if (hit('act') && (this.row === ROWS.length || isTouch || document.activeElement === document.getElementById('nameInput'))) this.done();
   },
-  change(k, d) { const a = OPT[k], i = a.indexOf(this.look[k] ?? null); this.look[k] = a[(i + d + a.length) % a.length]; sfx.select();
+  change(k, d) { const a = OPT[k]; let i = a.indexOf(this.look[k] ?? (typeof a[0] === 'boolean' ? false : null)); if (i < 0) i = 0;
+    let v = a[(i + d + a.length) % a.length]; if (k === 'beard' && this.look.body === 'f') v = false; this.look[k] = v; sfx.select();
+    if (k === 'bottomCol' || k === 'bottom') { this.look.pants = this.look.bottomCol; this.look.skirtCol = this.look.bottomCol; }
+    if (k === 'hat') { this.look.capCol = this.look.topCol; this.look.scarfCol = this.look.topCol; if (v === 'scarf') this.look.hair = this.look.hair === 'bald' ? 'bun' : this.look.hair; }
     // смена пола подбирает подходящие по умолчанию причёску и низ — дальше можно поменять
     if (k === 'body') { const f = this.look.body === 'f'; this.look.bottom = f ? 'skirt' : 'pants';
-      if (f && this.look.hair === 'short') this.look.hair = 'long'; if (!f && (this.look.hair === 'long' || this.look.hair === 'bun')) this.look.hair = 'short'; } },
+      if (f && this.look.hair === 'short') this.look.hair = 'long'; if (!f && (this.look.hair === 'long' || this.look.hair === 'bun')) this.look.hair = 'short';
+      if (f) this.look.beard = false; if (!f && this.look.hat === 'scarf') this.look.hat = null; } },
   done() {
     const name = (document.getElementById('nameInput').value || '').trim().slice(0, 12) || ['Төраға', 'Председатель', 'Chairman'][LI()];
+    this.look.pants = this.look.bottomCol; this.look.skirtCol = this.look.bottomCol;
     SAVE.name = name; SAVE.look = this.look; SAVE.created = true; persist(); this.leave();
-    irisTo(100, 120, () => go('prologue'));
+    irisTo(100, 120, () => go(this.edit ? 'title' : 'prologue'));   // из меню — обратно в меню, в начале игры — в пролог
   },
   draw() {
     rect(0, 0, W, H, '#2a3348');
@@ -242,18 +264,21 @@ scenes.creator = {
     sprite(portrait(this.look, 'happy'), 26, 162);
     text(L(UI.hello).trim(), 74, 172, { col: INK }); text((document.getElementById('nameInput').value || '…').slice(0, 12), 74, 186, { col: INK_TEAL });
     text(L(UI.name), 200, 22, { col: '#f2c94c' });
-    OPT_ROWS.forEach((k, i) => {
-      const y = 50 + i * 16, sel = this.row === i;
-      if (sel) rect(194, y - 3, 200, 15, 'rgba(242,201,76,.15)');
-      text(L(UI[k]), 200, y + 2, { col: sel ? '#f2c94c' : '#f4f3ee' });
-      if (button('◂', 0, y - 2, 'dark', { left: 300, w: 16 })) { this.row = i; this.change(k, -1); }
-      if (button('▸', 0, y - 2, 'dark', { left: 372, w: 16 })) { this.row = i; this.change(k, 1); }
-      const v = this.look[k] ?? null;
-      if (k === 'skin' || k === 'hairCol' || k === 'topCol') { rect(322, y, 44, 12, OUT); rect(323, y + 1, 42, 10, v); }
-      else { const names = { short: 'Қысқа|Короткие|Short', long: 'Ұзын|Длинные|Long', bun: 'Түйін|Пучок|Bun', bald: 'Жоқ|Нет|None', curly: 'Бұйра|Кудри|Curly', leather: 'Күртеше|Куртка|Jacket', hoodie: 'Худи|Худи|Hoodie', shirt: 'Көйлек|Рубашка|Shirt', jacket: 'Пиджак|Пиджак|Blazer', chapan: 'Шапан|Чапан|Chapan', tyube: 'Тақия|Тюбетейка|Takiya', cap: 'Кепка|Кепка|Cap', null: '—|—|—', m: 'Ер|Парень|Guy', f: 'Қыз|Девушка|Girl', pants: 'Шалбар|Брюки|Trousers', skirt: 'Юбка|Юбка|Skirt' };
-        const s = (names[v] || '—|—|—').split('|')[LI()]; text(s, 344, y + 3, { align: 'center', col: '#9fd9c2', size: 6 }); }   // всегда одного размера
+    // вкладки
+    const ROWS = OPT_TABS[this.tab];
+    for (const [tk, x] of [['look', 196], ['wear', 296]]) if (button(L(UI['tab_' + tk]), 0, 48, this.tab === tk ? 'primary' : 'dark', { left: x, w: 94 })) { this.tab = tk; this.row = 0; }
+    ROWS.forEach((k, i) => {
+      const y = 68 + i * 19, sel = this.row === i, off = k === 'beard' && this.look.body === 'f';
+      if (sel) rect(194, y - 3, 200, 17, 'rgba(242,201,76,.15)');
+      text(L(UI[k]), 200, y + 2, { col: off ? '#6a7088' : sel ? '#f2c94c' : '#f4f3ee', size: 6 });
+      if (off) return;
+      if (button('◂', 0, y - 1, 'dark', { left: 300, w: 16 })) { this.row = i; this.change(k, -1); }
+      if (button('▸', 0, y - 1, 'dark', { left: 372, w: 16 })) { this.row = i; this.change(k, 1); }
+      const v = this.look[k] ?? (typeof OPT[k][0] === 'boolean' ? false : null);
+      if (OPT_COLORS.includes(k)) { rect(322, y + 1, 44, 12, OUT); rect(323, y + 2, 42, 10, v || '#888'); }
+      else { const s2 = (OPT_NAMES[String(v)] || '—|—').split('|')[LI()]; text(s2, 344, y + 4, { align: 'center', col: '#9fd9c2', size: 6 }); }
     });
-    if (button(L(UI.ready), 296, 190, 'primary', { selected: this.row === OPT_ROWS.length })) this.done();
+    if (button(L(UI.ready), 296, 190, 'primary', { selected: this.row === ROWS.length })) this.done();
   },
 };
 
@@ -378,7 +403,7 @@ scenes.tour = {
   // Данияр у своей двери рассказывает про E-KNOT; после этого появляется Енот, а сам Данияр — «за»
   async racIntro(r) {
     const look = r.look;
-    dlgOpen('Данияр', e => portrait(look, e), ARCH.it.voice);
+    dlgOpen('Данияр', e => portrait(look, e), ARCH.it.voice, null, false);
     await say(L(PRO.rac1), 'happy'); await say(L(PRO.rac2));
     dlgOpen('E-KNOT', () => RACCOON_PORT, 900); await say(L(RAC_INTRO.notify), 'happy'); await say(L(UI.racMenuHint), 'happy'); dlgClose();
     SAVE.racIntro = true; SAVE.racSeen = { ...(SAVE.racSeen || {}), notify: true }; persist();
@@ -596,10 +621,10 @@ scenes.tour = {
   /* ---- стук в дверь и разговор ---- */
   // реплика героя в разговоре с жильцом (его портрет и голос), потом — обратно к жильцу
   async heroSay(r, line, expr = 'happy') {
-    const swap = DLG.port, swapName = DLG.name, swapMood = DLG.mood;
-    DLG.port = e => portrait(SAVE.look, e); DLG.name = SAVE.name; DLG.voice = 420;
+    const swap = DLG.port, swapName = DLG.name, swapMood = DLG.mood, swapF = DLG.female;
+    DLG.port = e => portrait(SAVE.look, e); DLG.name = SAVE.name; DLG.voice = heroVoice(); DLG.hero = true; DLG.female = SAVE.look && SAVE.look.body === 'f';
     await say(this.fmt(r, line), expr);
-    DLG.port = swap; DLG.name = swapName; DLG.voice = r.A.voice; DLG.mood = swapMood;
+    DLG.port = swap; DLG.name = swapName; DLG.voice = r.A.voice; DLG.mood = swapMood; DLG.hero = false; DLG.female = swapF;
   },
   fmt(r, v) { const T = this.tour; return fmtLine(typeof v === 'string' ? v : L(v), { f: r.floor, apt: aptNo(r.apt), g: T.goal, q: T.quorum || '' }).replace('{n}', this.signatures()); },
   async visit(r) {
@@ -626,7 +651,7 @@ scenes.tour = {
     if (r.sleeping) { r.mood -= 8; r.sleeping = false; }
     r.away = false; this.addTime(.5);
     const sc = A.noVote || A.renter || A.notOwner ? null : scenFor(r.arch, T);
-    dlgOpen(r.name, e => portrait(r.look, e), A.voice, A.noVote || A.renter || A.notOwner ? null : () => r.mood);
+    dlgOpen(r.name, e => portrait(r.look, e), A.voice, A.noVote || A.renter || A.notOwner ? null : () => r.mood, r.look.body === 'f');
     // реплика жильца: из сценария тура, иначе из характера; у каждого свой вариант, реакции без повторов подряд
     const Ln = (k, src) => {
       if (k === 'story') { const c = this.complaint(r); if (c) return this.fmt(r, c); }
@@ -773,7 +798,7 @@ scenes.tour = {
   /* ---- помощница-активистка ---- */
   async runHelper() {
     this.busy = true; const f = this.tour.helperFloor, look = this.helper.look;
-    dlgOpen(L(UI.helperName), e => portrait(look, e), 470);
+    dlgOpen(L(UI.helperName), e => portrait(look, e), 470, null, true);
     await say(L(UI.helper1).replace('{f}', f), 'happy');
     const c = await ask([{ label: L(UI.hYes) }, { label: L(UI.hNo) }]);
     if (c === 0) { await say(L(UI.helperOk), 'happy'); this.helper.state = 'busy'; this.helper.doneAt = this.minute + 8; }
@@ -1184,12 +1209,12 @@ function varyLook(a, R) {
     case 'novosel': youngF(); L.top = any(['shirt', 'jacket', 'hoodie']); break;
     case 'renter': youngF(); L.top = any(['hoodie', 'shirt']); L.headphones = ch(.25); break;
     case 'shady': youngM(); Object.assign(L, { top: 'leather', topCol: any(['#2b2a33', '#3a2a2a']), beard: ch(.5) }); break;
-    case 'notowner': ch(.5) ? youngF() : youngM(); Object.assign(L, { top: ch(.65) ? 'hoodie' : 'shirt', headphones: ch(.4), glasses: ch(.2) });
+    case 'notowner': youngM();   // имена в списке Виталия мужские — значит, мужчина Object.assign(L, { top: ch(.65) ? 'hoodie' : 'shirt', headphones: ch(.4), glasses: ch(.2) });
       if (L.body === 'm' && ch(.25)) Object.assign(L, { hat: 'cap', capCol: any(['#b8443f', '#3f6f8c', '#c79a3b', '#2b2a33']) }); break;
-    case 'business': if (ch(.7)) youngM(); else { youngF(); L.hair = any(['bun', 'long']); L.bottom = 'skirt'; }
+    case 'business': youngM();
       Object.assign(L, { top: ch(.8) ? 'jacket' : 'leather', topCol: any(['#2b2a33', '#3a4a5a', '#4a4a52', '#5a3a3a']), glasses: ch(.25), beard: L.body === 'm' && ch(.15) }); break;
-    case 'it': if (ch(.7)) youngM(); else youngF(); Object.assign(L, { top: 'hoodie', topCol: any(['#2b2a33', '#3a4a5a', '#4a3a5a', '#2f8577', '#5d6b5a']), glasses: ch(.55), headphones: ch(.4) }); break;
-    case 'night': if (ch(.85)) youngM(); else youngF(); Object.assign(L, { beard: L.body === 'm' && ch(.5), top: any(['shirt', 'leather', 'hoodie']), topCol: any(['#9aa0a5', '#4a4a52', '#3a4a3a', '#5a4a3a', '#2b2a33']) });
+    case 'it': youngM(); Object.assign(L, { top: 'hoodie', topCol: any(['#2b2a33', '#3a4a5a', '#4a3a5a', '#2f8577', '#5d6b5a']), glasses: ch(.55), headphones: ch(.4) }); break;
+    case 'night': youngM(); Object.assign(L, { beard: L.body === 'm' && ch(.5), top: any(['shirt', 'leather', 'hoodie']), topCol: any(['#9aa0a5', '#4a4a52', '#3a4a3a', '#5a4a3a', '#2b2a33']) });
       if (L.body === 'm' && ch(.15)) L.hair = 'bald'; if (ch(.35)) Object.assign(L, { hat: 'cap', capCol: any(['#2b2a33', '#4a4a52', '#3f6f8c']) }); break;
     default: ch(.5) ? youngF() : youngM(); L.top = any(['hoodie', 'shirt', 'leather']); L.headphones = ch(.2);
   }

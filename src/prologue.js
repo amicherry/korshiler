@@ -112,6 +112,10 @@ scenes.prologue = {
     this.hx = 110; this.dir = 1; this.scx = 0; this.moving = false; this.walkT = 0; this.stepAcc = 0;
     this.floors = HOUSE.floors; this.heroApt = HOUSE.heroApt;
     this.homeFloor = Math.ceil(this.heroApt / HOUSE.perFloor); this.homeX = DOOR_X[(this.heroApt - 1) % HOUSE.perFloor];
+    // подъезд и квартиру рисуем заранее, пока идёт улица, — иначе у двери игра на миг «подвисала»
+    this.preBg = null; this.room = null;
+    setTimeout(() => { if (scene === this && !this.preBg) this.preBg = this.makeStairs(); }, 700);
+    setTimeout(() => { if (scene === this && !this.room) this.room = buildRoom(); }, 1500);
     this.npcs = PRO_NPC.map(n => ({ ...n, look: Object.assign({}, ARCH[n.arch].look), done: false, gone: 0 }));
     setTouch({ move: true });
   },
@@ -119,7 +123,7 @@ scenes.prologue = {
   base(f) { return floorBase(f, this.floors); },
   // реплика героя / соседа
   async talk(name, look, keys, expr = 'neutral', voice = 420) {
-    dlgOpen(name, e => portrait(look, e), voice);
+    dlgOpen(name, e => portrait(look, e), voice, null, look.body === 'f');
     for (const k of keys) await say(typeof k === 'string' ? L(PRO[k]) : L(k), expr);
     dlgClose();
   },
@@ -149,12 +153,15 @@ scenes.prologue = {
     await this.think('door', 'angry');
     irisTo(STREET_DOOR_X - this.scx, 110, () => this.toStairs());
   },
-  toStairs() {
-    this.phase = 'stairs'; this.busy = false;
+  makeStairs() {
     const R = rng(hashStr(USER.userId) + 9), look = {};
     for (let apt = 1; apt <= this.floors * HOUSE.perFloor; apt++) look[apt] = pick(R, DOOR_STYLES);
     look[this.heroApt] = { col: '#2f6f62', kind: 'metal' };
-    this.bg = drawStairwell(this.floors, apt => look[apt], new Set());
+    return drawStairwell(this.floors, apt => look[apt], new Set());
+  },
+  toStairs() {
+    this.phase = 'stairs'; this.busy = false;
+    this.bg = this.preBg || this.makeStairs();
     this.WH = this.bg.height;
     this.h = { x: 14, floor: 1, y: this.base(1), dir: 1, walkT: 0, moving: false, climb: null, anim: null };
     this.camY = clamp(this.h.y - 165, 0, this.WH - H); this.camX = 0;
@@ -260,7 +267,7 @@ scenes.prologue = {
     if (Math.abs(h.x - n.x) < 16) { h.goal = n.x - h.dir * 18; while (h.goal != null) await wait(30); }
     await this.talk(n.name, n.look, n.lines, n.arch === 'grump' ? 'angry' : 'sad', ARCH[n.arch].voice);
     if (n.pram) {
-      dlgOpen(n.name, e => portrait(n.look, e), ARCH[n.arch].voice);
+      dlgOpen(n.name, e => portrait(n.look, e), ARCH[n.arch].voice, null, n.look.body === 'f');
       const c = await ask([{ label: L(PRO.momHelp) }, { label: L(PRO.momBye) }]);
       if (c === 0) { dlgClose(); await this.talk(SAVE.name, SAVE.look, ['momHero'], 'happy');
         await this.talk(n.name, n.look, ['momThx'], 'happy', ARCH[n.arch].voice); SAVE.helpedMom = true; SAVE.trust = SAVE.trust || {}; for (let d = 1; d <= HOUSE.perFloor; d++) { const a = 8 * HOUSE.perFloor + d; SAVE.trust[a] = (SAVE.trust[a] || 0) + 5; } n.gone = 1; }
@@ -288,7 +295,7 @@ scenes.prologue = {
   },
   async flatMonologue() {
     await wait(300);
-    dlgOpen(SAVE.name, e => portrait(SAVE.look, e), 420);
+    dlgOpen(SAVE.name, e => portrait(SAVE.look, e), heroVoice(), null, SAVE.look && SAVE.look.body === 'f'); DLG.hero = true;   // мысли героя — голосом героя
     await say(L(PRO.flat1), 'sad'); await say(L(PRO.flat2), 'think');
     await say(L(PRO.flat3).replace('{g}', TOURS.L1.goal).replace('{n}', APTS), 'happy');
     dlgClose(); this.finish();
