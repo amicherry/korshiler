@@ -66,11 +66,15 @@ function personSprite(look, frame) {
       const lift = climb ? 3 * Math.max(0, Math.sin(phase)) : 0;
       // в юбке ноги в тёмных колготках и тоньше
       const col = skirt ? (near ? '#3b3742' : '#2a2730') : near ? pants[1] : pants[2], colD = skirt ? '#1d1b22' : near ? pants[2] : pants[3];
-      const [kx, ky] = seg(hipX + (near ? 1 : -1), hipY, a, 7, skirt ? 3 : 4, col, colD);
-      const [fx, fy] = seg(kx, ky - lift, a - bend, 8, skirt ? 3 : 4, col, colD);
-      const X = Math.round(fx), Y = PO ? Math.round(fy) : Math.min(41, Math.round(fy));
-      // крупный ботинок с носком вперёд и светлым бликом
-      r(X - 2, Y - 2, 6, 3, near ? shoe : '#1a1615'); r(X + 4, Y - 1, 1, 2, near ? shoe : '#1a1615'); r(X - 1, Y - 2, 3, 1, near ? shoeL : shoe);
+      // сначала считаем, где колено и стопа, рисуем ботинок, потом ногу поверх — штанина накрывает верх ботинка, ботинок не «проходит» сквозь ногу
+      const x0 = hipX + (near ? 1 : -1), kx0 = x0 + Math.sin(a) * 7, ky0 = hipY + Math.cos(a) * 7;
+      const fx0 = kx0 + Math.sin(a - bend) * 8, fy0 = ky0 - lift + Math.cos(a - bend) * 8;
+      const X = Math.round(fx0), Y = PO ? Math.round(fy0) : Math.min(41, Math.round(fy0)), sc = near ? shoe : '#1a1615';
+      const planted = PO || Y >= 40;
+      if (planted) { r(X - 2, Y - 2, 6, 3, sc); r(X + 4, Y - 1, 1, 2, sc); r(X - 1, Y - 2, 3, 1, near ? shoeL : shoe); }   // стоит на полу: ботинок целиком, носок вперёд
+      else { r(X - 1, Y - 1, 4, 2, sc); p(X + 3, Y, sc); }                                                        // нога в воздухе: ботинок меньше, по направлению голени
+      const [kx, ky] = seg(x0, hipY, a, 7, skirt ? 3 : 4, col, colD);
+      seg(kx, ky - lift, a - bend, Math.max(5, Math.round(Math.hypot(fx0 - kx, fy0 - (ky - lift))) - 1), skirt ? 3 : 4, col, colD);
     };
     const arm = (phase, near) => {
       let a = (moving ? -22 * Math.sin(phase) : 0) * D, elbow = (moving ? 12 + 14 * Math.max(0, -Math.sin(phase)) : 6) * D;
