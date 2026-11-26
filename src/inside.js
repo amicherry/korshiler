@@ -29,9 +29,9 @@ scenes.inside = {
     for (let f = 1; f <= this.floors; f++) { const b = floorBase(f, this.floors) - cy; if (b < -10 || b > H + 110) continue;
       for (const [li, lx] of [[0, 49], [1, 141], [2, 351], [3, 443]]) {
         const broken = !light && (f * 7 + li * 3) % 5 === 0, on = light || (!broken && Math.sin(t / 97 + f * 13 + li * 5) > -.75);
-        rect(lx, b - 94, 1, 6, '#0e1011'); rect(lx - 5, b - 88, 11, 4, '#1c1f24'); rect(lx - 3, b - 85, 7, 3, on ? '#fff1b8' : '#4b4f4c');
+        drawLamp(lx, b, on, light);
         if (on) { if (!this.glow) this.glow = makeCanvas(220, 94, ({ g }) => { const gr = g.createRadialGradient(110, 10, 2, 110, 44, 110); gr.addColorStop(0, 'rgba(255,214,140,.30)'); gr.addColorStop(.5, 'rgba(255,190,110,.10)'); gr.addColorStop(1, 'rgba(255,190,110,0)'); g.fillStyle = gr; g.fillRect(0, 0, 220, 94); });
-          ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = light ? 1 : .8; ctx.drawImage(this.glow, lx - 110, b - 94); ctx.restore(); } }
+          ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = this.fixed.has('walls') ? .35 : light ? 1 : .8; ctx.drawImage(this.glow, lx - 110, b - 94); ctx.restore(); } }
       text(`${f}`, cx + 6, b - 92, { col: 'rgba(244,243,238,.55)', size: 6 }); }
     ctx.restore();
     if (!light) { ctx.fillStyle = 'rgba(5,8,6,.28)'; ctx.fillRect(0, 0, W, H); }

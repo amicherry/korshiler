@@ -114,6 +114,10 @@ function drawHelp(title, rows, icons = null) {
   if (clicks.length) clicks.length = 0;
   return ok;
 }
+function drawLamp(lx, b, on, fixedLight) {   // после ремонта света — круглый плафон под потолком (референс), до — лампочка на проводе
+  if (fixedLight) { rect(lx - 7, b - 94, 15, 2, '#d8d4cc'); rect(lx - 6, b - 92, 13, 3, on ? '#fff6d8' : '#cfcac0'); rect(lx - 4, b - 89, 9, 1, on ? '#ffe9a8' : '#b8b2a6'); rect(lx - 7, b - 94, 15, 1, '#9a958c'); return; }
+  rect(lx, b - 94, 1, 6, '#0e1011'); rect(lx - 5, b - 88, 11, 4, '#1c1f24'); rect(lx - 3, b - 85, 7, 3, on ? '#fff1b8' : '#4b4f4c');
+}
 const POPS = [];
 function pop(x, y, s, col = '#f4f3ee') { POPS.push({ x, y, s, col, t: 0 }); }
 function drawPops(dt, ox = 0, oy = 0) {
@@ -917,11 +921,11 @@ scenes.tour = {
       for (const [li, lx] of [[0, 49], [1, 141], [2, 351], [3, 443]]) {
         const broken = !this.fixed.has('light') && (f * 7 + li * 3) % 5 === 0;
         const lampOn = this.fixed.has('light') || (!broken && Math.sin(t / 97 + f * 13 + li * 5 + this.lampSeed) > -.75);
-        rect(lx, b - 94, 1, 6, '#0e1011'); rect(lx - 5, b - 88, 11, 4, '#1c1f24'); rect(lx - 3, b - 85, 7, 3, lampOn ? '#fff1b8' : '#4b4f4c');
+        drawLamp(lx, b, lampOn, HOUSE_STATE.fixed.includes('light'));
         if (lampOn) {
           ctx.save(); ctx.globalCompositeOperation = 'lighter';
           if (!this.glow) this.glow = makeCanvas(220, 94, ({ g }) => { const gr = g.createRadialGradient(110, 10, 2, 110, 44, 110); gr.addColorStop(0, 'rgba(255,214,140,.30)'); gr.addColorStop(.5, 'rgba(255,190,110,.10)'); gr.addColorStop(1, 'rgba(255,190,110,0)'); g.fillStyle = gr; g.fillRect(0, 0, 220, 94); });
-          ctx.globalAlpha = this.fixed.has('light') ? 1 : .8; ctx.drawImage(this.glow, lx - 110, b - 94);
+          ctx.globalAlpha = this.fixed.has('walls') ? .35 : this.fixed.has('light') ? 1 : .8; ctx.drawImage(this.glow, lx - 110, b - 94);   // светлые стены после ремонта не пересвечиваем
           for (let i = 0; i < 4; i++) { const dx = Math.sin(t / 2200 + i * 2.1 + f + li) * 40, dy = ((t / 60 + i * 37 + f * 11) % 70); rect(lx + dx, b - 80 + dy, 1, 1, 'rgba(255,236,190,.5)'); }
           ctx.restore();
         }
