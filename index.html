@@ -2735,6 +2735,14 @@ const POSES = {
   smell:  { lf: [-5, 5], ln: [6, 8], af: [10, 10], an: [100, 75], lean: -2, dy: 0 },
   lieUp:  { lf: [0, 0], ln: [0, 0], af: [180, 0], an: [176, 0], lean: 0, dy: 0 },
 };
+// контур: прозрачный пиксель рядом с фигурой красим в тёмный оттенок соседа — силуэт читается чётко, без «чёрной обводки»
+function outlinePass(g, w, h) {
+  const im = g.getImageData(0, 0, w, h), d = im.data, src = new Uint8ClampedArray(d);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; if (src[i + 3]) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const j = (yy * w + xx) * 4;
+      if (src[j + 3] > 200) { d[i] = src[j] * .35; d[i + 1] = src[j + 1] * .33; d[i + 2] = src[j + 2] * .38 + 6; d[i + 3] = 255; break; } } }
+  g.putImageData(im, 0, 0);
+}
 function personSprite(look, frame) {
   const key = JSON.stringify(look) + '|' + frame;
   if (PERSON_CACHE.has(key)) return PERSON_CACHE.get(key);
@@ -2820,11 +2828,8 @@ function personSprite(look, frame) {
     r(hx, 2 + hy, 8, 8, sk); r(hx + 8, 5 + hy, 1, 2, sk); p(hx + 8, 4 + hy, skL);  // лицо, нос
     r(hx, 3 + hy, 1, 6, skD); r(hx + 1, 9 + hy, 6, 1, skD); p(hx + 7, 9 + hy, skD); // затылок, подбородок
     r(hx + 6, 2 + hy, 2, 2, skL);                                                    // лоб на свету
-    r(hx + 2, 5 + hy, 2, 2, skD); p(hx + 2, 5 + hy, sk);                            // ухо
-    const blink = frame === 'idle1' && look.blink;
-    if (!blink) { r(hx + 6, 4 + hy, 1, 2, OUT); if (fem) p(hx + 7, 4 + hy, OUT); } else r(hx + 6, 5 + hy, 2, 1, skD);
-    r(hx + 6, 7 + hy, 2, 1, fem ? '#b8545e' : '#9a5a4a');
-    if (look.old) { p(hx + 5, 4 + hy, skD); p(hx + 5, 7 + hy, skD); p(hx + 4, 8 + hy, skD); }
+    // лица у фигурок нет — только объём (лицо видно в окне диалога): тень щеки и подбородка
+    r(hx + 1, 6 + hy, 3, 3, skD); r(hx + 4, 8 + hy, 3, 1, skD);
     const H1 = hair[1], H0 = hair[0], H2 = hair[2];
     const cap = () => { r(hx - 1, 1 + hy, 9, 2, H1); r(hx, hy, 7, 1, H1); r(hx + 1, hy, 4, 1, H0); r(hx + 2, 1 + hy, 4, 1, H0); };
     if (look.hair === 'short') { cap(); r(hx - 1, 2 + hy, 3, 5, H1); p(hx - 1, 6 + hy, H2); r(hx + 6, 2 + hy, 2, 1, H1); p(hx + 7, 3 + hy, H2); }
@@ -2846,6 +2851,7 @@ function personSprite(look, frame) {
       for (let y = 0; y < CHh; y++) { const k = clamp((hipRow - y) / (hipRow - topRow), 0, 1.3); g.drawImage(U, 0, y, CW, 1, Math.round(tilt * k), y, CW, 1); }
     }
   });
+  outlinePass(c.getContext('2d'), c.width, c.height);
   PERSON_CACHE.set(key, c); return c;
 }
 const PW = 18, PH = 42;
@@ -3410,17 +3416,22 @@ function portrait(look, expr = 'neutral') {
   const key = JSON.stringify(look) + '|' + expr;
   if (PORT_CACHE.has(key)) return PORT_CACHE.get(key);
   const c = makeCanvas(40, 40, ({ r, p, ell, line }) => {
-    const sk = look.skin, skD = shade(sk, -30), hc = look.hairCol, tc = look.topCol;
-    // плечи и шея
+    const sk = look.skin, skD = shade(sk, -30), skL = shade(sk, 18), skDD = shade(sk, -48), hc = look.hairCol, tc = look.topCol;
+    // плечи: свет справа сверху, слева тень, складки у шеи
     r(8, 32, 24, 8, tc); r(6, 34, 28, 6, tc); r(8, 32, 24, 1, shade(tc, 25));
+    r(6, 35, 6, 5, shade(tc, -26)); r(8, 33, 3, 2, shade(tc, -18)); r(27, 33, 5, 2, shade(tc, 16)); r(12, 37, 1, 3, shade(tc, -30)); r(28, 37, 1, 3, shade(tc, -20));
     if (look.top === 'hoodie') { r(14, 32, 12, 2, shade(tc, -30)); p(17, 35, '#f4f3ee'); p(22, 35, '#f4f3ee'); }
     if (look.top === 'shirt') { r(17, 32, 6, 3, '#f4f3ee'); p(20, 34, shade(tc, -40)); }
     if (look.top === 'jacket') { r(17, 32, 6, 8, '#e9eef5'); r(19, 33, 2, 7, '#b8443f'); }
     if (look.top === 'leather') { r(16, 32, 8, 8, shade(tc, -35)); r(18, 32, 4, 3, '#2b2a33'); line(15, 32, 12, 38, shade(tc, 25)); line(24, 32, 27, 38, shade(tc, 25)); p(21, 37, '#c9c6c0'); }
     if (look.top === 'chapan') { r(8, 32, 24, 2, '#d9b43a'); r(19, 32, 2, 8, '#d9b43a'); }
-    r(17, 27, 6, 6, skD);
-    // голова
-    ell(20, 18, 9, 11, sk); r(10, 17, 2, 4, sk); r(28, 17, 2, 4, sk); p(10, 18, skD); p(29, 18, skD);
+    r(17, 27, 6, 6, skD); r(17, 27, 6, 2, skDD);                                  // шея, тень под подбородком
+    // голова: объём — тень слева и снизу, свет на лбу и правой скуле
+    ell(20, 18, 9, 11, sk);
+    for (let y = 7; y < 30; y++) for (let x = 10; x < 30; x++) { const inH = ((x - 20) ** 2) / 81 + ((y - 18) ** 2) / 121 <= 1; if (!inH) continue;
+      if (((x - 22.5) ** 2) / 81 + ((y - 15.5) ** 2) / 121 > 1) p(x, y, skD);
+      else if (((x - 23) ** 2) / 12 + ((y - 13) ** 2) / 10 <= 1) p(x, y, skL); }
+    r(10, 17, 2, 4, skD); r(28, 17, 2, 4, sk); p(10, 18, skDD); p(29, 18, skD); p(29, 19, skD);   // уши
     // волосы
     if (look.hair === 'short' || look.hair === 'bun') { ell(20, 10, 10, 5, hc); r(11, 10, 2, 8, hc); r(27, 10, 2, 7, hc); r(13, 12, 14, 1, hc); }
     if (look.hair === 'bun') ell(20, 4, 4, 3, hc);
@@ -3431,24 +3442,33 @@ function portrait(look, expr = 'neutral') {
       for (const [x, y] of [[12, 5], [16, 3], [21, 3], [26, 5], [10, 10], [29, 10], [14, 8], [24, 8], [10, 16], [29, 16], [19, 7]]) { p(x, y, hl); p(x + 1, y + 1, hd); }
       for (const x of [8, 31]) for (let y = 8; y < 22; y += 3) p(x, y, hc);
     }
-    if (look.hair === 'bald') { r(10, 13, 2, 6, hc); r(28, 13, 2, 6, hc); }
+    if (look.hair === 'bald') { r(10, 13, 2, 6, hc); r(28, 13, 2, 6, hc); p(23, 9, skL); p(24, 9, skL); }
+    if (['short', 'long', 'bun'].includes(look.hair)) { const hl = shade(hc, 30), hd = shade(hc, -30);   // блик и пряди
+      r(21, 7, 5, 1, hl); r(23, 8, 3, 1, hl); r(12, 9, 2, 6, hd); p(16, 12, hd); p(22, 12, hd); if (look.hair === 'long') { r(10, 20, 1, 9, hd); r(28, 18, 1, 10, hl); } }
     // глаза и рот
-    const E = OUT, ey = 18;
-    if (expr === 'happy') { for (const x of [15, 23]) { p(x, ey, E); p(x + 1, ey - 1, E); p(x + 2, ey, E); } }
-    else if (expr === 'think') { r(16, ey - 1, 2, 2, E); r(24, ey - 1, 2, 2, E); line(14, 13, 18, 12, hc); line(22, 14, 26, 14, hc); }
-    else { r(15, ey, 2, 2, E); r(23, ey, 2, 2, E); p(15, ey, '#f4f3ee'); p(23, ey, '#f4f3ee'); }
-    if (expr === 'angry') { line(14, 14, 18, 16, OUT); line(22, 16, 26, 14, OUT); }
-    if (expr === 'sad') { line(14, 16, 18, 14, hc); line(22, 14, 26, 16, hc); }
-    if (expr !== 'think' && expr !== 'angry' && expr !== 'sad') { line(14, 15, 17, 15, shade(hc, 10)); line(23, 15, 26, 15, shade(hc, 10)); }
-    p(20, 21, skD); p(20, 22, skD);
+    // глаза: белок, радужка, верхнее веко; брови цвета волос (толще у мужчин)
+    const E = '#1e1820', ey = 18, W0 = '#f2ede4', lid = shade(sk, -55), brow = shade(hc, -12), femB = look.body === 'f';
+    const eye = (x, look) => { r(x, ey, 4, 2, W0); r(x + 1 + look, ey, 2, 2, E); p(x + 1 + look, ey, '#5a4438'); r(x, ey - 1, 4, 1, lid); p(x + 3, ey + 1, skD); };
+    if (expr === 'happy') { for (const x of [14, 22]) { r(x, ey, 4, 1, lid); p(x, ey + 1, lid); p(x + 3, ey + 1, lid); p(x + 1, ey + 1, skD); } }
+    else if (expr === 'think') { eye(14, 1); eye(22, 1); }
+    else { eye(14, expr === 'sad' ? 0 : 1); eye(22, expr === 'sad' ? 0 : 1); }
+    const bw = femB ? 1 : 2;
+    if (expr === 'angry') { line(14, 14, 18, 16, brow); line(22, 16, 26, 14, brow); if (!femB) { line(14, 15, 17, 16, brow); line(23, 16, 26, 15, brow); } }
+    else if (expr === 'sad') { line(14, 16, 18, 14, brow); line(22, 14, 26, 16, brow); }
+    else if (expr === 'think') { line(14, 15, 18, 15, brow); line(22, 13, 26, 14, brow); }
+    else { r(14, 15, 4, bw, brow); r(22, 15, 4, bw, brow); p(14, 16, sk); }
+    // нос: тень слева, блик справа
+    p(19, 20, skD); p(19, 21, skD); r(19, 22, 3, 1, skD); p(21, 21, skL); p(20, 19, skL);
     const fem = look.body ? look.body === 'f' : (look.hair === 'long' || look.hair === 'bun' || look.hat === 'scarf');
     const M = fem ? '#b8545e' : '#7a3b34';
     if (fem && expr !== 'happy') { p(14, ey - 1, OUT); p(25, ey - 1, OUT); }            // ресницы
     if (fem) { p(14, 22, shade(sk, -8) === sk ? '#e8a08a' : '#e8a08a'); p(26, 22, '#e8a08a'); }   // румянец
-    if (expr === 'happy') { p(17, 24, M); r(18, 25, 4, 1, M); p(22, 24, M); }
+    const ML = shade(M, 28);
+    if (expr === 'happy') { p(17, 24, M); r(18, 25, 4, 1, M); p(22, 24, M); r(18, 26, 4, 1, ML); r(19, 25, 2, 1, '#f2ede4'); }
     else if (expr === 'angry' || expr === 'sad') { r(18, 25, 4, 1, M); p(17, 26, M); p(22, 26, M); }
-    else if (expr === 'think') { r(19, 25, 3, 1, M); }
-    else r(18, 25, 4, 1, M);
+    else if (expr === 'think') { r(19, 25, 3, 1, M); p(22, 24, M); }
+    else { r(18, 25, 4, 1, M); r(18, 26, 4, 1, fem ? ML : skD); }
+    p(20, 27, skD);                                                                   // ямка подбородка
     if (look.old) { p(13, 20, skD); p(27, 20, skD); line(16, 27, 18, 28, skD); }
     if (look.beard) { r(14, 24, 12, 5, hc); r(16, 29, 8, 2, hc); r(18, 25, 4, 1, '#7a3b34'); }
     if (look.glasses) { for (const x of [13, 21]) { r(x, 16, 6, 1, OUT); r(x, 21, 6, 1, OUT); r(x, 16, 1, 6, OUT); r(x + 5, 16, 1, 6, OUT); } r(19, 18, 2, 1, OUT); }
@@ -3485,6 +3505,7 @@ function portrait(look, expr = 'neutral') {
     if (look.hat === 'tyube') { r(11, 5, 18, 5, '#1b1a21'); r(12, 4, 16, 1, '#1b1a21'); for (const x of [13, 17, 21, 25]) { p(x, 6, '#f4f3ee'); p(x + 1, 7, '#f4f3ee'); p(x, 8, '#f4f3ee'); } }
     if (look.hat === 'cap') { const cc = look.capCol || '#b8443f'; ell(20, 8, 10, 4, cc); r(10, 8, 20, 3, cc); r(24, 10, 10, 2, shade(cc, -30)); }
   });
+  outlinePass(c.getContext('2d'), 40, 40);
   PORT_CACHE.set(key, c); return c;
 }
 
@@ -3586,19 +3607,30 @@ function dlgUpdate(dt) {
   }
   function choose() { const r = DLG.resolve, c = DLG.cursor; DLG.resolve = null; DLG.choices = null; sfx.select(); r(c); }
 }
+const p0 = (x, y) => rect(x, y, 1, 1, '#f2c94c');
 function dlgDraw() {
   if (!DLG.open) return;
   const x = 6, y = DLG_BOX.y, w = W - 12, h = DLG_BOX.h;
-  rect(x, y, w, h, '#f4f3ee'); rect(x + 2, y + 2, w - 4, h - 4, '#0b0c10');
-  // портрет
-  rect(x + 7, y + 8, 44, 44, '#f4f3ee'); rect(x + 8, y + 9, 42, 42, '#20222b');
-  if (DLG.port) sprite(DLG.port(DLG.expr), x + 9, y + 10);
-  // имя под портретом: длинные имена — мельче и в две строки
-  if (textW(DLG.name) <= 52) text(DLG.name, x + 29, y + 56, { align: 'center', col: '#f2c94c' });
-  else { const parts = DLG.name.split(' '); parts.slice(0, 2).forEach((s, i) => text(s.slice(0, 9), x + 29, y + 55 + i * 9, { align: 'center', col: '#f2c94c', size: 6 })); }
+  // окно: тёмно-синяя панель, двойная рамка, блик сверху, тень снизу
+  rect(x + 2, y + 3, w, h, 'rgba(4,5,10,.55)');
+  rect(x, y, w, h, '#c9cfdc'); rect(x + 1, y + 1, w - 2, h - 2, '#3a4258'); rect(x + 2, y + 2, w - 4, h - 4, '#121624');
+  rect(x + 3, y + 3, w - 6, 1, '#1f2538'); rect(x + 3, y + h - 4, w - 6, 1, '#0a0c14');
+  for (const [cx, cy] of [[x + 1, y + 1], [x + w - 3, y + 1], [x + 1, y + h - 3], [x + w - 3, y + h - 3]]) rect(cx, cy, 2, 2, '#8792ad');
+  // портрет в своей рамке, за ним мягкий свет — не «чёрный квадрат»
+  const px = x + 7, py = y + 7;
+  rect(px - 1, py - 1, 46, 46, '#0a0c14'); rect(px, py, 44, 44, '#c9cfdc'); rect(px + 1, py + 1, 42, 42, '#2b3150');
+  if (!dlgDraw.bg) dlgDraw.bg = makeCanvas(42, 42, ({ g }) => { const gr = g.createRadialGradient(24, 16, 2, 21, 22, 30); gr.addColorStop(0, '#5a6690'); gr.addColorStop(.55, '#343c60'); gr.addColorStop(1, '#1c2036'); g.fillStyle = gr; g.fillRect(0, 0, 42, 42); });
+  ctx.drawImage(dlgDraw.bg, px + 1, py + 1);
+  if (DLG.port) sprite(DLG.port(DLG.expr), px + 2, py + 3);
+  rect(px + 1, py + 42, 42, 1, '#1c2036');
+  // имя — табличка под портретом
+  { const nm = DLG.name || '', small = textW(nm) > 50, lines = small ? nm.split(' ').slice(0, 2).map(t => t.slice(0, 10)) : [nm], tw = Math.min(56, Math.max(...lines.map(t => textW(t, small ? 6 : 8))) + 8), th = small ? 17 : 11;
+    const nc = Math.max(px + 22, x + 4 + tw / 2);   // табличка не вылезает за рамку окна
+    rect(nc - tw / 2, py + 47, tw, th, '#f2c94c'); rect(nc - tw / 2, py + 47 + th - 1, tw, 1, '#a8822a');
+    lines.forEach((t, i) => text(t, nc, py + 49 + i * 8, { align: 'center', col: '#1a1424', size: small ? 6 : 8 })); }
   // текст
   if (!DLG.choices) wrapText(DLG.text.slice(0, Math.floor(DLG.shown)), DLG_TW).slice(0, DLG_LINES).forEach((l, i) => text(l, x + 58, y + 9 + i * 12));
-  if (!DLG.choices && DLG.shown >= DLG.text.length && DLG.resolve && !isTouch) { if (Math.floor(performance.now() / 300) % 2) rect(x + w - 14, y + h - 12, 6, 4, '#f2c94c'); }
+  if (!DLG.choices && DLG.shown >= DLG.text.length && DLG.resolve) { const bob = Math.floor(performance.now() / 250) % 2; rect(x + w - 15, y + h - 13 + bob, 7, 1, '#f2c94c'); rect(x + w - 14, y + h - 12 + bob, 5, 1, '#f2c94c'); rect(x + w - 13, y + h - 11 + bob, 3, 1, '#f2c94c'); p0(x + w - 12, y + h - 10 + bob); }   // мигающий «дальше»
   if (DLG.choices) {
     // варианты — крупные кнопки в две колонки, нажимаются пальцем
     const rowsN = Math.ceil(DLG.choices.length / 2), y0 = y + Math.round((h - rowsN * CH.rowH) / 2) + 1;

@@ -62,19 +62,30 @@ function dlgUpdate(dt) {
   }
   function choose() { const r = DLG.resolve, c = DLG.cursor; DLG.resolve = null; DLG.choices = null; sfx.select(); r(c); }
 }
+const p0 = (x, y) => rect(x, y, 1, 1, '#f2c94c');
 function dlgDraw() {
   if (!DLG.open) return;
   const x = 6, y = DLG_BOX.y, w = W - 12, h = DLG_BOX.h;
-  rect(x, y, w, h, '#f4f3ee'); rect(x + 2, y + 2, w - 4, h - 4, '#0b0c10');
-  // портрет
-  rect(x + 7, y + 8, 44, 44, '#f4f3ee'); rect(x + 8, y + 9, 42, 42, '#20222b');
-  if (DLG.port) sprite(DLG.port(DLG.expr), x + 9, y + 10);
-  // имя под портретом: длинные имена — мельче и в две строки
-  if (textW(DLG.name) <= 52) text(DLG.name, x + 29, y + 56, { align: 'center', col: '#f2c94c' });
-  else { const parts = DLG.name.split(' '); parts.slice(0, 2).forEach((s, i) => text(s.slice(0, 9), x + 29, y + 55 + i * 9, { align: 'center', col: '#f2c94c', size: 6 })); }
+  // окно: тёмно-синяя панель, двойная рамка, блик сверху, тень снизу
+  rect(x + 2, y + 3, w, h, 'rgba(4,5,10,.55)');
+  rect(x, y, w, h, '#c9cfdc'); rect(x + 1, y + 1, w - 2, h - 2, '#3a4258'); rect(x + 2, y + 2, w - 4, h - 4, '#121624');
+  rect(x + 3, y + 3, w - 6, 1, '#1f2538'); rect(x + 3, y + h - 4, w - 6, 1, '#0a0c14');
+  for (const [cx, cy] of [[x + 1, y + 1], [x + w - 3, y + 1], [x + 1, y + h - 3], [x + w - 3, y + h - 3]]) rect(cx, cy, 2, 2, '#8792ad');
+  // портрет в своей рамке, за ним мягкий свет — не «чёрный квадрат»
+  const px = x + 7, py = y + 7;
+  rect(px - 1, py - 1, 46, 46, '#0a0c14'); rect(px, py, 44, 44, '#c9cfdc'); rect(px + 1, py + 1, 42, 42, '#2b3150');
+  if (!dlgDraw.bg) dlgDraw.bg = makeCanvas(42, 42, ({ g }) => { const gr = g.createRadialGradient(24, 16, 2, 21, 22, 30); gr.addColorStop(0, '#5a6690'); gr.addColorStop(.55, '#343c60'); gr.addColorStop(1, '#1c2036'); g.fillStyle = gr; g.fillRect(0, 0, 42, 42); });
+  ctx.drawImage(dlgDraw.bg, px + 1, py + 1);
+  if (DLG.port) sprite(DLG.port(DLG.expr), px + 2, py + 3);
+  rect(px + 1, py + 42, 42, 1, '#1c2036');
+  // имя — табличка под портретом
+  { const nm = DLG.name || '', small = textW(nm) > 50, lines = small ? nm.split(' ').slice(0, 2).map(t => t.slice(0, 10)) : [nm], tw = Math.min(56, Math.max(...lines.map(t => textW(t, small ? 6 : 8))) + 8), th = small ? 17 : 11;
+    const nc = Math.max(px + 22, x + 4 + tw / 2);   // табличка не вылезает за рамку окна
+    rect(nc - tw / 2, py + 47, tw, th, '#f2c94c'); rect(nc - tw / 2, py + 47 + th - 1, tw, 1, '#a8822a');
+    lines.forEach((t, i) => text(t, nc, py + 49 + i * 8, { align: 'center', col: '#1a1424', size: small ? 6 : 8 })); }
   // текст
   if (!DLG.choices) wrapText(DLG.text.slice(0, Math.floor(DLG.shown)), DLG_TW).slice(0, DLG_LINES).forEach((l, i) => text(l, x + 58, y + 9 + i * 12));
-  if (!DLG.choices && DLG.shown >= DLG.text.length && DLG.resolve && !isTouch) { if (Math.floor(performance.now() / 300) % 2) rect(x + w - 14, y + h - 12, 6, 4, '#f2c94c'); }
+  if (!DLG.choices && DLG.shown >= DLG.text.length && DLG.resolve) { const bob = Math.floor(performance.now() / 250) % 2; rect(x + w - 15, y + h - 13 + bob, 7, 1, '#f2c94c'); rect(x + w - 14, y + h - 12 + bob, 5, 1, '#f2c94c'); rect(x + w - 13, y + h - 11 + bob, 3, 1, '#f2c94c'); p0(x + w - 12, y + h - 10 + bob); }   // мигающий «дальше»
   if (DLG.choices) {
     // варианты — крупные кнопки в две колонки, нажимаются пальцем
     const rowsN = Math.ceil(DLG.choices.length / 2), y0 = y + Math.round((h - rowsN * CH.rowH) / 2) + 1;

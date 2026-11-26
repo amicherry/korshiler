@@ -21,6 +21,14 @@ const POSES = {
   smell:  { lf: [-5, 5], ln: [6, 8], af: [10, 10], an: [100, 75], lean: -2, dy: 0 },
   lieUp:  { lf: [0, 0], ln: [0, 0], af: [180, 0], an: [176, 0], lean: 0, dy: 0 },
 };
+// контур: прозрачный пиксель рядом с фигурой красим в тёмный оттенок соседа — силуэт читается чётко, без «чёрной обводки»
+function outlinePass(g, w, h) {
+  const im = g.getImageData(0, 0, w, h), d = im.data, src = new Uint8ClampedArray(d);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; if (src[i + 3]) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const j = (yy * w + xx) * 4;
+      if (src[j + 3] > 200) { d[i] = src[j] * .35; d[i + 1] = src[j + 1] * .33; d[i + 2] = src[j + 2] * .38 + 6; d[i + 3] = 255; break; } } }
+  g.putImageData(im, 0, 0);
+}
 function personSprite(look, frame) {
   const key = JSON.stringify(look) + '|' + frame;
   if (PERSON_CACHE.has(key)) return PERSON_CACHE.get(key);
@@ -106,11 +114,8 @@ function personSprite(look, frame) {
     r(hx, 2 + hy, 8, 8, sk); r(hx + 8, 5 + hy, 1, 2, sk); p(hx + 8, 4 + hy, skL);  // лицо, нос
     r(hx, 3 + hy, 1, 6, skD); r(hx + 1, 9 + hy, 6, 1, skD); p(hx + 7, 9 + hy, skD); // затылок, подбородок
     r(hx + 6, 2 + hy, 2, 2, skL);                                                    // лоб на свету
-    r(hx + 2, 5 + hy, 2, 2, skD); p(hx + 2, 5 + hy, sk);                            // ухо
-    const blink = frame === 'idle1' && look.blink;
-    if (!blink) { r(hx + 6, 4 + hy, 1, 2, OUT); if (fem) p(hx + 7, 4 + hy, OUT); } else r(hx + 6, 5 + hy, 2, 1, skD);
-    r(hx + 6, 7 + hy, 2, 1, fem ? '#b8545e' : '#9a5a4a');
-    if (look.old) { p(hx + 5, 4 + hy, skD); p(hx + 5, 7 + hy, skD); p(hx + 4, 8 + hy, skD); }
+    // лица у фигурок нет — только объём (лицо видно в окне диалога): тень щеки и подбородка
+    r(hx + 1, 6 + hy, 3, 3, skD); r(hx + 4, 8 + hy, 3, 1, skD);
     const H1 = hair[1], H0 = hair[0], H2 = hair[2];
     const cap = () => { r(hx - 1, 1 + hy, 9, 2, H1); r(hx, hy, 7, 1, H1); r(hx + 1, hy, 4, 1, H0); r(hx + 2, 1 + hy, 4, 1, H0); };
     if (look.hair === 'short') { cap(); r(hx - 1, 2 + hy, 3, 5, H1); p(hx - 1, 6 + hy, H2); r(hx + 6, 2 + hy, 2, 1, H1); p(hx + 7, 3 + hy, H2); }
@@ -132,6 +137,7 @@ function personSprite(look, frame) {
       for (let y = 0; y < CHh; y++) { const k = clamp((hipRow - y) / (hipRow - topRow), 0, 1.3); g.drawImage(U, 0, y, CW, 1, Math.round(tilt * k), y, CW, 1); }
     }
   });
+  outlinePass(c.getContext('2d'), c.width, c.height);
   PERSON_CACHE.set(key, c); return c;
 }
 const PW = 18, PH = 42;
