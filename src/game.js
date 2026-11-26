@@ -270,7 +270,7 @@ scenes.creator = {
     paper(16, 14, 168, 196, 5);
     text(L(UI.creator), 100, 24, { align: 'center', col: INK_RED });
     const fr = ['idle0', 'idle1'][Math.floor(this.t / 500) % 2];
-    ctx.save(); ctx.translate(73, 34); ctx.scale(3, 3); ctx.drawImage(personSprite(this.look, fr), 0, 0); ctx.restore();
+    { const im = personSprite(this.look, fr); ctx.save(); ctx.translate(73 - im.ox * 3, 34 - im.oy * 3); ctx.scale(3, 3); ctx.drawImage(im, 0, 0); ctx.restore(); }
     sprite(portrait(this.look, 'happy'), 26, 162);
     text(L(UI.hello).trim(), 74, 172, { col: INK }); text((document.getElementById('nameInput').value || '…').slice(0, 12), 74, 186, { col: INK_TEAL });
     text(L(UI.name), 200, 22, { col: '#f2c94c' });

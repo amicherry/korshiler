@@ -129,6 +129,7 @@ function makeCanvas(w, h, draw) {
 }
 function sprite(img, x, y, flip = false, alpha = 1) {
   ctx.imageSmoothingEnabled = false;
+  if (img.ox || img.oy) { x -= img.ox || 0; y -= img.oy || 0; }   // у фигурок есть поля по краям
   if (alpha !== 1) ctx.globalAlpha = alpha;
   if (flip) { ctx.save(); ctx.translate(Math.round(x) + img.width, Math.round(y)); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0); ctx.restore(); }
   else ctx.drawImage(img, Math.round(x), Math.round(y));

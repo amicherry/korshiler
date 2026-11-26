@@ -33,13 +33,15 @@ function personSprite(look, frame) {
   const key = JSON.stringify(look) + '|' + frame;
   if (PERSON_CACHE.has(key)) return PERSON_CACHE.get(key);
   const PO = frame.startsWith('pose_') ? POSES[frame.slice(5)] : null, ox = PO ? POSE_OX : 0, oy = PO ? POSE_OY : 0;
-  const CW = PO ? 34 : 18, CHh = PO ? 46 : 42;
+  // поля вокруг фигуры: шаг, носок ботинка и кепка не обрезаются краем картинки (раньше ноги «пропадали»)
+  const PADX = PO ? 9 : 5, PADY = 2;
+  const CW = (PO ? 34 : 18) + PADX * 2, CHh = (PO ? 46 : 42) + PADY;
   // в позе ноги и верх рисуются на разных слоях: верх потом наклоняется построчно (без размытия пикселей)
   let legsL = null, upL = null;
   const c = makeCanvas(CW, CHh, (P0) => {
     let cur = P0;
     if (PO) { legsL = {}; upL = {}; makeCanvas(CW, CHh, Q => Object.assign(legsL, Q)); makeCanvas(CW, CHh, Q => Object.assign(upL, Q)); }
-    const r = (x, y, w, h, col) => cur.r(x + ox, y + oy, w, h, col), p = (x, y, col) => cur.p(x + ox, y + oy, col);
+    const r = (x, y, w, h, col) => cur.r(x + ox + PADX, y + oy + PADY, w, h, col), p = (x, y, col) => cur.p(x + ox + PADX, y + oy + PADY, col);
     const toLegs = () => { if (PO) cur = legsL; }, toUp = () => { if (PO) cur = upL; };
     const lean = 0, tilt = PO ? PO.lean : 0, pdy = PO ? PO.dy : 0;
     const fem = look.body ? look.body === 'f' : (look.hair === 'long' || look.hair === 'bun' || look.hat === 'scarf');
@@ -135,13 +137,14 @@ function personSprite(look, frame) {
     if (look.hat === 'scarf') { const sc = tones(look.scarfCol || '#c8414a'); r(hx - 1, hy - 1, 10, 4, sc[1]); r(hx - 2, 2 + hy, 4, 10, sc[1]); r(hx + 1, 9 + hy, 6, 3, sc[2]); r(hx + 1, hy, 5, 1, sc[0]); p(hx + 7, 3 + hy, sc[2]); p(hx - 1, 6 + hy, sc[0]); }
     if (PO) {
       // сборка: ноги как есть, верх — со сдвигом строк: у бёдер 0, у макушки tilt
-      const g = P0.g, hipRow = 24 + pdy + oy, topRow = 1 + pdy + oy;
+      const g = P0.g, hipRow = 24 + pdy + oy + PADY, topRow = 1 + pdy + oy + PADY;
       g.drawImage(legsL.g.canvas, 0, 0);
       const U = upL.g.canvas;
       for (let y = 0; y < CHh; y++) { const k = clamp((hipRow - y) / (hipRow - topRow), 0, 1.3); g.drawImage(U, 0, y, CW, 1, Math.round(tilt * k), y, CW, 1); }
     }
   });
   outlinePass(c.getContext('2d'), c.width, c.height);
+  c.ox = PADX; c.oy = PADY;   // sprite() сдвигает на поля — место на экране то же
   PERSON_CACHE.set(key, c); return c;
 }
 const PW = 18, PH = 42;
@@ -153,7 +156,7 @@ function lyingSprite(look) {
   const src = personSprite(look, 'pose_lieUp'), c = makeCanvas(src.height, src.width, ({ g }) => { g.translate(src.height, 0); g.rotate(Math.PI / 2); g.drawImage(src, 0, 0); });
   const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let bottom = 0;
   for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 0) bottom = y;
-  c.bottom = bottom; c.hip = c.width - 1 - (24 + POSE_OY); PERSON_CACHE.set(key, c); return c;
+  c.bottom = bottom; c.hip = c.width - 1 - (24 + POSE_OY + (src.oy || 0)); PERSON_CACHE.set(key, c); return c;
 }
 
 /* ============================================================
