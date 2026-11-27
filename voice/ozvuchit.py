@@ -19,7 +19,7 @@
    Модель: --model eleven_v3 (по умолчанию, как у Виталия) или другая, если на слух лучше.
 Если установлен ffmpeg — громкость выравнивается до −16 LUFS, тишина по краям обрезается, моно 44,1 кГц 128 кбит/с.
 """
-import argparse, csv, json, os, shutil, subprocess, sys
+import time, argparse, csv, json, os, shutil, subprocess, sys
 import requests
 
 TAGS = {"greet": "", "good": "[interested]", "meh": "[hesitant]", "bad": "[annoyed]", "yes": "[warmly]",
@@ -85,9 +85,18 @@ def main():
     if todo and not key: sys.exit("Нет ELEVEN_API_KEY (см. шаг 2 в начале файла)")
     for i, (r, lg, text, out, vid) in enumerate(todo, 1):
         print(f"[{i}/{len(todo)}] {out}")
-        resp = requests.post(f"https://api.elevenlabs.io/v1/text-to-speech/{vid}?output_format=mp3_44100_128",
-                             headers={"xi-api-key": key, "Content-Type": "application/json"},
-                             json={"text": text, "model_id": a.model, "language_code": LANG[lg]}, timeout=120)
+        resp = None
+        for attempt in range(5):   # связь оборвалась — ждём и пробуем ещё раз, а не падаем
+            try:
+                resp = requests.post(f"https://api.elevenlabs.io/v1/text-to-speech/{vid}?output_format=mp3_44100_128",
+                                     headers={"xi-api-key": key, "Content-Type": "application/json"},
+                                     json={"text": text, "model_id": a.model, "language_code": LANG[lg]}, timeout=120)
+                if resp.status_code in (429, 500, 502, 503, 504) and attempt < 4 and "quota" not in resp.text:
+                    print(f"  сервер занят ({resp.status_code}), жду…"); time.sleep(5 * (attempt + 1)); continue
+                break
+            except requests.exceptions.RequestException as e:
+                print(f"  связь оборвалась ({type(e).__name__}), повтор {attempt + 1}/5…"); time.sleep(5 * (attempt + 1))
+        if resp is None: print("  пропущено: нет связи. Запусти скрипт ещё раз позже — он доделает."); continue
         if resp.status_code != 200:
             print("  ошибка:", resp.status_code, resp.text[:300])
             if resp.status_code in (401, 402, 429) or "quota" in resp.text: sys.exit("Остановлено: ключ не подходит или закончились кредиты. Готовые файлы сохранены.")
