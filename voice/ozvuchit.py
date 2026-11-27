@@ -47,6 +47,8 @@ def read_env():
                 k, v = line.split("=", 1); d[k.strip()] = v.strip().strip('"').strip("'")
     return d
 
+UP = {"kz": "мың теңге", "ru": "тысяча тенге"}   # {up} в игре — всегда 1 000 ₸ (content.js, UP)
+
 ALL = ["voice_lines.csv", "voice_extra.csv", "geroinya.csv"]
 
 def main():
@@ -74,8 +76,9 @@ def main():
             if os.path.exists(out) and not a.force: continue
             vid = voices.get(r["герой"]) or (voices.get("hero") if r["герой"] == "hero_m" else "")
             if not vid: novoice[r["герой"]] = novoice.get(r["герой"], 0) + 1; continue
+            if "{f}" in r[lg] or "{op}" in r[lg]: continue   # этаж/оператор меняются в игре — такие реплики не озвучиваем
             tag = "" if a.no_tags or r["герой"] in ("hero_f", "hero_m") else TAGS.get(r["ключ"], "")
-            text = (tag + " " + r[lg]).strip(); chars += len(text); todo.append((r, lg, text, out, vid))
+            text = (tag + " " + r[lg].replace("{up}", UP[lg])).strip(); chars += len(text); todo.append((r, lg, text, out, vid))
     print(f"к озвучке: {len(todo)} файлов, ≈{chars} символов (кредитов) · модель: {a.model}")
     if novoice: print("пропущено — нет Voice ID в voices.json:", ", ".join(f"{k} ({v})" for k, v in sorted(novoice.items())))
     if a.dry:
