@@ -4,6 +4,8 @@
 1) В ElevenLabs подобрать голос каждому герою, скопировать его Voice ID в voice/voices.json:
      {"grump": "...", "apa": "...", "hero": "..."}
 2) Ключ — только в переменную окружения, в файлы и в чат не вставлять:
+     Проще всего: скопировать .env.example в .env (в корне проекта) и вписать ключ после ELEVEN_API_KEY=
+     .env в git не попадает. Или в терминале:
      Windows (PowerShell):  $env:ELEVEN_API_KEY="ваш_ключ"
      macOS / Linux:          export ELEVEN_API_KEY=ваш_ключ
 3) Из корня репозитория:
@@ -36,6 +38,15 @@ def post(path):
     if r.returncode == 0: os.replace(tmp, path)
     elif os.path.exists(tmp): os.remove(tmp)
 
+def read_env():
+    """Ключ можно положить в файл .env в корне проекта: ELEVEN_API_KEY=sk_...  (.env не попадает в git)"""
+    p, d = os.path.join(HERE, "..", ".env"), {}
+    if os.path.exists(p):
+        for line in open(p, encoding="utf-8-sig"):
+            if "=" in line and not line.strip().startswith("#"):
+                k, v = line.split("=", 1); d[k.strip()] = v.strip().strip('"').strip("'")
+    return d
+
 ALL = ["voice_lines.csv", "voice_extra.csv", "geroinya.csv"]
 
 def main():
@@ -47,7 +58,7 @@ def main():
     ap.add_argument("--no-tags", action="store_true", help="без эмоциональных тегов (если модель их не понимает)")
     a = ap.parse_args()
     voices = json.load(open(os.path.join(HERE, "voices.json"), encoding="utf-8")) if os.path.exists(os.path.join(HERE, "voices.json")) else {}
-    key = os.environ.get("ELEVEN_API_KEY")
+    key = os.environ.get("ELEVEN_API_KEY") or read_env().get("ELEVEN_API_KEY")
     files = [os.path.join(HERE, f) for f in ALL] if a.all else a.lines
     if not files: sys.exit("Укажи таблицу реплик или --all")
     rows = [r for f in files for r in csv.DictReader(open(f, encoding="utf-8-sig"), delimiter=";")]
