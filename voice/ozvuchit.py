@@ -8,9 +8,12 @@
      macOS / Linux:          export ELEVEN_API_KEY=ваш_ключ
 3) Из корня репозитория:
      pip install requests
-     python voice/ozvuchit.py voice/proba_tur1_grump_apa.csv --dry        # посмотреть, что будет озвучено
-     python voice/ozvuchit.py voice/proba_tur1_grump_apa.csv               # озвучить (готовые файлы пропускает)
-     python voice/ozvuchit.py voice/proba_tur1_grump_apa.csv --only grump_init_no --force   # переозвучить одну строку
+     python voice/ozvuchit.py --all --dry          # что ещё не озвучено и сколько это символов (кредитов)
+     python voice/ozvuchit.py --all                # озвучить ВСЁ, чего ещё нет (готовые файлы пропускает)
+     python voice/ozvuchit.py --all --who hero_f   # только героиня (можно несколько: --who apa,grump)
+     python voice/ozvuchit.py voice/voice_lines.csv --only grump_init_no --force   # переозвучить одну строку
+   Если у героя нет Voice ID в voices.json — его строки пропускаются (не ошибка), в конце будет список.
+   Можно прервать (Ctrl+C) и запустить снова — продолжит с того места.
    Модель: --model eleven_v3 (по умолчанию, как у Виталия) или другая, если на слух лучше.
 Если установлен ffmpeg — громкость выравнивается до −16 LUFS, тишина по краям обрезается, моно 44,1 кГц 128 кбит/с.
 """
@@ -33,33 +36,52 @@ def post(path):
     if r.returncode == 0: os.replace(tmp, path)
     elif os.path.exists(tmp): os.remove(tmp)
 
+ALL = ["voice_lines.csv", "voice_extra.csv", "geroinya.csv"]
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("lines"); ap.add_argument("--lang", default="kz,ru")
+    ap.add_argument("lines", nargs="*"); ap.add_argument("--all", action="store_true", help="все таблицы реплик сразу")
+    ap.add_argument("--who", default="", help="только эти герои, через запятую: hero_f,apa"); ap.add_argument("--lang", default="kz,ru")
     ap.add_argument("--model", default="eleven_v3"); ap.add_argument("--only", default="")
     ap.add_argument("--dry", action="store_true"); ap.add_argument("--force", action="store_true")
     ap.add_argument("--no-tags", action="store_true", help="без эмоциональных тегов (если модель их не понимает)")
     a = ap.parse_args()
     voices = json.load(open(os.path.join(HERE, "voices.json"), encoding="utf-8")) if os.path.exists(os.path.join(HERE, "voices.json")) else {}
     key = os.environ.get("ELEVEN_API_KEY")
-    rows = list(csv.DictReader(open(a.lines, encoding="utf-8-sig"), delimiter=";"))
+    files = [os.path.join(HERE, f) for f in ALL] if a.all else a.lines
+    if not files: sys.exit("Укажи таблицу реплик или --all")
+    rows = [r for f in files for r in csv.DictReader(open(f, encoding="utf-8-sig"), delimiter=";")]
     if a.only: rows = [r for r in rows if r["id"] in a.only.split(",")]
-    print("реплик:", len(rows), "· модель:", a.model)
+    for r in rows:   # мужской герой из общей таблицы («hero») — в папку hero_m, героиня — в hero_f
+        if r["герой"] == "hero": r["герой"] = "hero_m"
+    if a.who: rows = [r for r in rows if r["герой"] in a.who.split(",")]
+    todo, chars, novoice, done = [], 0, {}, 0
     for r in rows:
         for lg in a.lang.split(","):
-            tag = "" if a.no_tags else TAGS.get(r["ключ"], "")
-            text = (tag + " " + r[lg]).strip()
-            sub = r["герой"] if r["герой"] in ("hero_f", "hero_m") else ""   # героиня и герой — в своих папках
+            sub = r["герой"] if r["герой"] in ("hero_f", "hero_m") else ""
             out = os.path.join("out", lg, sub, r["id"] + ".mp3")
-            print(f"{lg} {r['id']} [{r['герой']}] → {text}")
-            if a.dry or (os.path.exists(out) and not a.force): continue
-            vid = voices.get(r["герой"])
-            if not key: sys.exit("Нет ELEVEN_API_KEY (см. шаг 2 в начале файла)")
-            if not vid: sys.exit(f"Нет Voice ID для «{r['герой']}» в voice/voices.json")
-            resp = requests.post(f"https://api.elevenlabs.io/v1/text-to-speech/{vid}?output_format=mp3_44100_128",
-                                 headers={"xi-api-key": key, "Content-Type": "application/json"},
-                                 json={"text": text, "model_id": a.model, "language_code": LANG[lg]}, timeout=120)
-            if resp.status_code != 200: print("  ошибка:", resp.status_code, resp.text[:300]); continue
-            os.makedirs(os.path.dirname(out), exist_ok=True); open(out, "wb").write(resp.content); post(out)
+            if os.path.exists(out) and not a.force: continue
+            vid = voices.get(r["герой"]) or (voices.get("hero") if r["герой"] == "hero_m" else "")
+            if not vid: novoice[r["герой"]] = novoice.get(r["герой"], 0) + 1; continue
+            tag = "" if a.no_tags or r["герой"] in ("hero_f", "hero_m") else TAGS.get(r["ключ"], "")
+            text = (tag + " " + r[lg]).strip(); chars += len(text); todo.append((r, lg, text, out, vid))
+    print(f"к озвучке: {len(todo)} файлов, ≈{chars} символов (кредитов) · модель: {a.model}")
+    if novoice: print("пропущено — нет Voice ID в voices.json:", ", ".join(f"{k} ({v})" for k, v in sorted(novoice.items())))
+    if a.dry:
+        for r, lg, text, out, _ in todo[:40]: print(f"  {out} → {text}")
+        if len(todo) > 40: print(f"  … и ещё {len(todo) - 40}")
+        return
+    if todo and not key: sys.exit("Нет ELEVEN_API_KEY (см. шаг 2 в начале файла)")
+    for i, (r, lg, text, out, vid) in enumerate(todo, 1):
+        print(f"[{i}/{len(todo)}] {out}")
+        resp = requests.post(f"https://api.elevenlabs.io/v1/text-to-speech/{vid}?output_format=mp3_44100_128",
+                             headers={"xi-api-key": key, "Content-Type": "application/json"},
+                             json={"text": text, "model_id": a.model, "language_code": LANG[lg]}, timeout=120)
+        if resp.status_code != 200:
+            print("  ошибка:", resp.status_code, resp.text[:300])
+            if resp.status_code in (401, 402, 429) or "quota" in resp.text: sys.exit("Остановлено: ключ не подходит или закончились кредиты. Готовые файлы сохранены.")
+            continue
+        os.makedirs(os.path.dirname(out), exist_ok=True); open(out, "wb").write(resp.content); post(out); done += 1
+    print("готово:", done, "файлов")
 
 if __name__ == "__main__": main()

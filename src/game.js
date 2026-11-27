@@ -405,6 +405,14 @@ scenes.tour = {
   // доля голосов «за», собранных приложением (уведомление, обзвон, дожатие, чат, приглашение хозяину)
   appShare() { const y = this.events.filter(e => e.t === 'yes'), app = y.filter(e => APP_VIA.includes(e.via)).length; return y.length ? Math.round(app / y.length * 100) : 0; },
   goalMet() { return this.outcome().ok; },
+  // «куда идти»: в собрании 1 — к апа (кв. 48) и ворчуну (кв. 52), в собрании 2 — к Данияру, дальше — сколько ещё нужно
+  objective() {
+    const T = this.tour;
+    if (this.dan && !SAVE.racIntro) return { r: this.dan, t: L(UI.objDan).replace('{a}', aptNo(this.dan.apt)).replace('{f}', this.dan.floor) };
+    if (T.id !== 'L1') return null;
+    for (const n of ['48', '52']) { const r = Object.values(this.res).find(r => aptNo(r.apt) === n); if (r && r.status === 'unknown') return { r, t: L(UI.objFirst).replace('{a}', n).replace('{f}', r.floor) }; }
+    const need = T.goal - this.signatures(); return need > 0 ? { t: L(UI.objMore).replace('{n}', need) } : null;
+  },
   // с учётом обещавших проголосовать онлайн: можно закрыть собрание и дождаться их голосов
   goalLikely() { const pend = Object.values(this.res).filter(r => r.status === 'online').length; return voteOutcome(this.tour, this.votes() + pend, this.against(), this.abstained()).ok; },
   // игровой день 1…60: время тура растянуто на 60 дней
@@ -1158,6 +1166,23 @@ scenes.tour = {
     if (this.app && button(L(UI.raccoon), 0, 1, this.rac.menu ? 'primary' : 'alt', { left: 338 }) && !this.busy && !DLG.open) { this.rac.menu = !this.rac.menu; if (this.rac.menu) toasts.length = 0; }
     const pend = Object.values(this.res).filter(r => r.status === 'online').length, papers = Object.values(this.res).filter(r => r.status === 'paper').length;
     let hy = 22; text(`${this.hero.floor}${L(UI.floor)}`, 8, hy, { col: '#f4f3ee', shadow: '#0b0c10', size: 6 });
+    const obj = !this.goalMet() && this.objective();
+    if (obj) { const ot = '★ ' + obj.t; rect(4, hy + 7, textW(ot, 6) + 8, 11, 'rgba(14,17,28,.82)'); text(ot, 8, hy + 9, { col: '#f2c94c', shadow: '#0b0c10', size: 6 });
+      if (obj.r && !DLG.open && !this.busy) {   // прыгающая стрелка над нужной дверью; если дверь за краем экрана — стрелка у края
+        const b = Math.sin(performance.now() / 160) * 2, X = DOOR_X[obj.r.d] - this.camX, Y = this.base(obj.r.floor) - this.camY - 74;
+        const tri = (x, y, dir) => { x = Math.round(x); y = Math.round(y);
+          for (let i = 0; i < 5; i++) { const w = 9 - i * 2, o = w >> 1;
+            if (dir === 'd') { rect(x - o - 1, y + i, w + 2, 2, '#0b0c10'); rect(x - o, y + i, w, 1, '#f2c94c'); }
+            else if (dir === 'u') { rect(x - o - 1, y - i - 1, w + 2, 2, '#0b0c10'); rect(x - o, y - i, w, 1, '#f2c94c'); }
+            else if (dir === 'r') { rect(x + i - 1, y - o - 1, 2, w + 2, '#0b0c10'); rect(x + i, y - o, 1, w, '#f2c94c'); }
+            else { rect(x - i - 1, y - o - 1, 2, w + 2, '#0b0c10'); rect(x - i, y - o, 1, w, '#f2c94c'); } } };
+        if (Y < 34) tri(clamp(X, 12, W - 12), 50 - b, 'u');
+        else if (Y > H - 14) tri(clamp(X, 12, W - 12), H - 6 + b, 'd');
+        else if (X < 6) tri(6 - b, clamp(Y + 30, 40, H - 10), 'l');
+        else if (X > W - 6) tri(W - 6 + b, clamp(Y + 30, 40, H - 10), 'r');
+        else tri(X, Y + b, 'd');
+      }
+    }
     if (pend) text(L(UI.hudOnline).replace('{n}', pend), 84, hy, { col: '#7fc4a8', size: 6, shadow: '#0b0c10' });
     if (papers) text(`📄 ${papers}`, 220, hy, { col: '#d8d2bf', size: 6, shadow: '#0b0c10' });
     if ((this.goalMet() || this.goalLikely()) && !this.busy && !DLG.open) { if (button(L(UI.finish), W / 2, 30, 'primary')) this.finish(false); }

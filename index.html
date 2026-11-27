@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<!-- Telegram Mini App: вне Telegram скрипт ничего не делает (initData пустая) -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 /* Layout: one letterboxed pixel canvas; touch pads float over the bottom corners. Single deliberate dark frame. */
 :root{
@@ -54,6 +56,15 @@ body{height:100%;margin:0;background:var(--frame);color:var(--ink);overflow:hidd
 #rotate{display:none;position:fixed;top:calc(8px + env(safe-area-inset-top, 0px));left:50%;transform:translateX(-50%);z-index:6;
   background:rgba(43,42,51,.92);border:1px solid var(--accent);color:var(--ink);font:9px/1.6 var(--font-pixel);padding:8px 12px;text-align:center;max-width:calc(100% - 32px)}
 @media (orientation:portrait){ .touch #rotate{display:block} }
+/* вход через Telegram по номеру телефона */
+#tgauth{position:fixed;inset:0;z-index:8;background:var(--frame);display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));text-align:center}
+#tgauth .box{max-width:420px;display:grid;gap:18px;justify-items:center}
+#tgauth h1{margin:0;font:16px/1.4 var(--font-pixel);color:var(--accent)}
+#tgauth p{margin:0;font:9px/1.9 var(--font-pixel);color:var(--ink)}
+#tgauth small{font:8px/1.8 var(--font-pixel);color:#9fb0cc}
+#tgauth button{font:10px/1.4 var(--font-pixel);color:#0e111c;background:var(--accent);border:0;border-bottom:4px solid #b8902a;padding:14px 18px;cursor:pointer}
+#tgauth button:active{border-bottom-width:1px;transform:translateY(3px)}
+.tg.touch body{padding-top:calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px))}
 #err{position:fixed;left:8px;right:8px;top:8px;z-index:9;background:#b8443f;color:#fff;font:12px/1.4 ui-monospace,monospace;padding:8px;white-space:pre-wrap;max-height:40vh;overflow:auto}
 </style>
 </head>
@@ -63,6 +74,7 @@ body{height:100%;margin:0;background:var(--frame);color:var(--ink);overflow:hidd
 <div id="rotate"></div>
 <button id="fs" aria-label="На весь экран"><svg viewBox="0 0 20 20"><path d="M2 7V2h5M13 2h5v5M18 13v5h-5M7 18H2v-5"/></svg></button>
 <div id="err" hidden></div>
+<div id="tgauth" hidden><div class="box"><h1>КӨРШІЛЕР</h1><p id="tgText"></p><button id="tgBtn"></button><small id="tgNote"></small></div></div>
 <div id="touch" aria-label="Экранное управление">
   <div class="pad">
     <button class="btn" data-k="left" aria-label="Влево"><svg viewBox="0 0 10 10"><path d="M7 1 2 5l5 4z"/></svg></button>
@@ -576,6 +588,9 @@ const UI = {
   insideDone: { kz: 'Ішінде жасалды:', ru: 'Внутри сделано:' },
   insideHint: { kz: 'Жоғары-төмен жылжыт: тышқанмен сүйре немесе ↑ ↓', ru: 'Листай вверх-вниз: тяни мышкой или ↑ ↓' },
   tipT:       { kz: 'Кеңес', ru: 'Подсказка' },
+  objFirst:   { kz: 'Көршіңнің есігін қақ: {a}-пәтер, {f}-қабат', ru: 'Постучи к соседям: кв. {a}, {f} этаж' },
+  objMore:    { kz: 'Көршілерді арала: тағы {n} «иә» керек', ru: 'Обойди соседей: нужно ещё {n} «за»' },
+  objDan:     { kz: 'Даниярға кір: {a}-пәтер, {f}-қабат', ru: 'Зайди к Данияру: кв. {a}, {f} этаж' },
   nobody:     { kz: 'Ешкім жоқ сияқты. Кейін қайта келуге болады.', ru: 'Похоже, никого нет. Можно зайти позже.' },
   noOpen:     { kz: 'Ешкім ашпады... Тағы қағып көр.', ru: 'Никто не открыл... Попробуй ещё раз.' },
   goalDone: { kz: 'Қажетті дауыстар бар! Жиналысты аяқтауға немесе тағы жинауға болады.', ru: 'Нужные голоса есть! Можно завершить собрание или собрать ещё.' },
@@ -2376,6 +2391,39 @@ const LAUNCH = (() => {
   return { token, lang, name: s('name', 16), level: int('level', 0, 999), tour: int('tour', -1, 6), title: s('title', 32), complex: s('complex', 28) };
 })();
 
+/* ---------- Telegram Mini App ----------
+   Внутри Telegram: вход только после «Поделиться номером» (WebApp.requestContact).
+   Серверу уходят initData (подпись Telegram) и ответ requestContact — настоящий сервер проверяет их токеном бота.
+   Вне Telegram (обычный браузер) — как раньше: гость или токен приложения E-KNOT. */
+const TG = (() => { try { const w = window.Telegram && window.Telegram.WebApp; return w && w.initData ? w : null; } catch (e) { return null; } })();
+const TG_T = {
+  kz: { text: 'Ойнау үшін Telegram-дағы телефон нөміріңмен кір. Нөмір E-KNOT профиліне ғана керек.', btn: 'НӨМІРМЕН КІРУ', note: 'Нөмірсіз ойын ашылмайды.', again: 'Нөмір жіберілмеді. Қайта көріңіз.', old: 'Telegram-ды жаңартыңыз — бұл нұсқа нөмірмен кіруді қолдамайды.' },
+  ru: { text: 'Чтобы играть, войди по номеру телефона из Telegram. Номер нужен только для профиля E-KNOT.', btn: 'ВОЙТИ ПО НОМЕРУ', note: 'Без номера игра не откроется.', again: 'Номер не отправлен. Попробуй ещё раз.', old: 'Обнови Telegram — эта версия не умеет входить по номеру.' },
+};
+async function tgLogin() {
+  if (!TG) return null;
+  try { TG.ready(); TG.expand(); document.documentElement.classList.add('tg');
+    if (TG.isVersionAtLeast('7.7')) TG.disableVerticalSwipes();          // свайп по игре не должен закрывать окно
+    if (TG.isVersionAtLeast('6.1')) { TG.setHeaderColor('#15161c'); TG.setBackgroundColor('#15161c'); }
+    if (TG.isVersionAtLeast('8.0') && /android|iphone|ipad/i.test(navigator.userAgent)) TG.requestFullscreen();
+  } catch (e) {}
+  const u = TG.initDataUnsafe && TG.initDataUnsafe.user || {}, key = 'kn_tg_phone_' + u.id;
+  const lang = LAUNCH.lang || (loadStr('d67_lang', '') || (u.language_code === 'ru' ? 'ru' : 'kz')), T = TG_T[lang === 'ru' ? 'ru' : 'kz'];
+  if (!LAUNCH.lang && !loadStr('d67_lang', '')) LAUNCH.lang = lang === 'ru' ? 'ru' : 'kz';
+  const saved = loadStr(key, ''); if (saved) { try { return { user: u, ...JSON.parse(saved) }; } catch (e) {} }
+  const box = document.getElementById('tgauth'), btn = document.getElementById('tgBtn'), txt = document.getElementById('tgText'), note = document.getElementById('tgNote');
+  txt.textContent = T.text; btn.textContent = T.btn; note.textContent = T.note; box.hidden = false;
+  if (!TG.isVersionAtLeast('6.9')) { note.textContent = T.old; btn.hidden = true; return new Promise(() => {}); }
+  return new Promise(done => {
+    btn.onclick = () => TG.requestContact((ok, res) => {
+      if (!ok) { note.textContent = T.again; try { TG.HapticFeedback.notificationOccurred('error'); } catch (e) {} return; }
+      const c = res && res.responseUnsafe && res.responseUnsafe.contact || {};
+      const info = { phone: c.phone_number || null, contact: res && res.response || null };   // contact — строка с подписью Telegram для проверки на сервере
+      saveStr(key, JSON.stringify(info)); box.hidden = true; done({ user: u, ...info });
+    });
+  });
+}
+
 const API_CONFIG = {
   baseUrl: null,                 // например 'https://api.e-knot.kz/game/v1'
   latency: [150, 450],           // задержка ответа заглушки, мс
@@ -2420,7 +2468,13 @@ const MockServer = (() => {
     'POST /auth'({ body }) {
       const t = body.token && TOKENS[body.token], Lp = body.launch || {};
       let user;
-      if (t) user = { ...t, guest: false };
+      if (body.tg) {
+        // Telegram: настоящий сервер проверяет подпись initData и contact токеном бота; заглушка верит на слово
+        let tu = {}; try { tu = JSON.parse(new URLSearchParams(body.tg.initData).get('user') || '{}'); } catch (e) {}
+        user = { userId: 'tg-' + (tu.id || hashStr(body.tg.initData).toString(36)), name: (tu.first_name || '').slice(0, 12) || null, phone: body.tg.phone || null,
+                 complex: { id: 'c-tg', name: Lp.complex || 'E-KNOT', city: 'Астана' }, apartment: null, guest: false, telegram: true };
+      }
+      else if (t) user = { ...t, guest: false };
       else if (body.token) {
         // любой другой токен — как будто его выдал сервер E-KNOT: имя и ЖК приходят параметрами запуска
         const cid = 'c-' + hashStr(Lp.complex || 'eknot').toString(36);
@@ -2610,8 +2664,8 @@ const API = {
     const q = new URLSearchParams(location.search);
     let deviceId = loadStr('kn_device', ''); if (!deviceId) { deviceId = 'g-' + Math.floor(Math.random() * 1e9); saveStr('kn_device', deviceId); }
     // токен из ссылки приложения: ?token=demo (или #demo — так работает и опубликованная страница)
-    const token = LAUNCH.token;
-    const r = await request('POST', '/auth', { body: { token, deviceId, launch: { name: LAUNCH.name, complex: LAUNCH.complex, level: LAUNCH.level, tour: LAUNCH.tour, title: LAUNCH.title } } });
+    const token = LAUNCH.token, tg = await tgLogin();
+    const r = await request('POST', '/auth', { body: { token, deviceId, tg: tg && { initData: TG.initData, contact: tg.contact, phone: tg.phone }, launch: { name: LAUNCH.name, complex: LAUNCH.complex, level: LAUNCH.level, tour: LAUNCH.tour, title: LAUNCH.title } } });
     this.session = r.session; this.user = r.user;
     return { ...r.user, fromApp: !r.user.guest };
   },
@@ -3958,6 +4012,14 @@ scenes.tour = {
   // доля голосов «за», собранных приложением (уведомление, обзвон, дожатие, чат, приглашение хозяину)
   appShare() { const y = this.events.filter(e => e.t === 'yes'), app = y.filter(e => APP_VIA.includes(e.via)).length; return y.length ? Math.round(app / y.length * 100) : 0; },
   goalMet() { return this.outcome().ok; },
+  // «куда идти»: в собрании 1 — к апа (кв. 48) и ворчуну (кв. 52), в собрании 2 — к Данияру, дальше — сколько ещё нужно
+  objective() {
+    const T = this.tour;
+    if (this.dan && !SAVE.racIntro) return { r: this.dan, t: L(UI.objDan).replace('{a}', aptNo(this.dan.apt)).replace('{f}', this.dan.floor) };
+    if (T.id !== 'L1') return null;
+    for (const n of ['48', '52']) { const r = Object.values(this.res).find(r => aptNo(r.apt) === n); if (r && r.status === 'unknown') return { r, t: L(UI.objFirst).replace('{a}', n).replace('{f}', r.floor) }; }
+    const need = T.goal - this.signatures(); return need > 0 ? { t: L(UI.objMore).replace('{n}', need) } : null;
+  },
   // с учётом обещавших проголосовать онлайн: можно закрыть собрание и дождаться их голосов
   goalLikely() { const pend = Object.values(this.res).filter(r => r.status === 'online').length; return voteOutcome(this.tour, this.votes() + pend, this.against(), this.abstained()).ok; },
   // игровой день 1…60: время тура растянуто на 60 дней
@@ -4711,6 +4773,23 @@ scenes.tour = {
     if (this.app && button(L(UI.raccoon), 0, 1, this.rac.menu ? 'primary' : 'alt', { left: 338 }) && !this.busy && !DLG.open) { this.rac.menu = !this.rac.menu; if (this.rac.menu) toasts.length = 0; }
     const pend = Object.values(this.res).filter(r => r.status === 'online').length, papers = Object.values(this.res).filter(r => r.status === 'paper').length;
     let hy = 22; text(`${this.hero.floor}${L(UI.floor)}`, 8, hy, { col: '#f4f3ee', shadow: '#0b0c10', size: 6 });
+    const obj = !this.goalMet() && this.objective();
+    if (obj) { const ot = '★ ' + obj.t; rect(4, hy + 7, textW(ot, 6) + 8, 11, 'rgba(14,17,28,.82)'); text(ot, 8, hy + 9, { col: '#f2c94c', shadow: '#0b0c10', size: 6 });
+      if (obj.r && !DLG.open && !this.busy) {   // прыгающая стрелка над нужной дверью; если дверь за краем экрана — стрелка у края
+        const b = Math.sin(performance.now() / 160) * 2, X = DOOR_X[obj.r.d] - this.camX, Y = this.base(obj.r.floor) - this.camY - 74;
+        const tri = (x, y, dir) => { x = Math.round(x); y = Math.round(y);
+          for (let i = 0; i < 5; i++) { const w = 9 - i * 2, o = w >> 1;
+            if (dir === 'd') { rect(x - o - 1, y + i, w + 2, 2, '#0b0c10'); rect(x - o, y + i, w, 1, '#f2c94c'); }
+            else if (dir === 'u') { rect(x - o - 1, y - i - 1, w + 2, 2, '#0b0c10'); rect(x - o, y - i, w, 1, '#f2c94c'); }
+            else if (dir === 'r') { rect(x + i - 1, y - o - 1, 2, w + 2, '#0b0c10'); rect(x + i, y - o, 1, w, '#f2c94c'); }
+            else { rect(x - i - 1, y - o - 1, 2, w + 2, '#0b0c10'); rect(x - i, y - o, 1, w, '#f2c94c'); } } };
+        if (Y < 34) tri(clamp(X, 12, W - 12), 50 - b, 'u');
+        else if (Y > H - 14) tri(clamp(X, 12, W - 12), H - 6 + b, 'd');
+        else if (X < 6) tri(6 - b, clamp(Y + 30, 40, H - 10), 'l');
+        else if (X > W - 6) tri(W - 6 + b, clamp(Y + 30, 40, H - 10), 'r');
+        else tri(X, Y + b, 'd');
+      }
+    }
     if (pend) text(L(UI.hudOnline).replace('{n}', pend), 84, hy, { col: '#7fc4a8', size: 6, shadow: '#0b0c10' });
     if (papers) text(`📄 ${papers}`, 220, hy, { col: '#d8d2bf', size: 6, shadow: '#0b0c10' });
     if ((this.goalMet() || this.goalLikely()) && !this.busy && !DLG.open) { if (button(L(UI.finish), W / 2, 30, 'primary')) this.finish(false); }

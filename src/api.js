@@ -18,6 +18,39 @@ const LAUNCH = (() => {
   return { token, lang, name: s('name', 16), level: int('level', 0, 999), tour: int('tour', -1, 6), title: s('title', 32), complex: s('complex', 28) };
 })();
 
+/* ---------- Telegram Mini App ----------
+   Внутри Telegram: вход только после «Поделиться номером» (WebApp.requestContact).
+   Серверу уходят initData (подпись Telegram) и ответ requestContact — настоящий сервер проверяет их токеном бота.
+   Вне Telegram (обычный браузер) — как раньше: гость или токен приложения E-KNOT. */
+const TG = (() => { try { const w = window.Telegram && window.Telegram.WebApp; return w && w.initData ? w : null; } catch (e) { return null; } })();
+const TG_T = {
+  kz: { text: 'Ойнау үшін Telegram-дағы телефон нөміріңмен кір. Нөмір E-KNOT профиліне ғана керек.', btn: 'НӨМІРМЕН КІРУ', note: 'Нөмірсіз ойын ашылмайды.', again: 'Нөмір жіберілмеді. Қайта көріңіз.', old: 'Telegram-ды жаңартыңыз — бұл нұсқа нөмірмен кіруді қолдамайды.' },
+  ru: { text: 'Чтобы играть, войди по номеру телефона из Telegram. Номер нужен только для профиля E-KNOT.', btn: 'ВОЙТИ ПО НОМЕРУ', note: 'Без номера игра не откроется.', again: 'Номер не отправлен. Попробуй ещё раз.', old: 'Обнови Telegram — эта версия не умеет входить по номеру.' },
+};
+async function tgLogin() {
+  if (!TG) return null;
+  try { TG.ready(); TG.expand(); document.documentElement.classList.add('tg');
+    if (TG.isVersionAtLeast('7.7')) TG.disableVerticalSwipes();          // свайп по игре не должен закрывать окно
+    if (TG.isVersionAtLeast('6.1')) { TG.setHeaderColor('#15161c'); TG.setBackgroundColor('#15161c'); }
+    if (TG.isVersionAtLeast('8.0') && /android|iphone|ipad/i.test(navigator.userAgent)) TG.requestFullscreen();
+  } catch (e) {}
+  const u = TG.initDataUnsafe && TG.initDataUnsafe.user || {}, key = 'kn_tg_phone_' + u.id;
+  const lang = LAUNCH.lang || (loadStr('d67_lang', '') || (u.language_code === 'ru' ? 'ru' : 'kz')), T = TG_T[lang === 'ru' ? 'ru' : 'kz'];
+  if (!LAUNCH.lang && !loadStr('d67_lang', '')) LAUNCH.lang = lang === 'ru' ? 'ru' : 'kz';
+  const saved = loadStr(key, ''); if (saved) { try { return { user: u, ...JSON.parse(saved) }; } catch (e) {} }
+  const box = document.getElementById('tgauth'), btn = document.getElementById('tgBtn'), txt = document.getElementById('tgText'), note = document.getElementById('tgNote');
+  txt.textContent = T.text; btn.textContent = T.btn; note.textContent = T.note; box.hidden = false;
+  if (!TG.isVersionAtLeast('6.9')) { note.textContent = T.old; btn.hidden = true; return new Promise(() => {}); }
+  return new Promise(done => {
+    btn.onclick = () => TG.requestContact((ok, res) => {
+      if (!ok) { note.textContent = T.again; try { TG.HapticFeedback.notificationOccurred('error'); } catch (e) {} return; }
+      const c = res && res.responseUnsafe && res.responseUnsafe.contact || {};
+      const info = { phone: c.phone_number || null, contact: res && res.response || null };   // contact — строка с подписью Telegram для проверки на сервере
+      saveStr(key, JSON.stringify(info)); box.hidden = true; done({ user: u, ...info });
+    });
+  });
+}
+
 const API_CONFIG = {
   baseUrl: null,                 // например 'https://api.e-knot.kz/game/v1'
   latency: [150, 450],           // задержка ответа заглушки, мс
@@ -62,7 +95,13 @@ const MockServer = (() => {
     'POST /auth'({ body }) {
       const t = body.token && TOKENS[body.token], Lp = body.launch || {};
       let user;
-      if (t) user = { ...t, guest: false };
+      if (body.tg) {
+        // Telegram: настоящий сервер проверяет подпись initData и contact токеном бота; заглушка верит на слово
+        let tu = {}; try { tu = JSON.parse(new URLSearchParams(body.tg.initData).get('user') || '{}'); } catch (e) {}
+        user = { userId: 'tg-' + (tu.id || hashStr(body.tg.initData).toString(36)), name: (tu.first_name || '').slice(0, 12) || null, phone: body.tg.phone || null,
+                 complex: { id: 'c-tg', name: Lp.complex || 'E-KNOT', city: 'Астана' }, apartment: null, guest: false, telegram: true };
+      }
+      else if (t) user = { ...t, guest: false };
       else if (body.token) {
         // любой другой токен — как будто его выдал сервер E-KNOT: имя и ЖК приходят параметрами запуска
         const cid = 'c-' + hashStr(Lp.complex || 'eknot').toString(36);
@@ -252,8 +291,8 @@ const API = {
     const q = new URLSearchParams(location.search);
     let deviceId = loadStr('kn_device', ''); if (!deviceId) { deviceId = 'g-' + Math.floor(Math.random() * 1e9); saveStr('kn_device', deviceId); }
     // токен из ссылки приложения: ?token=demo (или #demo — так работает и опубликованная страница)
-    const token = LAUNCH.token;
-    const r = await request('POST', '/auth', { body: { token, deviceId, launch: { name: LAUNCH.name, complex: LAUNCH.complex, level: LAUNCH.level, tour: LAUNCH.tour, title: LAUNCH.title } } });
+    const token = LAUNCH.token, tg = await tgLogin();
+    const r = await request('POST', '/auth', { body: { token, deviceId, tg: tg && { initData: TG.initData, contact: tg.contact, phone: tg.phone }, launch: { name: LAUNCH.name, complex: LAUNCH.complex, level: LAUNCH.level, tour: LAUNCH.tour, title: LAUNCH.title } } });
     this.session = r.session; this.user = r.user;
     return { ...r.user, fromApp: !r.user.guest };
   },
