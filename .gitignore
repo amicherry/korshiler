@@ -2,3 +2,4 @@ shots/
 node_modules/
 old_eknot.html
 .env
+__pycache__/
