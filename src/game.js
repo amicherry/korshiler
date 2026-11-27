@@ -235,15 +235,18 @@ scenes.creator = {
     this.look.bottomCol = this.look.bottom === 'skirt' ? (this.look.skirtCol || OPT.bottomCol[0]) : (this.look.pants || OPT.bottomCol[0]);
     const box = document.getElementById('nameBox'), inp = document.getElementById('nameInput');
     inp.value = SAVE.name || USER.name || ''; inp.placeholder = ['Атың', 'Имя', 'Name'][LI()]; box.hidden = false;
-    setTouch({ act: L(UI.ready), up: true, down: true, move: true });
+    setTouch({});   // здесь всё нажимается пальцем прямо на экране — круглые кнопки только закрывали бы настройки
   },
   leave() { document.getElementById('nameBox').hidden = true; },
   focus() { return { x: 100, y: 120 }; },
   update(dt) {
     this.t += dt;
     const box = document.getElementById('nameBox'), r = cv.getBoundingClientRect();
-    box.style.left = (r.left + r.width * (282 / W)) + 'px'; box.style.top = (r.top + r.height * (30 / H)) + 'px';
-    document.getElementById('nameInput').style.width = Math.round(r.width * (200 / W)) + 'px';
+    // поле имени — строго в своей строке холста (y 31…44), размер от масштаба игры, чтобы не наезжало на вкладки
+    const k = r.height / H, inp = document.getElementById('nameInput');
+    box.style.left = (r.left + r.width * (293 / W)) + 'px'; box.style.top = (r.top + k * 31) + 'px';
+    Object.assign(inp.style, { width: Math.round(k * 194) + 'px', height: Math.round(k * 13) + 'px', fontSize: Math.max(10, Math.round(k * 7)) + 'px',
+      padding: '0 ' + Math.round(k * 4) + 'px', borderWidth: Math.max(1, Math.round(k)) + 'px', boxSizing: 'border-box', lineHeight: '1' });
     const ROWS = OPT_TABS[this.tab];
     if (hit('up')) { this.row = (this.row + ROWS.length) % (ROWS.length + 1); sfx.select(); }
     if (hit('down')) { this.row = (this.row + 1) % (ROWS.length + 1); sfx.select(); }

@@ -64,7 +64,9 @@ body{height:100%;margin:0;background:var(--frame);color:var(--ink);overflow:hidd
 #tgauth small{font:8px/1.8 var(--font-pixel);color:#9fb0cc}
 #tgauth button{font:10px/1.4 var(--font-pixel);color:#0e111c;background:var(--accent);border:0;border-bottom:4px solid #b8902a;padding:14px 18px;cursor:pointer}
 #tgauth button:active{border-bottom-width:1px;transform:translateY(3px)}
-.tg.touch body{padding-top:calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px))}
+/* Telegram во весь экран: отступ только под строку состояния; кнопки Telegram «Close» и «⋮» ложатся на чёрные поля по бокам, а не сжимают игру */
+.tg.touch body{padding-top:var(--tg-safe-area-inset-top,0px)}
+.tg #fs{display:none}
 #err{position:fixed;left:8px;right:8px;top:8px;z-index:9;background:#b8443f;color:#fff;font:12px/1.4 ui-monospace,monospace;padding:8px;white-space:pre-wrap;max-height:40vh;overflow:auto}
 </style>
 </head>
