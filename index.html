@@ -111,8 +111,7 @@ const W = 400, H = 225, S = 3;
 // а холст шире — FW (до 520) под пропорцию телефона. Слева и справа по OX логических пикселей —
 // там продолжаются фон, улица и подъезд. Для проверки ширину можно задать в ссылке: ?fw=480
 const FW = (() => { try { const q = +new URLSearchParams(location.search).get('fw'); if (q) return Math.max(W, Math.min(560, Math.round(q / 2) * 2));
-  const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData;   // в Telegram сверху ещё полоса кнопок — экран фактически шире
-  const a = Math.max(innerWidth, innerHeight), b = Math.max(1, Math.min(innerWidth, innerHeight)) * (tg ? .8 : 1);
+  const a = Math.max(innerWidth, innerHeight), b = Math.max(1, Math.min(innerWidth, innerHeight));
   return Math.max(W, Math.min(520, Math.round(H * a / b / 2) * 2)); } catch (e) { return W; } })();
 const OX = (FW - W) / 2;
 const FONT = '"Press Start 2P", monospace';
@@ -125,9 +124,8 @@ if (isTouch) document.documentElement.classList.add('touch');
 function fit() {
   const wrap = document.getElementById('wrap');
   // Telegram во весь экран: сверху строка состояния и полоса с кнопками «Закрыть» / «⌄ ⋯» — игра встаёт ниже них
-  let ti = null; try { ti = typeof tgInsets === 'function' ? tgInsets() : null; } catch (e) {}   // до загрузки api.js Telegram ещё не готов
-  const top = ti ? ti.safe + ti.content : 0;
-  wrap.style.paddingTop = top ? top + 'px' : ''; wrap.style.alignItems = top ? 'start' : '';
+  // в Telegram тоже на весь экран: кнопки «Закрыть» и «⌄ ⋯» лежат поверх игры (так решили — игра и кнопки крупнее)
+  const top = 0;
   const k = Math.min(wrap.clientWidth / FW, (wrap.clientHeight - top) / H);
   cv.style.width = Math.floor(FW * k) + 'px';
   cv.style.height = Math.floor(H * k) + 'px';
