@@ -11,13 +11,16 @@ open('quiz.json', 'w').write(json.dumps(quiz, ensure_ascii=False, indent=1))
 import csv
 def vnorm(t): return re.sub(r'[^0-9a-zа-яәіңғүұқөһ]+', '', t.lower().replace('ё', 'е'))
 vids, vtpl, vhero = {'kz': {}, 'ru': {}}, {'kz': {}, 'ru': {}}, {'kz': {}, 'ru': {}}
+varch = {'kz': {}, 'ru': {}}   # общие реплики, которые говорят разные жильцы: у каждого свой файл (voice_more.csv)
+for row in csv.DictReader(open('voice/voice_more.csv', encoding='utf-8-sig'), delimiter=';'):
+    for lang in ('kz', 'ru'): varch[lang].setdefault(row['герой'], {}).setdefault(vnorm(row[lang]), row['id'])
 for row in [*csv.DictReader(open('voice/voice_lines.csv', encoding='utf-8-sig'), delimiter=';'), *csv.DictReader(open('voice/voice_extra.csv', encoding='utf-8-sig'), delimiter=';')]:   # таблица Виталия + реплики героя, которых в ней нет
     for lang in ('kz', 'ru'):
         t = row[lang].strip()
         if '{' in t: vtpl[lang].setdefault(t, row['id'])
         elif row['герой'] in ('hero', 'hero_f', 'hero_m'): vhero[lang].setdefault(vnorm(t), row['id'])   # реплики героя — отдельно: тот же текст может быть и у жильца
         else: vids[lang].setdefault(vnorm(t), row['id'])
-voice_js = 'const VOICE_IDS = ' + json.dumps(vids, ensure_ascii=False) + ';\nconst VOICE_HERO = ' + json.dumps(vhero, ensure_ascii=False) + ';\nconst VOICE_TPL = ' + json.dumps(vtpl, ensure_ascii=False) + ';\n'
+voice_js = 'const VOICE_IDS = ' + json.dumps(vids, ensure_ascii=False) + ';\nconst VOICE_HERO = ' + json.dumps(vhero, ensure_ascii=False) + ';\nconst VOICE_ARCH = ' + json.dumps(varch, ensure_ascii=False) + ';\nconst VOICE_TPL = ' + json.dumps(vtpl, ensure_ascii=False) + ';\n'
 order = ['engine', 'music', 'content', 'scen_texts', 'scen_glue', 'voice', 'api', 'art_head', 'art_world', 'art_night', 'art_portraits', 'game', 'interlude', 'prologue', 'house', 'inside']
 js = voice_js + '\n'.join(open(f'src/{n}.js').read() for n in order)
 js += '\nconst QUIZ_BUILTIN = ' + json.dumps(quiz, ensure_ascii=False) + ';\n' + open('src/quiz.js').read()

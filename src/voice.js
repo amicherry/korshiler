@@ -7,8 +7,9 @@ for (const lang of ['kz', 'ru']) for (const [tpl, id] of Object.entries(VOICE_TP
   const rx = tpl.toLowerCase().replace(/ё/g, 'е').replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\{[a-z]+\}/g, '(.+?)');
   VOICE_RX[lang].push([new RegExp('^' + rx + '$'), id]);
 }
-function voiceId(t, hero = false) {
+function voiceId(t, hero = false, arch = null) {
   const lang = LANG === 'ru' ? 'ru' : 'kz', k = vNorm(t);
+  if (arch && !hero && VOICE_ARCH[lang][arch] && VOICE_ARCH[lang][arch][k]) return VOICE_ARCH[lang][arch][k];   // общая реплика — голосом этого жильца
   if (hero && VOICE_HERO[lang][k]) return VOICE_HERO[lang][k];
   if (VOICE_IDS[lang][k]) return VOICE_IDS[lang][k];
   if (VOICE_HERO[lang][k]) return VOICE_HERO[lang][k];
@@ -28,11 +29,11 @@ function voiceLoad(src) {
   return p;
 }
 function voiceStop() { VOICE.seq = (VOICE.seq || 0) + 1; if (VOICE.cur) { try { VOICE.cur.stop ? VOICE.cur.stop() : VOICE.cur.pause(); } catch (e) {} VOICE.cur = null; } VOICE.playing = false; }
-function voiceSrc(t, heroG) { const id = voiceId(t, !!heroG); return id ? `out/${LANG === 'ru' ? 'ru' : 'kz'}/${heroG ? 'hero_' + heroG + '/' : ''}${id}.mp3` : null; }
-function voicePlay(t, heroG = null) {   // heroG: 'f'/'m' — реплика героя, ищем в out/<lang>/hero_f или hero_m
+function voiceSrc(t, heroG, arch = null) { const id = voiceId(t, !!heroG, arch); return id ? `out/${LANG === 'ru' ? 'ru' : 'kz'}/${heroG ? 'hero_' + heroG + '/' : ''}${id}.mp3` : null; }
+function voicePlay(t, heroG = null, arch = null) {   // heroG: 'f'/'m' — реплика героя, ищем в out/<lang>/hero_f или hero_m
   voiceStop();
   if (!SND.on || !SND.vox) return false;
-  const src = voiceSrc(t, heroG); if (!src || VOICE.missing.has(src)) return false;
+  const src = voiceSrc(t, heroG, arch); if (!src || VOICE.missing.has(src)) return false;
   return voicePlaySrc(src);
 }
 function voicePlaySrc(src) {

@@ -267,7 +267,7 @@ scenes.prologue = {
     if (Math.abs(h.x - n.x) < 16) { h.goal = n.x - h.dir * 18; while (h.goal != null) await wait(30); }
     await this.talk(n.name, n.look, n.lines, n.arch === 'grump' ? 'angry' : 'sad', ARCH[n.arch].voice);
     if (n.pram) {
-      dlgOpen(n.name, e => portrait(n.look, e), ARCH[n.arch].voice, null, n.look.body === 'f');
+      dlgOpen(n.name, e => portrait(n.look, e), ARCH[n.arch].voice, null, n.look.body === 'f'); DLG.arch = n.arch;
       const c = await ask([{ label: L(PRO.momHelp) }, { label: L(PRO.momBye) }]);
       if (c === 0) { dlgClose(); await this.talk(SAVE.name, SAVE.look, ['momHero'], 'happy');
         await this.talk(n.name, n.look, ['momThx'], 'happy', ARCH[n.arch].voice); SAVE.helpedMom = true; SAVE.trust = SAVE.trust || {}; for (let d = 1; d <= HOUSE.perFloor; d++) { const a = 8 * HOUSE.perFloor + d; SAVE.trust[a] = (SAVE.trust[a] || 0) + 5; } n.gone = 1; }

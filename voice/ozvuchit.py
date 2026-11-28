@@ -19,7 +19,7 @@
    Модель: --model eleven_v3 (по умолчанию, как у Виталия) или другая, если на слух лучше.
 Если установлен ffmpeg — громкость выравнивается до −16 LUFS, тишина по краям обрезается, моно 44,1 кГц 128 кбит/с.
 """
-import time, argparse, csv, json, os, shutil, subprocess, sys
+import re, time, argparse, csv, json, os, shutil, subprocess, sys
 import requests
 
 TAGS = {"greet": "", "good": "[interested]", "meh": "[hesitant]", "bad": "[annoyed]", "yes": "[warmly]",
@@ -49,7 +49,8 @@ def read_env():
 
 UP = {"kz": "мың теңге", "ru": "тысяча тенге"}   # {up} в игре — всегда 1 000 ₸ (content.js, UP)
 
-ALL = ["voice_lines.csv", "voice_extra.csv", "geroinya.csv"]
+ALL = ["voice_lines.csv", "voice_extra.csv", "voice_more.csv", "geroinya.csv"]
+FEMALE = {"apa", "mom", "teacher", "novosel", "renter", "obida", "hero_f"}   # «слышал(а)» → «слышала» у женских голосов
 
 def main():
     ap = argparse.ArgumentParser()
@@ -78,7 +79,7 @@ def main():
             if not vid: novoice[r["герой"]] = novoice.get(r["герой"], 0) + 1; continue
             if "{f}" in r[lg] or "{op}" in r[lg]: continue   # этаж/оператор меняются в игре — такие реплики не озвучиваем
             tag = "" if a.no_tags or r["герой"] in ("hero_f", "hero_m") else TAGS.get(r["ключ"], "")
-            text = (tag + " " + r[lg].replace("{up}", UP[lg])).strip(); chars += len(text); todo.append((r, lg, text, out, vid))
+            text = (tag + " " + re.sub(r"\(а\)", "а" if r["герой"] in FEMALE else "", r[lg].replace("{up}", UP[lg]))).strip(); chars += len(text); todo.append((r, lg, text, out, vid))
     print(f"к озвучке: {len(todo)} файлов, ≈{chars} символов (кредитов) · модель: {a.model}")
     if novoice: print("пропущено — нет Voice ID в voices.json:", ", ".join(f"{k} ({v})" for k, v in sorted(novoice.items())))
     if a.dry:

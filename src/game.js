@@ -20,7 +20,7 @@ function drawNet(dt) {
 
 /* ---------- Диалоги в стиле Undertale ---------- */
 const DLG = { open: false, name: '', port: null, voice: 400, text: '', shown: 0, choices: null, cursor: 0, resolve: null, expr: 'neutral', mood: null, blipAt: 0 };
-function dlgOpen(name, port, voice = 400, mood = null, female = null) { setTouch({ act: L(UI.next) }); Object.assign(DLG, { open: true, name, port, voice, mood, female, hero: false, text: '', shown: 0, choices: null }); }
+function dlgOpen(name, port, voice = 400, mood = null, female = null) { setTouch({ act: L(UI.next) }); Object.assign(DLG, { open: true, name, port, voice, mood, female, hero: false, arch: null, text: '', shown: 0, choices: null }); }
 // «подписал(а)» → «подписала» для женщины, «подписал» для мужчины (в казахском рода нет — ничего не меняется)
 const gform = (t, female) => String(t).replace(/([А-Яа-яЁё]+)\(а\)/g, (m, w) => female ? w + 'а' : w);
 function dlgClose() { voiceStop(); DLG.open = false; DLG.choices = null; DLG.resolve = null; }
@@ -28,7 +28,7 @@ function dlgClose() { voiceStop(); DLG.open = false; DLG.choices = null; DLG.res
 const DLG_LINES = 5, DLG_TW = 320;
 function sayPage(t, expr) { setTouch({ act: L(UI.next) }); return new Promise(res => Object.assign(DLG, { text: t, shown: 0, choices: null, expr, resolve: res })); }
 async function say(t, expr = 'neutral') {
-  voicePlay(t, DLG.hero ? (DLG.female ? 'f' : 'm') : null);   // есть mp3 — играет голос, нет — обычный «писк»; у героя — голос его пола
+  voicePlay(t, DLG.hero ? (DLG.female ? 'f' : 'm') : null, DLG.arch);   // есть mp3 — играет голос, нет — обычный «писк»; у героя — голос его пола
   t = gform(t, !!DLG.female);
   const lines = wrapText(t, DLG_TW);
   for (let i = 0; i < lines.length; i += DLG_LINES) await sayPage(lines.slice(i, i + DLG_LINES).join(' '), expr);
@@ -705,7 +705,7 @@ scenes.tour = {
     if (r.sleeping) { r.mood -= 8; r.sleeping = false; }
     r.away = false; this.addTime(.5);
     const sc = A.noVote || A.renter || A.notOwner ? null : scenFor(r.arch, T);
-    dlgOpen(r.name, e => portrait(r.look, e), A.voice, A.noVote || A.renter || A.notOwner ? null : () => r.mood, r.look.body === 'f');
+    dlgOpen(r.name, e => portrait(r.look, e), A.voice, A.noVote || A.renter || A.notOwner ? null : () => r.mood, r.look.body === 'f'); DLG.arch = r.arch;
     // реплика жильца: из сценария тура, иначе из характера; у каждого свой вариант, реакции без повторов подряд
     const Ln = (k, src) => {
       if (k === 'story') { const c = this.complaint(r); if (c) return this.fmt(r, c); }
