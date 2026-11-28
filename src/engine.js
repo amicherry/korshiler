@@ -200,8 +200,34 @@ function drawToasts(dt) {
 }
 
 /* ---------- звук (после первого касания) ---------- */
-const SND = { ac: null, on: loadStr('d67_sound', '1') === '1' };
-function audioUnlock() { if (!SND.ac) { try { SND.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } }
+const SND = { ac: null, on: loadStr('d67_sound', '1') === '1', mus: loadStr('d67_mus', '1') === '1', vox: loadStr('d67_vox', '1') === '1', silent: null };
+// Звук должен идти и в беззвучном режиме, как в рилсах:
+//  · iPhone (iOS 17+): audioSession.type = 'playback' — страница играет как видео, переключатель «беззвучно» её не глушит;
+//  · старые iPhone: тихий <audio> по кругу переводит страницу в тот же режим «медиа»;
+//  · везде: после сворачивания, звонка или выхода из Telegram AudioContext «засыпает» — будим на каждом касании и при возврате.
+const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const SILENT_WAV = (() => { const n = 4410, b = new Uint8Array(44 + n * 2), v = new DataView(b.buffer), w = (o, s) => [...s].forEach((c, i) => b[o + i] = c.charCodeAt(0));
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 44100, true); v.setUint32(28, 88200, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  let bin = ''; b.forEach(x => bin += String.fromCharCode(x)); return 'data:audio/wav;base64,' + btoa(bin); })();
+function audioUnlock() {
+  try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) {}
+  if (!SND.ac) { try { SND.ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' }); } catch (e) {} }
+  const ac = SND.ac; if (ac && ac.state !== 'running' && !document.hidden) { try { const p = ac.resume(); p && p.catch && p.catch(() => {}); } catch (e) {} }
+  if (IS_IOS && !navigator.audioSession && SND.on && !SND.silent) {
+    try { const a = new Audio(SILENT_WAV); a.loop = true; a.setAttribute('playsinline', ''); a.setAttribute('x-webkit-airplay', 'deny'); SND.silent = a; a.play().catch(() => { SND.silent = null; }); } catch (e) {}
+  }
+}
+// любое касание или клавиша — повод разбудить звук (в том числе кнопки поверх холста и экран входа Telegram)
+for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(ev, audioUnlock, { capture: true, passive: true });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (typeof voiceStop === 'function') voiceStop(); if (SND.silent) SND.silent.pause(); try { SND.ac && SND.ac.suspend(); } catch (e) {} }
+  else { if (SND.silent && SND.on) SND.silent.play().catch(() => {}); audioUnlock(); }
+});
+function soundSet(k, v) { SND[k] = v; saveStr({ on: 'd67_sound', mus: 'd67_mus', vox: 'd67_vox' }[k], v ? '1' : '0');
+  if (!SND.on || !SND.vox) { if (typeof voiceStop === 'function') voiceStop(); }
+  if (SND.silent) { if (SND.on) SND.silent.play().catch(() => {}); else SND.silent.pause(); }
+  audioUnlock(); }
 function beep(freq, dur = .04, type = 'square', vol = .04, delay = 0) {
   if (!SND.on || !SND.ac) return;
   try {
@@ -260,7 +286,7 @@ function frame(now) {
   const dt = clamp(now - last, 0, 50); last = now;
   ctx.setTransform(S, 0, 0, S, 0, 0); ctx.imageSmoothingEnabled = false;
   if (scene) { scene.update && scene.update(dt); scene.draw && scene.draw(dt); }
-  drawToasts(dt);
+  if (!(scene && scene.paused)) drawToasts(dt);   // на паузе подсказки не лезут поверх меню
   if (typeof drawNet === 'function') drawNet(dt);
   drawIris(dt);
   clicks = []; for (const k in pressed) pressed[k] = false;

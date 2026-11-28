@@ -296,8 +296,34 @@ function drawToasts(dt) {
 }
 
 /* ---------- звук (после первого касания) ---------- */
-const SND = { ac: null, on: loadStr('d67_sound', '1') === '1' };
-function audioUnlock() { if (!SND.ac) { try { SND.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } }
+const SND = { ac: null, on: loadStr('d67_sound', '1') === '1', mus: loadStr('d67_mus', '1') === '1', vox: loadStr('d67_vox', '1') === '1', silent: null };
+// Звук должен идти и в беззвучном режиме, как в рилсах:
+//  · iPhone (iOS 17+): audioSession.type = 'playback' — страница играет как видео, переключатель «беззвучно» её не глушит;
+//  · старые iPhone: тихий <audio> по кругу переводит страницу в тот же режим «медиа»;
+//  · везде: после сворачивания, звонка или выхода из Telegram AudioContext «засыпает» — будим на каждом касании и при возврате.
+const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const SILENT_WAV = (() => { const n = 4410, b = new Uint8Array(44 + n * 2), v = new DataView(b.buffer), w = (o, s) => [...s].forEach((c, i) => b[o + i] = c.charCodeAt(0));
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 44100, true); v.setUint32(28, 88200, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  let bin = ''; b.forEach(x => bin += String.fromCharCode(x)); return 'data:audio/wav;base64,' + btoa(bin); })();
+function audioUnlock() {
+  try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) {}
+  if (!SND.ac) { try { SND.ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' }); } catch (e) {} }
+  const ac = SND.ac; if (ac && ac.state !== 'running' && !document.hidden) { try { const p = ac.resume(); p && p.catch && p.catch(() => {}); } catch (e) {} }
+  if (IS_IOS && !navigator.audioSession && SND.on && !SND.silent) {
+    try { const a = new Audio(SILENT_WAV); a.loop = true; a.setAttribute('playsinline', ''); a.setAttribute('x-webkit-airplay', 'deny'); SND.silent = a; a.play().catch(() => { SND.silent = null; }); } catch (e) {}
+  }
+}
+// любое касание или клавиша — повод разбудить звук (в том числе кнопки поверх холста и экран входа Telegram)
+for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(ev, audioUnlock, { capture: true, passive: true });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (typeof voiceStop === 'function') voiceStop(); if (SND.silent) SND.silent.pause(); try { SND.ac && SND.ac.suspend(); } catch (e) {} }
+  else { if (SND.silent && SND.on) SND.silent.play().catch(() => {}); audioUnlock(); }
+});
+function soundSet(k, v) { SND[k] = v; saveStr({ on: 'd67_sound', mus: 'd67_mus', vox: 'd67_vox' }[k], v ? '1' : '0');
+  if (!SND.on || !SND.vox) { if (typeof voiceStop === 'function') voiceStop(); }
+  if (SND.silent) { if (SND.on) SND.silent.play().catch(() => {}); else SND.silent.pause(); }
+  audioUnlock(); }
 function beep(freq, dur = .04, type = 'square', vol = .04, delay = 0) {
   if (!SND.on || !SND.ac) return;
   try {
@@ -356,7 +382,7 @@ function frame(now) {
   const dt = clamp(now - last, 0, 50); last = now;
   ctx.setTransform(S, 0, 0, S, 0, 0); ctx.imageSmoothingEnabled = false;
   if (scene) { scene.update && scene.update(dt); scene.draw && scene.draw(dt); }
-  drawToasts(dt);
+  if (!(scene && scene.paused)) drawToasts(dt);   // на паузе подсказки не лезут поверх меню
   if (typeof drawNet === 'function') drawNet(dt);
   drawIris(dt);
   clicks = []; for (const k in pressed) pressed[k] = false;
@@ -406,7 +432,7 @@ function hat(t, vol) {
 }
 function musicTick() {
   const ac = SND.ac; if (!ac) return;
-  const out = musicOut(), on = SND.on && MUS.want && !document.hidden;
+  const out = musicOut(), on = SND.on && SND.mus && MUS.want && !document.hidden;
   // плавно глушим при выключенном звуке; смена темы — с начала такта
   out.gain.setTargetAtTime(on ? .055 : 0, ac.currentTime, .3);
   if (!on) return;
@@ -446,6 +472,15 @@ const UI = {
   hello:      { kz: 'Сәлем, ', ru: 'Привет, ' },
   lang:       { kz: 'ТІЛ', ru: 'ЯЗЫК' },
   sound:      { kz: 'ДЫБЫС', ru: 'ЗВУК' },
+  music:      { kz: 'МУЗЫКА', ru: 'МУЗЫКА' },
+  voices:     { kz: 'ДАУЫСТАР', ru: 'ГОЛОСА' },
+  soundTest:  { kz: 'ДЫБЫСТЫ ТЕКСЕРУ', ru: 'ПРОВЕРИТЬ ЗВУК' },
+  soundHint:  { kz: 'Естілмесе — телефонның медиа дыбысын көтеріңіз. Ойын дыбыссыз режимде де дыбыс шығарады.', ru: 'Не слышно? Прибавьте громкость медиа на телефоне. Игра звучит и в беззвучном режиме.' },
+  tgWriteT:   { kz: 'Telegram хабарламалары', ru: 'Сообщения в Telegram' },
+  tgWriteB:   { kz: 'Сертификат пен жаңалықтарды бот жібереді. Ботқа жазуға рұқсат бересіз бе?', ru: 'Сертификат и новости пришлёт бот. Разрешить боту писать вам?' },
+  tgAllow:    { kz: 'РҰҚСАТ БЕРУ', ru: 'РАЗРЕШИТЬ' },
+  tgLater:    { kz: 'КЕЙІН', ru: 'ПОЗЖЕ' },
+  tgOn:       { kz: 'Бот сізге жаза алады', ru: 'Бот может вам писать' },
   on:         { kz: 'ҚОСУЛЫ', ru: 'ВКЛ' }, off: { kz: 'ӨШІРУЛІ', ru: 'ВЫКЛ' },
   reset:      { kz: 'ПРОГРЕСТІ ТАЗАЛАУ', ru: 'СБРОСИТЬ ПРОГРЕСС' },
   resetSure:  { kz: 'СЕНІМДІСІҢ БЕ? ТАҒЫ БАС', ru: 'ТОЧНО? НАЖМИ ЕЩЁ РАЗ' },
@@ -2361,20 +2396,49 @@ function voiceId(t, hero = false) {
   for (const [rx, id] of VOICE_RX[lang]) if (rx.test(low)) return id;
   return null;
 }
-function voiceStop() { if (VOICE.cur) { try { VOICE.cur.pause(); } catch (e) {} VOICE.cur = null; } VOICE.playing = false; }
+// Голос играет через Web Audio (как музыка): на iPhone новый <audio> вне касания не стартует,
+// а Web Audio после первого касания играет всегда — и в беззвучном режиме тоже (см. audioUnlock).
+const VBUF = new Map();   // src → Promise<AudioBuffer>, держим последние ~40
+function voiceLoad(src) {
+  if (VBUF.has(src)) { const p = VBUF.get(src); VBUF.delete(src); VBUF.set(src, p); return p; }
+  const p = fetch(src).then(r => { if (!r.ok) { const e = new Error('missing'); e.missing = true; throw e; } return r.arrayBuffer(); })
+    .then(buf => new Promise((res, rej) => SND.ac.decodeAudioData(buf, res, rej)));
+  VBUF.set(src, p); if (VBUF.size > 40) VBUF.delete(VBUF.keys().next().value);
+  p.catch(e => { VBUF.delete(src); if (e && e.missing) VOICE.missing.add(src); });
+  return p;
+}
+function voiceStop() { VOICE.seq = (VOICE.seq || 0) + 1; if (VOICE.cur) { try { VOICE.cur.stop ? VOICE.cur.stop() : VOICE.cur.pause(); } catch (e) {} VOICE.cur = null; } VOICE.playing = false; }
+function voiceSrc(t, heroG) { const id = voiceId(t, !!heroG); return id ? `out/${LANG === 'ru' ? 'ru' : 'kz'}/${heroG ? 'hero_' + heroG + '/' : ''}${id}.mp3` : null; }
 function voicePlay(t, heroG = null) {   // heroG: 'f'/'m' — реплика героя, ищем в out/<lang>/hero_f или hero_m
   voiceStop();
-  if (!SND.on || typeof Audio === 'undefined') return false;
-  const id = voiceId(t, !!heroG); if (!id) return false;
-  const src = `out/${LANG === 'ru' ? 'ru' : 'kz'}/${heroG ? 'hero_' + heroG + '/' : ''}${id}.mp3`;
-  if (VOICE.missing.has(src)) return false;
-  const a = new Audio(src); a.volume = .95; VOICE.cur = a;
+  if (!SND.on || !SND.vox) return false;
+  const src = voiceSrc(t, heroG); if (!src || VOICE.missing.has(src)) return false;
+  return voicePlaySrc(src);
+}
+function voicePlaySrc(src) {
+  const seq = VOICE.seq;
+  // Web Audio — когда страница с сервера (fetch работает) и контекст создан; иначе — обычный <audio>
+  if (SND.ac && location.protocol !== 'file:') {
+    audioUnlock();
+    voiceLoad(src).then(buf => {
+      if (seq !== VOICE.seq || !SND.on || !SND.vox) return;
+      const s = SND.ac.createBufferSource(), g = SND.ac.createGain(); g.gain.value = .95;
+      s.buffer = buf; s.connect(g); g.connect(SND.ac.destination);
+      s.onended = () => { if (VOICE.cur === s) { VOICE.playing = false; VOICE.cur = null; } };
+      VOICE.cur = s; VOICE.playing = true; VOICE.ok.add(src); s.start();
+    }).catch(() => { if (seq === VOICE.seq) VOICE.playing = false; });
+    return true;
+  }
+  if (typeof Audio === 'undefined') return false;
+  const a = new Audio(src); a.volume = .95; a.setAttribute('playsinline', ''); VOICE.cur = a;
   a.addEventListener('playing', () => { if (VOICE.cur === a) { VOICE.playing = true; VOICE.ok.add(src); } });
   a.addEventListener('ended', () => { if (VOICE.cur === a) VOICE.playing = false; });
   a.addEventListener('error', () => { VOICE.missing.add(src); if (VOICE.cur === a) { VOICE.playing = false; VOICE.cur = null; } });
   a.play().catch(() => { VOICE.playing = false; });
   return true;
 }
+// кнопка «Проверить звук»: щелчок + реплика апа из первого собрания
+function soundTest() { audioUnlock(); sfx.stamp(); setTimeout(() => { voiceStop(); if (SND.on && SND.vox) voicePlaySrc(`out/${LANG === 'ru' ? 'ru' : 'kz'}/apa_init_greet.mp3`); }, 450); }
 
 /* ============================================================
    API — связь игры с сервером E-KNOT.
@@ -2425,12 +2489,24 @@ async function tgLogin() {
       const c = res && res.responseUnsafe && res.responseUnsafe.contact || {};
       const info = { phone: c.phone_number || null, contact: res && res.response || null };   // contact — строка с подписью Telegram для проверки на сервере
       saveStr(key, JSON.stringify(info)); box.hidden = true; done({ user: u, ...info });
+      if (!tgWriteOK()) setTimeout(() => tgWriteAsk(), 600);   // сразу после номера — разрешение боту писать (сертификаты, новости)
     });
   });
 }
 
+// разрешение боту писать игроку: без него бот не сможет прислать сертификат и напоминания
+function tgWriteOK() { if (!TG) return false; const u = TG.initDataUnsafe && TG.initDataUnsafe.user || {}; return !!u.allows_write_to_pm || loadStr('kn_tg_write', '') === 'yes'; }
+function tgWriteAsk(cb) {
+  if (!TG || !TG.isVersionAtLeast || !TG.isVersionAtLeast('6.9')) return cb && cb(false);
+  try { TG.requestWriteAccess(ok => { saveStr('kn_tg_write', ok ? 'yes' : 'no'); if (API.session) API.tgWrite(ok).catch(() => {}); cb && cb(ok); }); } catch (e) { cb && cb(false); }
+}
+
 const API_CONFIG = {
-  baseUrl: null,                 // например 'https://api.e-knot.kz/game/v1'
+  // адрес настоящего сервера. Пусто — работает заглушка. Задать можно тремя способами (без пересборки):
+  //   1) здесь строкой; 2) window.KORSHILER_API в index.html до игры; 3) в ссылке ?api=https://… (для проверки)
+  baseUrl: (() => { try { const q = new URLSearchParams(location.search).get('api') || window.KORSHILER_API || null;
+    return q && /^https:\/\//.test(q) ? q.replace(/\/+$/, '') : null; } catch (e) { return null; } })(),
+  timeoutMs: 12000,               // ответа нет дольше — считаем, что связь пропала, и повторяем
   latency: [150, 450],           // задержка ответа заглушки, мс
   failRate: .04,                 // доля «обрывов связи» в заглушке (?stable — без них)
 };
@@ -2624,6 +2700,8 @@ const MockServer = (() => {
       list = list.map((r, i) => ({ rank: i + 1, name: r.name, best: r.best, me: !!r.me }));
       return { scope, complexName: u.complex.name, top: list.slice(0, 8), mine: list.find(r => r.me) || null };
     },
+    // Telegram: игрок разрешил/запретил боту писать ему (сертификаты, напоминания)
+    'POST /tg/write'({ session, body }) { const u = me(session); u.tgWrite = !!body.allowed; commit(); return { ok: true, allowed: u.tgWrite }; },
     'GET /rewards'({ session }) { const u = me(session); return { rewards: db.rewards[u.userId] || [], guest: u.guest }; },
   };
 
@@ -2648,15 +2726,26 @@ async function request(method, path, { body, query } = {}, tries = 3) {
       try {
         if (!API_CONFIG.baseUrl) return await MockServer.handle(method, path, { session: API.session, body, query });
         const qs = query ? '?' + new URLSearchParams(query) : '';
-        const res = await fetch(API_CONFIG.baseUrl + path + qs, {
-          method, headers: { 'Content-Type': 'application/json', ...(API.session ? { Authorization: 'Bearer ' + API.session } : {}) },
-          body: body ? JSON.stringify(body) : undefined,
-        });
-        if (!res.ok) { const e = new Error('http_' + res.status); e.status = res.status; throw e; }
-        return await res.json();
+        const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, tm = ctl && setTimeout(() => ctl.abort(), API_CONFIG.timeoutMs);
+        let res;
+        try {
+          res = await fetch(API_CONFIG.baseUrl + path + qs, {
+            method, signal: ctl && ctl.signal,
+            headers: { 'Content-Type': 'application/json', 'X-Client': 'korshiler/' + CLIENT_VERSION, ...(API.session ? { Authorization: 'Bearer ' + API.session } : {}) },
+            body: body ? JSON.stringify(body) : undefined,
+          });
+        } finally { if (tm) clearTimeout(tm); }
+        if (!res.ok) {   // ошибка сервера: код из тела { error: 'no_money' } — как у заглушки
+          let code = 'http_' + res.status; try { const j = await res.json(); if (j && j.error) code = j.error; } catch (_) {}
+          const e = new Error(code); e.status = res.status; e.code = code;
+          // сессия истекла — один раз входим заново и повторяем запрос
+          if (res.status === 401 && path !== '/auth' && !API.reauthing) { API.reauthing = true; try { await API.auth(); } finally { API.reauthing = false; } continue; }
+          throw e;
+        }
+        return res.status === 204 ? {} : await res.json();
       } catch (e) {
-        // сеть мигнула — повторяем с паузой; ошибки вроде 401/404 не повторяем
-        if (e.status || i >= tries - 1) { NET.lastError = e; throw e; }
+        // сеть мигнула или сервер 5xx — повторяем с паузой; ошибки вроде 400/403/404/409 не повторяем
+        if ((e.status && e.status < 500) || i >= tries - 1) { NET.lastError = e; throw e; }
         await wait(400 * (i + 1));
       }
     }
@@ -2672,6 +2761,7 @@ const API = {
     const token = LAUNCH.token, tg = await tgLogin();
     const r = await request('POST', '/auth', { body: { token, deviceId, tg: tg && { initData: TG.initData, contact: tg.contact, phone: tg.phone }, launch: { name: LAUNCH.name, complex: LAUNCH.complex, level: LAUNCH.level, tour: LAUNCH.tour, title: LAUNCH.title } } });
     this.session = r.session; this.user = r.user;
+    if (TG && tgWriteOK()) this.tgWrite(true).catch(() => {});
     return { ...r.user, fromApp: !r.user.guest };
   },
   async load() { return (await request('GET', '/profile')).profile; },
@@ -2685,6 +2775,7 @@ const API = {
   async quizFinish(b) { return request('POST', '/quiz/finish', { body: b }, 4); },
   async buy(id) { return request('POST', '/house/buy', { body: { id } }); },
   async claim() { return request('POST', '/house/claim'); },
+  async tgWrite(allowed) { return request('POST', '/tg/write', { body: { allowed: !!allowed } }); },
 };
 
 // перенос старого сохранения (до появления заглушки сервера)
@@ -2695,7 +2786,7 @@ async function migrateOldSave() {
 }
 
 /* ---------- результат тура для приложения E-KNOT (docs/API.md, раздел 2) ---------- */
-const CLIENT_VERSION = '1.5.0';
+const CLIENT_VERSION = '1.6.0';
 function buildResult(scene, r) {
   const T = scene.tour, res = Object.values(scene.res);
   const thinking = res.filter(x => x.status === 'thinking').length, notReached = res.filter(x => ['unknown', 'away', 'noanswer'].includes(x.status)).length;
@@ -3808,14 +3899,47 @@ scenes.title = {
     text(L(UI.lang), W / 2, 62, { align: 'center', col: INK });
     if (button('ҚАЗ', W / 2 - 42, 76, LANG === 'kz' ? 'primary' : 'off', { w: 76 })) setLang('kz');
     if (button('РУС', W / 2 + 42, 76, LANG === 'ru' ? 'primary' : 'off', { w: 76 })) setLang('ru');
-    text(L(UI.sound), W / 2, 100, { align: 'center', col: INK });
-    if (button(SND.on ? L(UI.on) : L(UI.off), W / 2, 114, SND.on ? 'alt' : 'off')) { SND.on = !SND.on; saveStr('d67_sound', SND.on ? '1' : '0'); }
+    text(L(UI.sound), W / 2, 98, { align: 'center', col: INK });
+    soundToggles(W / 2, 110);
     if (button(this.done ? L(UI.resetDone) : this.sure ? L(UI.resetSure) : L(UI.reset), W / 2, 144, this.done ? 'off' : 'danger')) {
       if (this.done) {} else if (!this.sure) this.sure = true; else { SAVE = NEW_SAVE(); API.reset().catch(() => {}); this.done = true; }
     }
     if (button(L(UI.back), W / 2, 176, 'alt')) this.settings = false;
   },
 };
+// звук: три переключателя в ряд — общий звук, музыка, голоса (на титуле и в паузе)
+function soundToggles(cx, y) {
+  [['on', UI.sound], ['mus', UI.music], ['vox', UI.voices]].forEach(([k, lab], i) => {
+    const on = SND[k], dim = k !== 'on' && !SND.on;
+    if (button(L(lab), cx + (i - 1) * 78, y, on && !dim ? 'alt' : 'off', { w: 74 })) { soundSet(k, !on); if (!on) sfx.select(); } });
+}
+// окно настроек поверх паузы: игра стоит и ничего не сбрасывается; true — закрыть
+// строка «сообщения в Telegram» в настройках: уже можно — галочка, нельзя — кнопка «разрешить»
+function tgWriteRow(cx, y) {
+  if (tgWriteOK()) { text('✓ ' + L(UI.tgOn), cx, y + 4, { align: 'center', col: '#9fd9c2', size: 6 }); return; }
+  text(L(UI.tgWriteT), cx, y - 6, { align: 'center', col: '#8f86a8', size: 6 });
+  if (button(L(UI.tgAllow), cx, y + 2, 'primary', { w: 130 })) tgWriteAsk(ok => ok && toast(L(UI.tipT), L(UI.tgOn), 2000));
+}
+// напоминание в доме: если в Telegram пропустили «разрешить боту писать» — спрашиваем снова после каждой новой победы; true — закрыть
+function drawTgAsk() {
+  rect(0, 0, W, H, 'rgba(11,10,20,.6)'); frameBox(90, 60, 220, 104, .97);
+  text(L(UI.tgWriteT), W / 2, 70, { align: 'center', col: '#f2c94c' });
+  wrapText(L(UI.tgWriteB), 196, 6).slice(0, 4).forEach((l, i) => text(l, W / 2, 86 + i * 8, { align: 'center', col: '#cfd6e4', size: 6 }));
+  let close = false;
+  if (button(L(UI.tgAllow), W / 2 - 52, 140, 'primary', { w: 96 })) { tgWriteAsk(ok => ok && toast(L(UI.tipT), L(UI.tgOn), 2000)); close = true; }
+  if (button(L(UI.tgLater), W / 2 + 52, 140, 'off', { w: 96 })) close = true;
+  clicks.length = 0; return close;
+}
+function drawSoundPanel() {
+  rect(0, 0, W, H, 'rgba(11,10,20,.72)'); frameBox(72, 30, 256, 172, .97);
+  text(L(UI.settings), W / 2, 40, { align: 'center', col: '#f4f3ee' });
+  soundToggles(W / 2, 64);
+  if (button(L(UI.soundTest), W / 2, 90, 'primary', { w: 170 })) soundTest();
+  wrapText(L(UI.soundHint), 232, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, 114 + i * 8, { align: 'center', col: '#8f86a8', size: 6 }));
+  if (TG && typeof tgWriteRow === 'function') tgWriteRow(W / 2, 144);
+  const back = button(L(UI.back), W / 2, 178, 'alt', { w: 130 });
+  clicks.length = 0; return back;
+}
 function setLang(l) { LANG = l === 'ru' ? 'ru' : 'kz'; saveStr('d67_lang', l); document.getElementById('rotate').textContent = L(UI.rotate); }
 
 /* ============================================================
@@ -4091,10 +4215,10 @@ scenes.tour = {
   update(dt) {
     if (this.over) return;
     // пауза: время стоит, можно продолжить или выйти из уровня
-    if (this.paused) { setTouch({}); if (hit('back')) this.paused = false; return; }
+    if (this.paused) { setTouch({}); if (hit('back')) { if (this.pset) this.pset = false; else this.paused = false; } return; }
     if (this.help) return;   // открыта подсказка «?» — игра стоит
     if (this.chatWin) { this.chatWin.t += dt; return; }   // окно чата дома
-    if (hit('back') && !this.busy && !DLG.open && !this.ballot && !this.liftPick) { this.paused = true; return; }
+    if (hit('back') && !this.busy && !DLG.open && !this.ballot && !this.liftPick) { this.paused = true; this.pset = false; voiceStop(); return; }
     dlgUpdate(dt);
     const h = this.hero, T = this.tour;
     // время идёт, пока игрок ходит (в диалоге и в бюллетене — пауза)
@@ -4673,11 +4797,13 @@ scenes.tour = {
     if (this.chatWin) this.drawChat();
     if (this.help && drawHelp(L(UI.helpTourT), HELP_TOUR.filter(([, b]) => !b.app || this.app), HELP_ICONS)) { this.help = false; SAVE.helpTour = true; persist(); }
     if (this.paused) {
-      rect(0, 0, W, H, 'rgba(11,10,20,.65)'); frameBox(120, 50, 160, 120);
-      text(L(UI.pause), W / 2, 62, { align: 'center', col: '#f4f3ee' });
-      wrapText(L(UI.pauseNote), 140, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, 76 + i * 8, { align: 'center', col: '#8f86a8', size: 6 }));
-      if (button(L(UI.resume), W / 2, 104, 'primary', { w: 130 })) this.paused = false;
-      if (button(L(UI.quitLevel), W / 2, 130, 'alt', { w: 130 })) { this.over = true; this.paused = false; DLG.open = false; setTouch({});
+      if (this.pset) { if (drawSoundPanel()) this.pset = false; return; }   // настройки поверх паузы — собрание стоит как было
+      rect(0, 0, W, H, 'rgba(11,10,20,.65)'); frameBox(120, 44, 160, 136);
+      text(L(UI.pause), W / 2, 54, { align: 'center', col: '#f4f3ee' });
+      wrapText(L(UI.pauseNote), 140, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, 68 + i * 8, { align: 'center', col: '#8f86a8', size: 6 }));
+      if (button(L(UI.resume), W / 2, 96, 'primary', { w: 130 })) this.paused = false;
+      if (button(L(UI.settings), W / 2, 120, 'alt', { w: 130 })) this.pset = true;
+      if (button(L(UI.quitLevel), W / 2, 152, 'danger', { w: 130 })) { this.over = true; this.paused = false; DLG.open = false; setTouch({});
         irisTo(W / 2, 110, () => go(HOUSE_STATE.won.length ? 'house' : 'title')); }
       clicks.length = 0; return;
     }
@@ -4761,7 +4887,7 @@ scenes.tour = {
   drawHUD() {
     const T = this.tour;
     rect(0, 0, W, 19, '#0e111c'); rect(0, 19, W, 1, '#55607c'); rect(0, 20, W, 1, 'rgba(5,6,10,.6)');
-    if (button('II', 0, 1, 'dark', { left: 1, w: 16 }) && !this.busy && !DLG.open) this.paused = true;
+    if (button('II', 0, 1, 'dark', { left: 1, w: 16 }) && !this.busy && !DLG.open) { this.paused = true; this.pset = false; voiceStop(); }
     // дни — с тура 2 (в туре 1 таймера нет)
     if (!T.noTimer) { const left = this.end - this.minute, late = left < T.duration * .12;
       text(`${L(UI.day)} ${this.day()}/${T.days}`, 22, 3, { col: late ? '#e98f6f' : '#f4f3ee', size: 6 });
@@ -5846,6 +5972,10 @@ scenes.house = {
   enter(d) { this.t = 0; this.sel = null; this.anim = null; this.busy = false; setTouch({}); this.refresh(); if (d && d.focus) this.sel = d.focus;
     // подсказка — один раз, пока ничего не отремонтировано
     this.help = !SAVE.helpHouse;   // первый раз — сразу объясняем, что здесь делать
+    // Telegram: боту не разрешили писать — после каждой новой победы напоминаем (сертификат придёт через бота)
+    const won = (HOUSE_STATE.won || []).length;
+    this.tgAsk = !!TG && !tgWriteOK() && won > 0 && won > (SAVE.tgAskWon || 0);
+    if (this.tgAsk) { SAVE.tgAskWon = won; persist(); }
   },
   refresh() { API.house().then(h => { HOUSE_STATE = h; SAVE.coins = h.coins; }).catch(() => {}); },
   // что можно сделать с вещью сейчас
@@ -5880,7 +6010,7 @@ scenes.house = {
     this.t += dt; if (this.anim) this.anim.t += dt;
     if (hit('back')) irisTo(W / 2, 120, () => go('title'));
   },
-  draw(dt) { this.drawMain(dt); this.drawHelpIfOpen(); },
+  draw(dt) { this.drawMain(dt); if (this.tgAsk && !this.help) { if (drawTgAsk()) this.tgAsk = false; } else this.drawHelpIfOpen(); },
   drawMain(dt) {
     drawHouseMap(this.t, this.anim);
     // маркеры: «!» — можно действовать, замок — пока закрыто
@@ -6301,7 +6431,7 @@ scenes.quiz = {
   update(dt) {
     if (this.state === 'loading') return;
     this.t += dt;
-    if (hit('back') && !['end', 'intro'].includes(this.state)) this.paused = !this.paused;
+    if (hit('back') && !['end', 'intro'].includes(this.state)) { if (this.pset) this.pset = false; else this.paused = !this.paused; }
     if (this.paused) return;
     if (this.state === 'intro') { if (hit('act')) this.state = 'run'; return; }
     if (this.state === 'run') {
@@ -6445,7 +6575,7 @@ scenes.quiz = {
     ctx.drawImage(QZ.vig, 0, 0);
     // HUD
     rect(0, 0, W, 20, 'rgba(14,16,20,.88)');
-    if (button('II', 0, 2, 'dark', { left: 2, w: 16 })) this.paused = true;
+    if (button('II', 0, 2, 'dark', { left: 2, w: 16 })) { this.paused = true; this.pset = false; }
     for (let i = 0; i < this.total; i++) sprite(QZ.page, 24 + i * 11, 4, false, i < this.done ? 1 : .22);
     text(money(this.coins), 24 + this.total * 11 + 6, 6, { col: '#f2c94c', size: 6 });
     const prog = clamp(this.hx / this.totalLen(), 0, 1), bx = 250, bw = 140;
@@ -6515,10 +6645,12 @@ scenes.quiz = {
     else if (button(L(UI.toHouse), W / 2 + 66, 176, 'primary')) irisTo(W / 2, 120, () => go('house'));
   },
   drawPause() {
-    rect(0, 0, W, H, 'rgba(10,12,20,.7)'); frameBox(110, 60, 180, 96, .96);
-    text(L(UI.pause), W / 2, 70, { align: 'center', col: '#f4f3ee' });
-    if (button(L(UI.resume), W / 2, 92, 'primary')) this.paused = false;
-    if (button(L(UI.quitLevel), W / 2, 118, 'danger')) irisTo(W / 2, 120, () => this.then ? go('tour', { tour: this.then, skipInter: true }) : go('house'));
+    if (this.pset) { if (drawSoundPanel()) this.pset = false; return; }
+    rect(0, 0, W, H, 'rgba(10,12,20,.7)'); frameBox(110, 52, 180, 120, .96);
+    text(L(UI.pause), W / 2, 62, { align: 'center', col: '#f4f3ee' });
+    if (button(L(UI.resume), W / 2, 84, 'primary', { w: 130 })) this.paused = false;
+    if (button(L(UI.settings), W / 2, 108, 'alt', { w: 130 })) this.pset = true;
+    if (button(L(UI.quitLevel), W / 2, 142, 'danger', { w: 130 })) irisTo(W / 2, 120, () => this.then ? go('tour', { tour: this.then, skipInter: true }) : go('house'));
   },
 };
 

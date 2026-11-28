@@ -272,7 +272,7 @@ scenes.quiz = {
   update(dt) {
     if (this.state === 'loading') return;
     this.t += dt;
-    if (hit('back') && !['end', 'intro'].includes(this.state)) this.paused = !this.paused;
+    if (hit('back') && !['end', 'intro'].includes(this.state)) { if (this.pset) this.pset = false; else this.paused = !this.paused; }
     if (this.paused) return;
     if (this.state === 'intro') { if (hit('act')) this.state = 'run'; return; }
     if (this.state === 'run') {
@@ -416,7 +416,7 @@ scenes.quiz = {
     ctx.drawImage(QZ.vig, 0, 0);
     // HUD
     rect(0, 0, W, 20, 'rgba(14,16,20,.88)');
-    if (button('II', 0, 2, 'dark', { left: 2, w: 16 })) this.paused = true;
+    if (button('II', 0, 2, 'dark', { left: 2, w: 16 })) { this.paused = true; this.pset = false; }
     for (let i = 0; i < this.total; i++) sprite(QZ.page, 24 + i * 11, 4, false, i < this.done ? 1 : .22);
     text(money(this.coins), 24 + this.total * 11 + 6, 6, { col: '#f2c94c', size: 6 });
     const prog = clamp(this.hx / this.totalLen(), 0, 1), bx = 250, bw = 140;
@@ -486,9 +486,11 @@ scenes.quiz = {
     else if (button(L(UI.toHouse), W / 2 + 66, 176, 'primary')) irisTo(W / 2, 120, () => go('house'));
   },
   drawPause() {
-    rect(0, 0, W, H, 'rgba(10,12,20,.7)'); frameBox(110, 60, 180, 96, .96);
-    text(L(UI.pause), W / 2, 70, { align: 'center', col: '#f4f3ee' });
-    if (button(L(UI.resume), W / 2, 92, 'primary')) this.paused = false;
-    if (button(L(UI.quitLevel), W / 2, 118, 'danger')) irisTo(W / 2, 120, () => this.then ? go('tour', { tour: this.then, skipInter: true }) : go('house'));
+    if (this.pset) { if (drawSoundPanel()) this.pset = false; return; }
+    rect(0, 0, W, H, 'rgba(10,12,20,.7)'); frameBox(110, 52, 180, 120, .96);
+    text(L(UI.pause), W / 2, 62, { align: 'center', col: '#f4f3ee' });
+    if (button(L(UI.resume), W / 2, 84, 'primary', { w: 130 })) this.paused = false;
+    if (button(L(UI.settings), W / 2, 108, 'alt', { w: 130 })) this.pset = true;
+    if (button(L(UI.quitLevel), W / 2, 142, 'danger', { w: 130 })) irisTo(W / 2, 120, () => this.then ? go('tour', { tour: this.then, skipInter: true }) : go('house'));
   },
 };

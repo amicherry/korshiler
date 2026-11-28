@@ -41,7 +41,7 @@ function hat(t, vol) {
 }
 function musicTick() {
   const ac = SND.ac; if (!ac) return;
-  const out = musicOut(), on = SND.on && MUS.want && !document.hidden;
+  const out = musicOut(), on = SND.on && SND.mus && MUS.want && !document.hidden;
   // плавно глушим при выключенном звуке; смена темы — с начала такта
   out.gain.setTargetAtTime(on ? .055 : 0, ac.currentTime, .3);
   if (!on) return;

@@ -196,14 +196,47 @@ scenes.title = {
     text(L(UI.lang), W / 2, 62, { align: 'center', col: INK });
     if (button('ҚАЗ', W / 2 - 42, 76, LANG === 'kz' ? 'primary' : 'off', { w: 76 })) setLang('kz');
     if (button('РУС', W / 2 + 42, 76, LANG === 'ru' ? 'primary' : 'off', { w: 76 })) setLang('ru');
-    text(L(UI.sound), W / 2, 100, { align: 'center', col: INK });
-    if (button(SND.on ? L(UI.on) : L(UI.off), W / 2, 114, SND.on ? 'alt' : 'off')) { SND.on = !SND.on; saveStr('d67_sound', SND.on ? '1' : '0'); }
+    text(L(UI.sound), W / 2, 98, { align: 'center', col: INK });
+    soundToggles(W / 2, 110);
     if (button(this.done ? L(UI.resetDone) : this.sure ? L(UI.resetSure) : L(UI.reset), W / 2, 144, this.done ? 'off' : 'danger')) {
       if (this.done) {} else if (!this.sure) this.sure = true; else { SAVE = NEW_SAVE(); API.reset().catch(() => {}); this.done = true; }
     }
     if (button(L(UI.back), W / 2, 176, 'alt')) this.settings = false;
   },
 };
+// звук: три переключателя в ряд — общий звук, музыка, голоса (на титуле и в паузе)
+function soundToggles(cx, y) {
+  [['on', UI.sound], ['mus', UI.music], ['vox', UI.voices]].forEach(([k, lab], i) => {
+    const on = SND[k], dim = k !== 'on' && !SND.on;
+    if (button(L(lab), cx + (i - 1) * 78, y, on && !dim ? 'alt' : 'off', { w: 74 })) { soundSet(k, !on); if (!on) sfx.select(); } });
+}
+// окно настроек поверх паузы: игра стоит и ничего не сбрасывается; true — закрыть
+// строка «сообщения в Telegram» в настройках: уже можно — галочка, нельзя — кнопка «разрешить»
+function tgWriteRow(cx, y) {
+  if (tgWriteOK()) { text('✓ ' + L(UI.tgOn), cx, y + 4, { align: 'center', col: '#9fd9c2', size: 6 }); return; }
+  text(L(UI.tgWriteT), cx, y - 6, { align: 'center', col: '#8f86a8', size: 6 });
+  if (button(L(UI.tgAllow), cx, y + 2, 'primary', { w: 130 })) tgWriteAsk(ok => ok && toast(L(UI.tipT), L(UI.tgOn), 2000));
+}
+// напоминание в доме: если в Telegram пропустили «разрешить боту писать» — спрашиваем снова после каждой новой победы; true — закрыть
+function drawTgAsk() {
+  rect(0, 0, W, H, 'rgba(11,10,20,.6)'); frameBox(90, 60, 220, 104, .97);
+  text(L(UI.tgWriteT), W / 2, 70, { align: 'center', col: '#f2c94c' });
+  wrapText(L(UI.tgWriteB), 196, 6).slice(0, 4).forEach((l, i) => text(l, W / 2, 86 + i * 8, { align: 'center', col: '#cfd6e4', size: 6 }));
+  let close = false;
+  if (button(L(UI.tgAllow), W / 2 - 52, 140, 'primary', { w: 96 })) { tgWriteAsk(ok => ok && toast(L(UI.tipT), L(UI.tgOn), 2000)); close = true; }
+  if (button(L(UI.tgLater), W / 2 + 52, 140, 'off', { w: 96 })) close = true;
+  clicks.length = 0; return close;
+}
+function drawSoundPanel() {
+  rect(0, 0, W, H, 'rgba(11,10,20,.72)'); frameBox(72, 30, 256, 172, .97);
+  text(L(UI.settings), W / 2, 40, { align: 'center', col: '#f4f3ee' });
+  soundToggles(W / 2, 64);
+  if (button(L(UI.soundTest), W / 2, 90, 'primary', { w: 170 })) soundTest();
+  wrapText(L(UI.soundHint), 232, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, 114 + i * 8, { align: 'center', col: '#8f86a8', size: 6 }));
+  if (TG && typeof tgWriteRow === 'function') tgWriteRow(W / 2, 144);
+  const back = button(L(UI.back), W / 2, 178, 'alt', { w: 130 });
+  clicks.length = 0; return back;
+}
 function setLang(l) { LANG = l === 'ru' ? 'ru' : 'kz'; saveStr('d67_lang', l); document.getElementById('rotate').textContent = L(UI.rotate); }
 
 /* ============================================================
@@ -479,10 +512,10 @@ scenes.tour = {
   update(dt) {
     if (this.over) return;
     // пауза: время стоит, можно продолжить или выйти из уровня
-    if (this.paused) { setTouch({}); if (hit('back')) this.paused = false; return; }
+    if (this.paused) { setTouch({}); if (hit('back')) { if (this.pset) this.pset = false; else this.paused = false; } return; }
     if (this.help) return;   // открыта подсказка «?» — игра стоит
     if (this.chatWin) { this.chatWin.t += dt; return; }   // окно чата дома
-    if (hit('back') && !this.busy && !DLG.open && !this.ballot && !this.liftPick) { this.paused = true; return; }
+    if (hit('back') && !this.busy && !DLG.open && !this.ballot && !this.liftPick) { this.paused = true; this.pset = false; voiceStop(); return; }
     dlgUpdate(dt);
     const h = this.hero, T = this.tour;
     // время идёт, пока игрок ходит (в диалоге и в бюллетене — пауза)
@@ -1061,11 +1094,13 @@ scenes.tour = {
     if (this.chatWin) this.drawChat();
     if (this.help && drawHelp(L(UI.helpTourT), HELP_TOUR.filter(([, b]) => !b.app || this.app), HELP_ICONS)) { this.help = false; SAVE.helpTour = true; persist(); }
     if (this.paused) {
-      rect(0, 0, W, H, 'rgba(11,10,20,.65)'); frameBox(120, 50, 160, 120);
-      text(L(UI.pause), W / 2, 62, { align: 'center', col: '#f4f3ee' });
-      wrapText(L(UI.pauseNote), 140, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, 76 + i * 8, { align: 'center', col: '#8f86a8', size: 6 }));
-      if (button(L(UI.resume), W / 2, 104, 'primary', { w: 130 })) this.paused = false;
-      if (button(L(UI.quitLevel), W / 2, 130, 'alt', { w: 130 })) { this.over = true; this.paused = false; DLG.open = false; setTouch({});
+      if (this.pset) { if (drawSoundPanel()) this.pset = false; return; }   // настройки поверх паузы — собрание стоит как было
+      rect(0, 0, W, H, 'rgba(11,10,20,.65)'); frameBox(120, 44, 160, 136);
+      text(L(UI.pause), W / 2, 54, { align: 'center', col: '#f4f3ee' });
+      wrapText(L(UI.pauseNote), 140, 6).slice(0, 3).forEach((l, i) => text(l, W / 2, 68 + i * 8, { align: 'center', col: '#8f86a8', size: 6 }));
+      if (button(L(UI.resume), W / 2, 96, 'primary', { w: 130 })) this.paused = false;
+      if (button(L(UI.settings), W / 2, 120, 'alt', { w: 130 })) this.pset = true;
+      if (button(L(UI.quitLevel), W / 2, 152, 'danger', { w: 130 })) { this.over = true; this.paused = false; DLG.open = false; setTouch({});
         irisTo(W / 2, 110, () => go(HOUSE_STATE.won.length ? 'house' : 'title')); }
       clicks.length = 0; return;
     }
@@ -1149,7 +1184,7 @@ scenes.tour = {
   drawHUD() {
     const T = this.tour;
     rect(0, 0, W, 19, '#0e111c'); rect(0, 19, W, 1, '#55607c'); rect(0, 20, W, 1, 'rgba(5,6,10,.6)');
-    if (button('II', 0, 1, 'dark', { left: 1, w: 16 }) && !this.busy && !DLG.open) this.paused = true;
+    if (button('II', 0, 1, 'dark', { left: 1, w: 16 }) && !this.busy && !DLG.open) { this.paused = true; this.pset = false; voiceStop(); }
     // дни — с тура 2 (в туре 1 таймера нет)
     if (!T.noTimer) { const left = this.end - this.minute, late = left < T.duration * .12;
       text(`${L(UI.day)} ${this.day()}/${T.days}`, 22, 3, { col: late ? '#e98f6f' : '#f4f3ee', size: 6 });

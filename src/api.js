@@ -47,12 +47,24 @@ async function tgLogin() {
       const c = res && res.responseUnsafe && res.responseUnsafe.contact || {};
       const info = { phone: c.phone_number || null, contact: res && res.response || null };   // contact — строка с подписью Telegram для проверки на сервере
       saveStr(key, JSON.stringify(info)); box.hidden = true; done({ user: u, ...info });
+      if (!tgWriteOK()) setTimeout(() => tgWriteAsk(), 600);   // сразу после номера — разрешение боту писать (сертификаты, новости)
     });
   });
 }
 
+// разрешение боту писать игроку: без него бот не сможет прислать сертификат и напоминания
+function tgWriteOK() { if (!TG) return false; const u = TG.initDataUnsafe && TG.initDataUnsafe.user || {}; return !!u.allows_write_to_pm || loadStr('kn_tg_write', '') === 'yes'; }
+function tgWriteAsk(cb) {
+  if (!TG || !TG.isVersionAtLeast || !TG.isVersionAtLeast('6.9')) return cb && cb(false);
+  try { TG.requestWriteAccess(ok => { saveStr('kn_tg_write', ok ? 'yes' : 'no'); if (API.session) API.tgWrite(ok).catch(() => {}); cb && cb(ok); }); } catch (e) { cb && cb(false); }
+}
+
 const API_CONFIG = {
-  baseUrl: null,                 // например 'https://api.e-knot.kz/game/v1'
+  // адрес настоящего сервера. Пусто — работает заглушка. Задать можно тремя способами (без пересборки):
+  //   1) здесь строкой; 2) window.KORSHILER_API в index.html до игры; 3) в ссылке ?api=https://… (для проверки)
+  baseUrl: (() => { try { const q = new URLSearchParams(location.search).get('api') || window.KORSHILER_API || null;
+    return q && /^https:\/\//.test(q) ? q.replace(/\/+$/, '') : null; } catch (e) { return null; } })(),
+  timeoutMs: 12000,               // ответа нет дольше — считаем, что связь пропала, и повторяем
   latency: [150, 450],           // задержка ответа заглушки, мс
   failRate: .04,                 // доля «обрывов связи» в заглушке (?stable — без них)
 };
@@ -246,6 +258,8 @@ const MockServer = (() => {
       list = list.map((r, i) => ({ rank: i + 1, name: r.name, best: r.best, me: !!r.me }));
       return { scope, complexName: u.complex.name, top: list.slice(0, 8), mine: list.find(r => r.me) || null };
     },
+    // Telegram: игрок разрешил/запретил боту писать ему (сертификаты, напоминания)
+    'POST /tg/write'({ session, body }) { const u = me(session); u.tgWrite = !!body.allowed; commit(); return { ok: true, allowed: u.tgWrite }; },
     'GET /rewards'({ session }) { const u = me(session); return { rewards: db.rewards[u.userId] || [], guest: u.guest }; },
   };
 
@@ -270,15 +284,26 @@ async function request(method, path, { body, query } = {}, tries = 3) {
       try {
         if (!API_CONFIG.baseUrl) return await MockServer.handle(method, path, { session: API.session, body, query });
         const qs = query ? '?' + new URLSearchParams(query) : '';
-        const res = await fetch(API_CONFIG.baseUrl + path + qs, {
-          method, headers: { 'Content-Type': 'application/json', ...(API.session ? { Authorization: 'Bearer ' + API.session } : {}) },
-          body: body ? JSON.stringify(body) : undefined,
-        });
-        if (!res.ok) { const e = new Error('http_' + res.status); e.status = res.status; throw e; }
-        return await res.json();
+        const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, tm = ctl && setTimeout(() => ctl.abort(), API_CONFIG.timeoutMs);
+        let res;
+        try {
+          res = await fetch(API_CONFIG.baseUrl + path + qs, {
+            method, signal: ctl && ctl.signal,
+            headers: { 'Content-Type': 'application/json', 'X-Client': 'korshiler/' + CLIENT_VERSION, ...(API.session ? { Authorization: 'Bearer ' + API.session } : {}) },
+            body: body ? JSON.stringify(body) : undefined,
+          });
+        } finally { if (tm) clearTimeout(tm); }
+        if (!res.ok) {   // ошибка сервера: код из тела { error: 'no_money' } — как у заглушки
+          let code = 'http_' + res.status; try { const j = await res.json(); if (j && j.error) code = j.error; } catch (_) {}
+          const e = new Error(code); e.status = res.status; e.code = code;
+          // сессия истекла — один раз входим заново и повторяем запрос
+          if (res.status === 401 && path !== '/auth' && !API.reauthing) { API.reauthing = true; try { await API.auth(); } finally { API.reauthing = false; } continue; }
+          throw e;
+        }
+        return res.status === 204 ? {} : await res.json();
       } catch (e) {
-        // сеть мигнула — повторяем с паузой; ошибки вроде 401/404 не повторяем
-        if (e.status || i >= tries - 1) { NET.lastError = e; throw e; }
+        // сеть мигнула или сервер 5xx — повторяем с паузой; ошибки вроде 400/403/404/409 не повторяем
+        if ((e.status && e.status < 500) || i >= tries - 1) { NET.lastError = e; throw e; }
         await wait(400 * (i + 1));
       }
     }
@@ -294,6 +319,7 @@ const API = {
     const token = LAUNCH.token, tg = await tgLogin();
     const r = await request('POST', '/auth', { body: { token, deviceId, tg: tg && { initData: TG.initData, contact: tg.contact, phone: tg.phone }, launch: { name: LAUNCH.name, complex: LAUNCH.complex, level: LAUNCH.level, tour: LAUNCH.tour, title: LAUNCH.title } } });
     this.session = r.session; this.user = r.user;
+    if (TG && tgWriteOK()) this.tgWrite(true).catch(() => {});
     return { ...r.user, fromApp: !r.user.guest };
   },
   async load() { return (await request('GET', '/profile')).profile; },
@@ -307,6 +333,7 @@ const API = {
   async quizFinish(b) { return request('POST', '/quiz/finish', { body: b }, 4); },
   async buy(id) { return request('POST', '/house/buy', { body: { id } }); },
   async claim() { return request('POST', '/house/claim'); },
+  async tgWrite(allowed) { return request('POST', '/tg/write', { body: { allowed: !!allowed } }); },
 };
 
 // перенос старого сохранения (до появления заглушки сервера)
@@ -317,7 +344,7 @@ async function migrateOldSave() {
 }
 
 /* ---------- результат тура для приложения E-KNOT (docs/API.md, раздел 2) ---------- */
-const CLIENT_VERSION = '1.5.0';
+const CLIENT_VERSION = '1.6.0';
 function buildResult(scene, r) {
   const T = scene.tour, res = Object.values(scene.res);
   const thinking = res.filter(x => x.status === 'thinking').length, notReached = res.filter(x => ['unknown', 'away', 'noanswer'].includes(x.status)).length;

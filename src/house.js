@@ -318,6 +318,10 @@ scenes.house = {
   enter(d) { this.t = 0; this.sel = null; this.anim = null; this.busy = false; setTouch({}); this.refresh(); if (d && d.focus) this.sel = d.focus;
     // подсказка — один раз, пока ничего не отремонтировано
     this.help = !SAVE.helpHouse;   // первый раз — сразу объясняем, что здесь делать
+    // Telegram: боту не разрешили писать — после каждой новой победы напоминаем (сертификат придёт через бота)
+    const won = (HOUSE_STATE.won || []).length;
+    this.tgAsk = !!TG && !tgWriteOK() && won > 0 && won > (SAVE.tgAskWon || 0);
+    if (this.tgAsk) { SAVE.tgAskWon = won; persist(); }
   },
   refresh() { API.house().then(h => { HOUSE_STATE = h; SAVE.coins = h.coins; }).catch(() => {}); },
   // что можно сделать с вещью сейчас
@@ -352,7 +356,7 @@ scenes.house = {
     this.t += dt; if (this.anim) this.anim.t += dt;
     if (hit('back')) irisTo(W / 2, 120, () => go('title'));
   },
-  draw(dt) { this.drawMain(dt); this.drawHelpIfOpen(); },
+  draw(dt) { this.drawMain(dt); if (this.tgAsk && !this.help) { if (drawTgAsk()) this.tgAsk = false; } else this.drawHelpIfOpen(); },
   drawMain(dt) {
     drawHouseMap(this.t, this.anim);
     // маркеры: «!» — можно действовать, замок — пока закрыто
