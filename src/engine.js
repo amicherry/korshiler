@@ -281,12 +281,15 @@ function go(name, data, from) {
   const p = from || (scene.focus ? scene.focus() : { x: W / 2, y: H / 2 });
   irisFrom(p.x, p.y);
 }
+const BGF = (() => { const c = document.getElementById('bgfill'); return c ? { g: c.getContext('2d'), n: 0 } : null; })();
 let last = performance.now();
 function frame(now) {
   const dt = clamp(now - last, 0, 50); last = now;
   ctx.setTransform(S, 0, 0, S, 0, 0); ctx.imageSmoothingEnabled = false;
   if (scene) { scene.update && scene.update(dt); scene.draw && scene.draw(dt); }
-  if (!(scene && scene.paused)) drawToasts(dt);   // на паузе подсказки не лезут поверх меню
+  if (!(scene && scene.paused)) drawToasts(dt);
+  // поля вокруг игры: уменьшенная копия кадра, размытая CSS-ом (обновляем ~6 раз в секунду — это почти бесплатно)
+  if (BGF && (BGF.n = (BGF.n + 1) % 10) === 0) { try { BGF.g.drawImage(cv, 0, 0, 64, 36); } catch (e) {} }   // на паузе подсказки не лезут поверх меню
   if (typeof drawNet === 'function') drawNet(dt);
   drawIris(dt);
   clicks = []; for (const k in pressed) pressed[k] = false;

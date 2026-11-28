@@ -29,7 +29,9 @@ const TG_T = {
 };
 async function tgLogin() {
   if (!TG) return null;
-  try { TG.ready(); TG.expand(); document.documentElement.classList.add('tg');
+  try { TG.ready(); TG.expand(); document.documentElement.classList.add('tg'); setTimeout(fit, 60);
+    // Telegram меняет размеры окна и «безопасные» отступы (повернули телефон, включили весь экран) — подгоняем игру
+    for (const ev of ['viewportChanged', 'safeAreaChanged', 'contentSafeAreaChanged', 'fullscreenChanged']) try { TG.onEvent(ev, () => setTimeout(fit, 60)); } catch (e) {}
     if (TG.isVersionAtLeast('7.7')) TG.disableVerticalSwipes();          // свайп по игре не должен закрывать окно
     if (TG.isVersionAtLeast('6.1')) { TG.setHeaderColor('#15161c'); TG.setBackgroundColor('#15161c'); }
     if (TG.isVersionAtLeast('8.0') && /android|iphone|ipad/i.test(navigator.userAgent)) TG.requestFullscreen();
