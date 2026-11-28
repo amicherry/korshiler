@@ -23,6 +23,15 @@ const LAUNCH = (() => {
    Серверу уходят initData (подпись Telegram) и ответ requestContact — настоящий сервер проверяет их токеном бота.
    Вне Telegram (обычный браузер) — как раньше: гость или токен приложения E-KNOT. */
 const TG = (() => { try { const w = window.Telegram && window.Telegram.WebApp; return w && w.initData ? w : null; } catch (e) { return null; } })();
+// отступы Telegram в CSS-пикселях: строка состояния, полоса кнопок, ширина зоны кнопки от края экрана
+function tgInsets() {
+  if (!TG || !document.documentElement.classList.contains('tg')) return null;
+  const css = n => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)) || 0;
+  const safe = (TG.safeAreaInset && TG.safeAreaInset.top) || css('--tg-safe-area-inset-top');
+  const content = (TG.contentSafeAreaInset && TG.contentSafeAreaInset.top) || css('--tg-content-safe-area-inset-top');
+  if (!safe && !content) return null;
+  return { safe, content, pill: 140 };
+}
 const TG_T = {
   kz: { text: 'Ойнау үшін Telegram-дағы телефон нөміріңмен кір. Нөмір E-KNOT профиліне ғана керек.', btn: 'НӨМІРМЕН КІРУ', note: 'Нөмірсіз ойын ашылмайды.', again: 'Нөмір жіберілмеді. Қайта көріңіз.', old: 'Telegram-ды жаңартыңыз — бұл нұсқа нөмірмен кіруді қолдамайды.' },
   ru: { text: 'Чтобы играть, войди по номеру телефона из Telegram. Номер нужен только для профиля E-KNOT.', btn: 'ВОЙТИ ПО НОМЕРУ', note: 'Без номера игра не откроется.', again: 'Номер не отправлен. Попробуй ещё раз.', old: 'Обнови Telegram — эта версия не умеет входить по номеру.' },

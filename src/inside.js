@@ -8,7 +8,7 @@ scenes.inside = {
     look[HOUSE.heroApt] = { col: '#2f6f62', kind: 'metal' };
     this.bg = drawStairwell(this.floors, a => look[a], this.fixed);
     const heroF = Math.ceil(HOUSE.heroApt / HOUSE.perFloor);
-    this.camY = clamp(floorBase(heroF, this.floors) - 150, 0, this.bg.height - H); this.camX = 0; this.vy = 0; this.vx = 0; this.drag = null;
+    this.camY = clamp(floorBase(heroF, this.floors) - 150, 0, this.bg.height - H); this.camX = camClamp(0, SW); this.vy = 0; this.vx = 0; this.drag = null;
     setTouch({ up: true, down: true });
   },
   update(dt) {
@@ -19,7 +19,7 @@ scenes.inside = {
     if (pointer.down && pointer.y > 20) { if (!this.drag) this.drag = { x: pointer.x, y: pointer.y, cx: this.camX, cy: this.camY };
       else { this.camY = this.drag.cy - (pointer.y - this.drag.y); this.camX = this.drag.cx - (pointer.x - this.drag.x); } }
     else this.drag = null;
-    this.camY = clamp(this.camY, 0, this.bg.height - H); this.camX = clamp(this.camX, 0, SW - W);
+    this.camY = clamp(this.camY, 0, this.bg.height - H); this.camX = camClamp(this.camX, SW);
     if (hit('back')) irisTo(W / 2, 120, () => go('house'));
   },
   draw(dt) {

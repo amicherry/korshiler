@@ -5,18 +5,29 @@
    чтобы при растягивании под экран не терялись строки пикселей.
    ============================================================ */
 const W = 400, H = 225, S = 3;
+// Широкий экран: всё по-прежнему рисуется в «сцене» 400×225 (кнопки и окна на своих местах, по центру),
+// а холст шире — FW (до 520) под пропорцию телефона. Слева и справа по OX логических пикселей —
+// там продолжаются фон, улица и подъезд. Для проверки ширину можно задать в ссылке: ?fw=480
+const FW = (() => { try { const q = +new URLSearchParams(location.search).get('fw'); if (q) return Math.max(W, Math.min(560, Math.round(q / 2) * 2));
+  const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData;   // в Telegram сверху ещё полоса кнопок — экран фактически шире
+  const a = Math.max(innerWidth, innerHeight), b = Math.max(1, Math.min(innerWidth, innerHeight)) * (tg ? .8 : 1);
+  return Math.max(W, Math.min(520, Math.round(H * a / b / 2) * 2)); } catch (e) { return W; } })();
+const OX = (FW - W) / 2;
 const FONT = '"Press Start 2P", monospace';
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
-cv.width = W * S; cv.height = H * S;
+cv.width = FW * S; cv.height = H * S;
 const isTouch = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 if (isTouch) document.documentElement.classList.add('touch');
 
 function fit() {
   const wrap = document.getElementById('wrap');
-  // на телефоне — максимально крупно; кнопки полупрозрачные и лежат поверх игры
-  const k = Math.min(wrap.clientWidth / W, wrap.clientHeight / H);
-  cv.style.width = Math.floor(W * k) + 'px';
+  // Telegram во весь экран: сверху строка состояния и полоса с кнопками «Закрыть» / «⌄ ⋯» — игра встаёт ниже них
+  let ti = null; try { ti = typeof tgInsets === 'function' ? tgInsets() : null; } catch (e) {}   // до загрузки api.js Telegram ещё не готов
+  const top = ti ? ti.safe + ti.content : 0;
+  wrap.style.paddingTop = top ? top + 'px' : ''; wrap.style.alignItems = top ? 'start' : '';
+  const k = Math.min(wrap.clientWidth / FW, (wrap.clientHeight - top) / H);
+  cv.style.width = Math.floor(FW * k) + 'px';
   cv.style.height = Math.floor(H * k) + 'px';
 }
 addEventListener('resize', fit); fit();
@@ -80,7 +91,7 @@ function setTouch({ act = null, up = false, down = false, move = false } = {}) {
 /* мышь и касания по холсту: щелчки собираются за кадр, кнопки проверяют их сами */
 let clicks = [];
 const pointer = { x: -1, y: -1 };
-function toLogical(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
+function toLogical(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * FW - OX, y: (e.clientY - r.top) / r.height * H }; }
 cv.addEventListener('pointerdown', e => { audioUnlock(); const p = toLogical(e); clicks.push(p); pointer.down = true; pointer.x = p.x; pointer.y = p.y; });
 addEventListener('pointerup', () => { pointer.down = false; }); addEventListener('pointercancel', () => { pointer.down = false; });
 cv.addEventListener('pointermove', e => { const p = toLogical(e); pointer.x = p.x; pointer.y = p.y; });
@@ -113,7 +124,11 @@ function wrapText(s, maxW, size = 8) {
 }
 
 /* ---------- примитивы ---------- */
-function rect(x, y, w, h, col) { ctx.fillStyle = col; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+// прямоугольник во всю ширину сцены (затемнение, полоса меню, фон) растягиваем на весь широкий экран
+function rect(x, y, w, h, col) { if (OX && x <= 0 && x + w >= W) { x = -OX; w = FW; }
+  ctx.fillStyle = col; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+// камера по миру ширины ww: экран видит [camX − OX, camX + W + OX]; мир уже экрана — ставим по центру
+function camClamp(tx, ww) { return ww >= FW ? clamp(tx, OX, ww - W - OX) : (ww - W) / 2; }
 function makeCanvas(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
@@ -126,6 +141,17 @@ function makeCanvas(w, h, draw) {
       if ((x * x) / (rx * rx + .5) + (y * y) / (ry * ry + .5) <= 1) g.fillRect(cx + x, cy + y, 1, 1); },
   };
   draw(P); return c;
+}
+// фон шириной в сцену (400) → шириной в экран: края продолжаем зеркально (дома, небо, земля просто становятся шире)
+const WIDE = new WeakMap();
+function wide(c) { if (!OX || !c) return c; let w = WIDE.get(c); if (!w) { w = widenBg(c); WIDE.set(c, w); } return w; }
+function widenBg(c) {
+  if (!OX) return c;
+  return makeCanvas(FW, c.height, ({ g }) => {
+    g.drawImage(c, OX, 0);
+    g.save(); g.translate(OX, 0); g.scale(-1, 1); g.drawImage(c, 0, 0, OX, c.height, 0, 0, OX, c.height); g.restore();
+    g.save(); g.translate(2 * (OX + W), 0); g.scale(-1, 1); g.drawImage(c, W - OX, 0, OX, c.height, W, 0, OX, c.height); g.restore();
+  });
 }
 function sprite(img, x, y, flip = false, alpha = 1) {
   ctx.imageSmoothingEnabled = false;
@@ -257,8 +283,9 @@ const TR_NOISE = Array.from({ length: TR_COLS * TR_ROWS }, (_, i) => { const x =
 function drawTrCells(k, cover) {
   // клетки всегда целые квадраты; край волны — 3 ступени серого, как пиксельный градиент
   const shades = ['rgba(11,12,16,.35)', 'rgba(11,12,16,.65)', '#0b0c10'];
-  for (let ry = 0; ry < TR_ROWS; ry++) for (let cx = 0; cx < TR_COLS; cx++) {
-    const th = (ry / TR_ROWS) * .65 + TR_NOISE[ry * TR_COLS + cx] * .35;
+  const c0 = Math.floor(-OX / TR_CELL), c1 = Math.ceil((W + OX) / TR_CELL);
+  for (let ry = 0; ry < TR_ROWS; ry++) for (let cx = c0; cx < c1; cx++) {
+    const th = (ry / TR_ROWS) * .65 + TR_NOISE[ry * TR_COLS + ((cx % TR_COLS) + TR_COLS) % TR_COLS] * .35;
     let v = (k * 1.45 - th) / .2; v = cover ? v : 1 - v; if (v <= 0) continue;
     ctx.fillStyle = shades[Math.min(2, Math.floor(v * 3))];
     ctx.fillRect(cx * TR_CELL, ry * TR_CELL, TR_CELL, TR_CELL);
@@ -268,13 +295,14 @@ function drawIris(dt) {
   if (!trans.phase) return;
   trans.t += dt; const D = 380, k = Math.min(1, trans.t / D);
   if (trans.phase === 'out') { drawTrCells(k, true); if (k >= 1) { const cb = trans.cb; trans.phase = 'hold'; trans.t = 0; cb && cb(); } }
-  else if (trans.phase === 'hold') { ctx.fillStyle = '#0b0c10'; ctx.fillRect(0, 0, W, H); }
+  else if (trans.phase === 'hold') { ctx.fillStyle = '#0b0c10'; ctx.fillRect(-OX, 0, FW, H); }
   else { drawTrCells(k, false); if (k >= 1) trans.phase = null; }
 }
 
 /* ---------- сцены и главный цикл ---------- */
 const scenes = {}; let scene = null;
 function go(name, data, from) {
+  if (scene && scene.leave && scenes[name] !== scene) { try { scene.leave(); } catch (e) {} }
   scene = scenes[name]; clicks = []; toasts.length = 0; for (const k in pressed) pressed[k] = false;
   if (typeof musicFor === 'function') musicFor(name);
   scene.enter && scene.enter(data || {});
@@ -285,7 +313,8 @@ const BGF = (() => { const c = document.getElementById('bgfill'); return c ? { g
 let last = performance.now();
 function frame(now) {
   const dt = clamp(now - last, 0, 50); last = now;
-  ctx.setTransform(S, 0, 0, S, 0, 0); ctx.imageSmoothingEnabled = false;
+  ctx.setTransform(S, 0, 0, S, OX * S, 0); ctx.imageSmoothingEnabled = false;
+  if (OX) { ctx.fillStyle = '#0b0c10'; ctx.fillRect(-OX, 0, FW, H); }
   if (scene) { scene.update && scene.update(dt); scene.draw && scene.draw(dt); }
   if (!(scene && scene.paused)) drawToasts(dt);
   // поля вокруг игры: уменьшенная копия кадра, размытая CSS-ом (обновляем ~6 раз в секунду — это почти бесплатно)

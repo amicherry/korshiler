@@ -66,7 +66,8 @@ body{height:100%;margin:0;background:var(--frame);color:var(--ink);overflow:hidd
 #tgauth button:active{border-bottom-width:1px;transform:translateY(3px)}
 /* Telegram во весь экран: игра встаёт ниже кнопок «Закрыть» и «⌄ ⋯», чтобы они не закрывали меню и паузу;
    всё вокруг игры заполняет размытая картинка самой игры — чёрных полей нет */
-.tg.touch body{padding-top:calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px))}
+.tg.touch body{padding-top:0}   /* отступ сверху в Telegram считает fit() в engine.js */
+.tg #wrap{padding-top:0}
 #bgfill{position:fixed;inset:-24px;width:calc(100% + 48px);height:calc(100% + 48px);z-index:0;pointer-events:none;
   filter:blur(10px) brightness(.42) saturate(1.15);image-rendering:auto}
 #wrap{position:relative;z-index:1}

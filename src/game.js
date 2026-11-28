@@ -277,7 +277,7 @@ scenes.creator = {
     const box = document.getElementById('nameBox'), r = cv.getBoundingClientRect();
     // поле имени — строго в своей строке холста (y 31…44), размер от масштаба игры, чтобы не наезжало на вкладки
     const k = r.height / H, inp = document.getElementById('nameInput');
-    box.style.left = (r.left + r.width * (293 / W)) + 'px'; box.style.top = (r.top + k * 31) + 'px';
+    box.style.left = (r.left + r.width * ((293 + OX) / FW)) + 'px'; box.style.top = (r.top + k * 31) + 'px';
     Object.assign(inp.style, { width: Math.round(k * 194) + 'px', height: Math.round(k * 13) + 'px', fontSize: Math.max(10, Math.round(k * 7)) + 'px',
       padding: '0 ' + Math.round(k * 4) + 'px', borderWidth: Math.max(1, Math.round(k)) + 'px', boxSizing: 'border-box', lineHeight: '1' });
     const ROWS = OPT_TABS[this.tab];
@@ -416,7 +416,7 @@ scenes.tour = {
     this.hero = { x: DOOR_X[(tour.heroApt - 1) % tour.perFloor] + 20, floor: hf, y: floorBase(hf, tour.floors), dir: -1, walkT: 0, moving: false, climb: null, knockT: 0 };
     this.minute = tour.start; this.end = tour.start + tour.duration;
     this.events = []; this.broadcasts = 0; this.busy = false; this.ballot = false; this.goalShown = false; this.over = false;
-    this.camY = clamp(this.hero.y - 165, 0, this.WH - H); this.camX = clamp(this.hero.x - W / 2, 0, SW - W);
+    this.camY = clamp(this.hero.y - 165, 0, this.WH - H); this.camX = camClamp(this.hero.x - W / 2, SW);
     this.talker = { floor: tour.talkerFloor, x: 95, done: false, look: { skin: '#d6a07a', hair: 'short', hairCol: '#3a2a20', top: 'hoodie', topCol: '#3b3f55', pants: '#2b2a33', hat: 'cap', capCol: '#3f6f8c', beard: true } };
     this.helper = { state: 'hidden', floor: 2, x: 397, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
     this.rats = this.fixed.has('basement') ? [] : [{ x: 80, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 380, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
@@ -599,7 +599,7 @@ scenes.tour = {
     // по горизонтали камера стоит, пока герой в средней части экрана (лестница целиком в ней) — без качки на пролётах
     const sx = this.hero.x - this.camX; let tx = this.camX;
     if (sx < 120) tx = this.hero.x - 120; else if (sx > 280) tx = this.hero.x - 280;
-    this.camX = lerp(this.camX, clamp(tx, 0, SW - W), Math.min(1, dt / 200));
+    this.camX = lerp(this.camX, camClamp(tx, SW), Math.min(1, dt / 200));
   },
   startClimb(d) {
     const h = this.hero, b = this.base(h.floor);

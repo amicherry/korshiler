@@ -66,7 +66,8 @@ body{height:100%;margin:0;background:var(--frame);color:var(--ink);overflow:hidd
 #tgauth button:active{border-bottom-width:1px;transform:translateY(3px)}
 /* Telegram во весь экран: игра встаёт ниже кнопок «Закрыть» и «⌄ ⋯», чтобы они не закрывали меню и паузу;
    всё вокруг игры заполняет размытая картинка самой игры — чёрных полей нет */
-.tg.touch body{padding-top:calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px))}
+.tg.touch body{padding-top:0}   /* отступ сверху в Telegram считает fit() в engine.js */
+.tg #wrap{padding-top:0}
 #bgfill{position:fixed;inset:-24px;width:calc(100% + 48px);height:calc(100% + 48px);z-index:0;pointer-events:none;
   filter:blur(10px) brightness(.42) saturate(1.15);image-rendering:auto}
 #wrap{position:relative;z-index:1}
@@ -106,18 +107,29 @@ const VOICE_TPL = {"kz": {"Айына небәрі {up} — бір литр ай
    чтобы при растягивании под экран не терялись строки пикселей.
    ============================================================ */
 const W = 400, H = 225, S = 3;
+// Широкий экран: всё по-прежнему рисуется в «сцене» 400×225 (кнопки и окна на своих местах, по центру),
+// а холст шире — FW (до 520) под пропорцию телефона. Слева и справа по OX логических пикселей —
+// там продолжаются фон, улица и подъезд. Для проверки ширину можно задать в ссылке: ?fw=480
+const FW = (() => { try { const q = +new URLSearchParams(location.search).get('fw'); if (q) return Math.max(W, Math.min(560, Math.round(q / 2) * 2));
+  const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData;   // в Telegram сверху ещё полоса кнопок — экран фактически шире
+  const a = Math.max(innerWidth, innerHeight), b = Math.max(1, Math.min(innerWidth, innerHeight)) * (tg ? .8 : 1);
+  return Math.max(W, Math.min(520, Math.round(H * a / b / 2) * 2)); } catch (e) { return W; } })();
+const OX = (FW - W) / 2;
 const FONT = '"Press Start 2P", monospace';
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
-cv.width = W * S; cv.height = H * S;
+cv.width = FW * S; cv.height = H * S;
 const isTouch = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 if (isTouch) document.documentElement.classList.add('touch');
 
 function fit() {
   const wrap = document.getElementById('wrap');
-  // на телефоне — максимально крупно; кнопки полупрозрачные и лежат поверх игры
-  const k = Math.min(wrap.clientWidth / W, wrap.clientHeight / H);
-  cv.style.width = Math.floor(W * k) + 'px';
+  // Telegram во весь экран: сверху строка состояния и полоса с кнопками «Закрыть» / «⌄ ⋯» — игра встаёт ниже них
+  let ti = null; try { ti = typeof tgInsets === 'function' ? tgInsets() : null; } catch (e) {}   // до загрузки api.js Telegram ещё не готов
+  const top = ti ? ti.safe + ti.content : 0;
+  wrap.style.paddingTop = top ? top + 'px' : ''; wrap.style.alignItems = top ? 'start' : '';
+  const k = Math.min(wrap.clientWidth / FW, (wrap.clientHeight - top) / H);
+  cv.style.width = Math.floor(FW * k) + 'px';
   cv.style.height = Math.floor(H * k) + 'px';
 }
 addEventListener('resize', fit); fit();
@@ -181,7 +193,7 @@ function setTouch({ act = null, up = false, down = false, move = false } = {}) {
 /* мышь и касания по холсту: щелчки собираются за кадр, кнопки проверяют их сами */
 let clicks = [];
 const pointer = { x: -1, y: -1 };
-function toLogical(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
+function toLogical(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * FW - OX, y: (e.clientY - r.top) / r.height * H }; }
 cv.addEventListener('pointerdown', e => { audioUnlock(); const p = toLogical(e); clicks.push(p); pointer.down = true; pointer.x = p.x; pointer.y = p.y; });
 addEventListener('pointerup', () => { pointer.down = false; }); addEventListener('pointercancel', () => { pointer.down = false; });
 cv.addEventListener('pointermove', e => { const p = toLogical(e); pointer.x = p.x; pointer.y = p.y; });
@@ -214,7 +226,11 @@ function wrapText(s, maxW, size = 8) {
 }
 
 /* ---------- примитивы ---------- */
-function rect(x, y, w, h, col) { ctx.fillStyle = col; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+// прямоугольник во всю ширину сцены (затемнение, полоса меню, фон) растягиваем на весь широкий экран
+function rect(x, y, w, h, col) { if (OX && x <= 0 && x + w >= W) { x = -OX; w = FW; }
+  ctx.fillStyle = col; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+// камера по миру ширины ww: экран видит [camX − OX, camX + W + OX]; мир уже экрана — ставим по центру
+function camClamp(tx, ww) { return ww >= FW ? clamp(tx, OX, ww - W - OX) : (ww - W) / 2; }
 function makeCanvas(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
@@ -227,6 +243,17 @@ function makeCanvas(w, h, draw) {
       if ((x * x) / (rx * rx + .5) + (y * y) / (ry * ry + .5) <= 1) g.fillRect(cx + x, cy + y, 1, 1); },
   };
   draw(P); return c;
+}
+// фон шириной в сцену (400) → шириной в экран: края продолжаем зеркально (дома, небо, земля просто становятся шире)
+const WIDE = new WeakMap();
+function wide(c) { if (!OX || !c) return c; let w = WIDE.get(c); if (!w) { w = widenBg(c); WIDE.set(c, w); } return w; }
+function widenBg(c) {
+  if (!OX) return c;
+  return makeCanvas(FW, c.height, ({ g }) => {
+    g.drawImage(c, OX, 0);
+    g.save(); g.translate(OX, 0); g.scale(-1, 1); g.drawImage(c, 0, 0, OX, c.height, 0, 0, OX, c.height); g.restore();
+    g.save(); g.translate(2 * (OX + W), 0); g.scale(-1, 1); g.drawImage(c, W - OX, 0, OX, c.height, W, 0, OX, c.height); g.restore();
+  });
 }
 function sprite(img, x, y, flip = false, alpha = 1) {
   ctx.imageSmoothingEnabled = false;
@@ -358,8 +385,9 @@ const TR_NOISE = Array.from({ length: TR_COLS * TR_ROWS }, (_, i) => { const x =
 function drawTrCells(k, cover) {
   // клетки всегда целые квадраты; край волны — 3 ступени серого, как пиксельный градиент
   const shades = ['rgba(11,12,16,.35)', 'rgba(11,12,16,.65)', '#0b0c10'];
-  for (let ry = 0; ry < TR_ROWS; ry++) for (let cx = 0; cx < TR_COLS; cx++) {
-    const th = (ry / TR_ROWS) * .65 + TR_NOISE[ry * TR_COLS + cx] * .35;
+  const c0 = Math.floor(-OX / TR_CELL), c1 = Math.ceil((W + OX) / TR_CELL);
+  for (let ry = 0; ry < TR_ROWS; ry++) for (let cx = c0; cx < c1; cx++) {
+    const th = (ry / TR_ROWS) * .65 + TR_NOISE[ry * TR_COLS + ((cx % TR_COLS) + TR_COLS) % TR_COLS] * .35;
     let v = (k * 1.45 - th) / .2; v = cover ? v : 1 - v; if (v <= 0) continue;
     ctx.fillStyle = shades[Math.min(2, Math.floor(v * 3))];
     ctx.fillRect(cx * TR_CELL, ry * TR_CELL, TR_CELL, TR_CELL);
@@ -369,13 +397,14 @@ function drawIris(dt) {
   if (!trans.phase) return;
   trans.t += dt; const D = 380, k = Math.min(1, trans.t / D);
   if (trans.phase === 'out') { drawTrCells(k, true); if (k >= 1) { const cb = trans.cb; trans.phase = 'hold'; trans.t = 0; cb && cb(); } }
-  else if (trans.phase === 'hold') { ctx.fillStyle = '#0b0c10'; ctx.fillRect(0, 0, W, H); }
+  else if (trans.phase === 'hold') { ctx.fillStyle = '#0b0c10'; ctx.fillRect(-OX, 0, FW, H); }
   else { drawTrCells(k, false); if (k >= 1) trans.phase = null; }
 }
 
 /* ---------- сцены и главный цикл ---------- */
 const scenes = {}; let scene = null;
 function go(name, data, from) {
+  if (scene && scene.leave && scenes[name] !== scene) { try { scene.leave(); } catch (e) {} }
   scene = scenes[name]; clicks = []; toasts.length = 0; for (const k in pressed) pressed[k] = false;
   if (typeof musicFor === 'function') musicFor(name);
   scene.enter && scene.enter(data || {});
@@ -386,7 +415,8 @@ const BGF = (() => { const c = document.getElementById('bgfill'); return c ? { g
 let last = performance.now();
 function frame(now) {
   const dt = clamp(now - last, 0, 50); last = now;
-  ctx.setTransform(S, 0, 0, S, 0, 0); ctx.imageSmoothingEnabled = false;
+  ctx.setTransform(S, 0, 0, S, OX * S, 0); ctx.imageSmoothingEnabled = false;
+  if (OX) { ctx.fillStyle = '#0b0c10'; ctx.fillRect(-OX, 0, FW, H); }
   if (scene) { scene.update && scene.update(dt); scene.draw && scene.draw(dt); }
   if (!(scene && scene.paused)) drawToasts(dt);
   // поля вокруг игры: уменьшенная копия кадра, размытая CSS-ом (обновляем ~6 раз в секунду — это почти бесплатно)
@@ -2473,6 +2503,15 @@ const LAUNCH = (() => {
    Серверу уходят initData (подпись Telegram) и ответ requestContact — настоящий сервер проверяет их токеном бота.
    Вне Telegram (обычный браузер) — как раньше: гость или токен приложения E-KNOT. */
 const TG = (() => { try { const w = window.Telegram && window.Telegram.WebApp; return w && w.initData ? w : null; } catch (e) { return null; } })();
+// отступы Telegram в CSS-пикселях: строка состояния, полоса кнопок, ширина зоны кнопки от края экрана
+function tgInsets() {
+  if (!TG || !document.documentElement.classList.contains('tg')) return null;
+  const css = n => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)) || 0;
+  const safe = (TG.safeAreaInset && TG.safeAreaInset.top) || css('--tg-safe-area-inset-top');
+  const content = (TG.contentSafeAreaInset && TG.contentSafeAreaInset.top) || css('--tg-content-safe-area-inset-top');
+  if (!safe && !content) return null;
+  return { safe, content, pill: 140 };
+}
 const TG_T = {
   kz: { text: 'Ойнау үшін Telegram-дағы телефон нөміріңмен кір. Нөмір E-KNOT профиліне ғана керек.', btn: 'НӨМІРМЕН КІРУ', note: 'Нөмірсіз ойын ашылмайды.', again: 'Нөмір жіберілмеді. Қайта көріңіз.', old: 'Telegram-ды жаңартыңыз — бұл нұсқа нөмірмен кіруді қолдамайды.' },
   ru: { text: 'Чтобы играть, войди по номеру телефона из Telegram. Номер нужен только для профиля E-KNOT.', btn: 'ВОЙТИ ПО НОМЕРУ', note: 'Без номера игра не откроется.', again: 'Номер не отправлен. Попробуй ещё раз.', old: 'Обнови Telegram — эта версия не умеет входить по номеру.' },
@@ -3399,12 +3438,12 @@ function buildNight() {
 function drawNight(dt) {
   if (NIGHT.lang !== LANG) buildNight();
   NIGHT.t += dt; const t = NIGHT.t;
-  sprite(NIGHT.sky, 0, 0);
+  sprite(wide(NIGHT.sky), -OX, 0);
   for (const s of NIGHT.stars) { ctx.globalAlpha = .4 + .6 * Math.abs(Math.sin(t / 900 + s.ph)); rect(s.x, s.y, s.big ? 2 : 1, s.big ? 2 : 1, '#dfe6f2'); }
   ctx.globalAlpha = 1;
   const px = (t / 24) % (W + 240) - 120;
   if (px > 0 && px < W) { const py = 30 + px * .04; rect(px, py, 3, 1, '#7f8fb0'); if (Math.floor(t / 450) % 2) rect(px + 3, py, 1, 1, '#ff5a4a'); }
-  sprite(NIGHT.mid, 0, 0);
+  sprite(wide(NIGHT.mid), -OX, 0);
   for (const b of NIGHT.blinkers) if (Math.sin(t / 380 + b.ph) > .3) rect(b.x, b.y, 1, 1, '#ff4a3a');
   // свет в окнах то гаснет, то загорается
   if (t > NIGHT.next) {
@@ -3432,7 +3471,7 @@ function drawNight(dt) {
     rect(x - 5, y - 17, 3, 7, '#cfd6e4'); rect(x - 4, y - 18, 4, 1, '#cfd6e4'); rect(x - 2, y - 15, 3, 1, '#8792ad');
     if (Math.sin(t / 300) > 0) rect(x, y - 13, 1, 1, '#ff4a3a');
   }
-  sprite(NIGHT.fg, 0, 0);
+  sprite(wide(NIGHT.fg), -OX, 0);
   
   for (const s of NIGHT.snow) { s.y += s.v * dt; s.x += s.dx * dt + Math.sin(t / 500 + s.y / 25) * .1; if (s.y > H) { s.y = -2; s.x = Math.random() * W; } rect(Math.round(s.x), Math.round(s.y), s.big ? 2 : 1, 1, s.c); }
 }
@@ -3990,7 +4029,7 @@ scenes.creator = {
     const box = document.getElementById('nameBox'), r = cv.getBoundingClientRect();
     // поле имени — строго в своей строке холста (y 31…44), размер от масштаба игры, чтобы не наезжало на вкладки
     const k = r.height / H, inp = document.getElementById('nameInput');
-    box.style.left = (r.left + r.width * (293 / W)) + 'px'; box.style.top = (r.top + k * 31) + 'px';
+    box.style.left = (r.left + r.width * ((293 + OX) / FW)) + 'px'; box.style.top = (r.top + k * 31) + 'px';
     Object.assign(inp.style, { width: Math.round(k * 194) + 'px', height: Math.round(k * 13) + 'px', fontSize: Math.max(10, Math.round(k * 7)) + 'px',
       padding: '0 ' + Math.round(k * 4) + 'px', borderWidth: Math.max(1, Math.round(k)) + 'px', boxSizing: 'border-box', lineHeight: '1' });
     const ROWS = OPT_TABS[this.tab];
@@ -4129,7 +4168,7 @@ scenes.tour = {
     this.hero = { x: DOOR_X[(tour.heroApt - 1) % tour.perFloor] + 20, floor: hf, y: floorBase(hf, tour.floors), dir: -1, walkT: 0, moving: false, climb: null, knockT: 0 };
     this.minute = tour.start; this.end = tour.start + tour.duration;
     this.events = []; this.broadcasts = 0; this.busy = false; this.ballot = false; this.goalShown = false; this.over = false;
-    this.camY = clamp(this.hero.y - 165, 0, this.WH - H); this.camX = clamp(this.hero.x - W / 2, 0, SW - W);
+    this.camY = clamp(this.hero.y - 165, 0, this.WH - H); this.camX = camClamp(this.hero.x - W / 2, SW);
     this.talker = { floor: tour.talkerFloor, x: 95, done: false, look: { skin: '#d6a07a', hair: 'short', hairCol: '#3a2a20', top: 'hoodie', topCol: '#3b3f55', pants: '#2b2a33', hat: 'cap', capCol: '#3f6f8c', beard: true } };
     this.helper = { state: 'hidden', floor: 2, x: 397, look: { skin: '#e3ad86', hair: 'long', hairCol: '#1b1a21', top: 'jacket', topCol: '#7d4f8a' } };
     this.rats = this.fixed.has('basement') ? [] : [{ x: 80, dir: 1, t: 0, st: 'roam', k: 0, pause: 0 }, { x: 380, dir: -1, t: 300, st: 'roam', k: 0, pause: 0 }];
@@ -4312,7 +4351,7 @@ scenes.tour = {
     // по горизонтали камера стоит, пока герой в средней части экрана (лестница целиком в ней) — без качки на пролётах
     const sx = this.hero.x - this.camX; let tx = this.camX;
     if (sx < 120) tx = this.hero.x - 120; else if (sx > 280) tx = this.hero.x - 280;
-    this.camX = lerp(this.camX, clamp(tx, 0, SW - W), Math.min(1, dt / 200));
+    this.camX = lerp(this.camX, camClamp(tx, SW), Math.min(1, dt / 200));
   },
   startClimb(d) {
     const h = this.hero, b = this.base(h.floor);
@@ -5372,7 +5411,7 @@ scenes.prologue = {
     this.moving = !!dir;
     if (dir) { this.dir = dir; this.hx = clamp(this.hx + dir * dt * .07, 8, SWS - 10); this.walkT += dt; this.stepAcc += dt; if (this.stepAcc > 240) { this.stepAcc = 0; sfx.step(); } }
     const sx = this.hx - this.scx; let tx = this.scx; if (sx < 140) tx = this.hx - 140; else if (sx > 260) tx = this.hx - 260;
-    this.scx = lerp(this.scx, clamp(tx, 0, SWS - W), Math.min(1, dt / 200));
+    this.scx = lerp(this.scx, camClamp(tx, SWS), Math.min(1, dt / 200));
     const atDoor = Math.abs(this.hx - STREET_DOOR_X) < 10;
     setTouch({ act: atDoor ? L(PRO.enter) : null, move: true });
     if (atDoor && (hit('act') || (this.plan == null && this.tapDoor))) this.enterHouse();
@@ -5394,7 +5433,7 @@ scenes.prologue = {
     this.bg = this.preBg || this.makeStairs();
     this.WH = this.bg.height;
     this.h = { x: 14, floor: 1, y: this.base(1), dir: 1, walkT: 0, moving: false, climb: null, anim: null };
-    this.camY = clamp(this.h.y - 165, 0, this.WH - H); this.camX = 0;
+    this.camY = clamp(this.h.y - 165, 0, this.WH - H); this.camX = camClamp(0, SW);
     this.drops = [0, 400, 800].map(o => ({ t: o })); this.rat = null; this.dust = []; this.stink = 0;
     irisFrom(this.h.x - this.camX, this.h.y - this.camY - 14);
   },
@@ -5514,7 +5553,7 @@ scenes.prologue = {
     this.camY = lerp(this.camY, target, Math.min(1, dt / 160));
     const sx = h.x - this.camX; let tx = this.camX;
     if (sx < 120) tx = h.x - 120; else if (sx > 280) tx = h.x - 280;
-    this.camX = lerp(this.camX, clamp(tx, 0, SW - W), Math.min(1, dt / 200));
+    this.camX = lerp(this.camX, camClamp(tx, SW), Math.min(1, dt / 200));
   },
 
   /* ---------- квартира ---------- */
@@ -5920,7 +5959,7 @@ function drawHouseItem(id, k, t) {
 
 function drawHouseMap(t, anim) {
   if (!HOUSE_ART.built) buildHouseArt();
-  sprite(HOUSE_ART.bg, 0, 0);
+  sprite(wide(HOUSE_ART.bg), -OX, 0);
   text('14', 177, 158, { size: 6, col: '#f4f3ee', align: 'center' });
   if (Math.random() < 1 / 40) { const w = pick(Math.random, HOUSE_ART.win); w.on = !w.on; }
   for (const w of HOUSE_ART.win) drawHouseWindow(w, t);
@@ -5957,7 +5996,7 @@ function drawHouseMap(t, anim) {
       for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, d = 4 + k * 18; ctx.globalAlpha = 1 - k; rect(Math.round(cx + Math.cos(a) * d), Math.round(cy + Math.sin(a) * d * .6), 2, 2, i % 2 ? '#e8dcc8' : '#b9aec8'); }
       ctx.globalAlpha = 1; }
   }
-  if (HOUSE_ART.fg) sprite(HOUSE_ART.fg, 0, 0);
+  if (HOUSE_ART.fg) sprite(wide(HOUSE_ART.fg), -OX, 0);
 }
 
 const GEAR_CACHE = new Map();
@@ -6124,7 +6163,7 @@ scenes.inside = {
     look[HOUSE.heroApt] = { col: '#2f6f62', kind: 'metal' };
     this.bg = drawStairwell(this.floors, a => look[a], this.fixed);
     const heroF = Math.ceil(HOUSE.heroApt / HOUSE.perFloor);
-    this.camY = clamp(floorBase(heroF, this.floors) - 150, 0, this.bg.height - H); this.camX = 0; this.vy = 0; this.vx = 0; this.drag = null;
+    this.camY = clamp(floorBase(heroF, this.floors) - 150, 0, this.bg.height - H); this.camX = camClamp(0, SW); this.vy = 0; this.vx = 0; this.drag = null;
     setTouch({ up: true, down: true });
   },
   update(dt) {
@@ -6135,7 +6174,7 @@ scenes.inside = {
     if (pointer.down && pointer.y > 20) { if (!this.drag) this.drag = { x: pointer.x, y: pointer.y, cx: this.camX, cy: this.camY };
       else { this.camY = this.drag.cy - (pointer.y - this.drag.y); this.camX = this.drag.cx - (pointer.x - this.drag.x); } }
     else this.drag = null;
-    this.camY = clamp(this.camY, 0, this.bg.height - H); this.camX = clamp(this.camX, 0, SW - W);
+    this.camY = clamp(this.camY, 0, this.bg.height - H); this.camX = camClamp(this.camX, SW);
     if (hit('back')) irisTo(W / 2, 120, () => go('house'));
   },
   draw(dt) {
@@ -6519,7 +6558,7 @@ scenes.quiz = {
   },
   drawWorld(dt = 16) {
     const cx = Math.round(this.cam), GY = QZ.GY, t = this.t;
-    for (let x = -(cx % 240); x < W; x += 240) ctx.drawImage(QZ.wall, x, 0);
+    for (let x = -(cx % 240) - 240; x < W + OX; x += 240) ctx.drawImage(QZ.wall, x, 0);
     // декор по модулям 240 px: окно / объявления / щиток — по хешу номера модуля
     const m0 = Math.floor(cx / 240) - 1;
     for (let m = m0; m < m0 + 4; m++) { const h = hash(m), x = m * 240 - cx;
@@ -6532,7 +6571,7 @@ scenes.quiz = {
     // пол: кафель в перспективе, блики от ламп
     for (let y = GY; y < H; y++) { const k = (y - GY) / (H - GY); rect(0, y, W, 1, `rgb(${70 - k * 22 | 0},${82 - k * 26 | 0},${76 - k * 24 | 0})`); }
     for (const yy of [3, 8, 15, 25, 39]) rect(0, GY + yy, W, 1, 'rgba(40,50,46,.6)');
-    const vx = W / 2; for (let wx = Math.floor(cx / 36) * 36 - 36; wx < cx + W + 72; wx += 36) { const sx = wx - cx, bx = vx + (sx - vx) * 1.9;
+    const vx = W / 2; for (let wx = Math.floor(cx / 36) * 36 - 108; wx < cx + W + 72 + OX; wx += 36) { const sx = wx - cx, bx = vx + (sx - vx) * 1.9;
       ctx.strokeStyle = 'rgba(40,50,46,.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(sx + .5, GY); ctx.lineTo(bx + .5, H); ctx.stroke(); }
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     for (let m = m0; m < m0 + 4; m++) { const x = m * 240 + 120 - cx; ctx.globalAlpha = .7; ctx.drawImage(QZ.pool, x - 80, GY + 1); ctx.globalAlpha = 1; ctx.drawImage(QZ.streak, x - 8, GY + 2); }
@@ -6581,8 +6620,8 @@ scenes.quiz = {
     }
     // передний план с параллаксом и виньетка
     const fx = -((cx * 1.6) % 1100);
-    for (let x = fx; x < W; x += 1100) ctx.drawImage(QZ.fg, x, H - 34);
-    ctx.drawImage(QZ.vig, 0, 0);
+    for (let x = fx - 1100; x < W + OX; x += 1100) ctx.drawImage(QZ.fg, x, H - 34);
+    ctx.drawImage(QZ.vig, -OX, 0, FW, H);
     // HUD
     rect(0, 0, W, 20, 'rgba(14,16,20,.88)');
     if (button('II', 0, 2, 'dark', { left: 2, w: 16 })) { this.paused = true; this.pset = false; }

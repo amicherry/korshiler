@@ -146,12 +146,12 @@ function buildNight() {
 function drawNight(dt) {
   if (NIGHT.lang !== LANG) buildNight();
   NIGHT.t += dt; const t = NIGHT.t;
-  sprite(NIGHT.sky, 0, 0);
+  sprite(wide(NIGHT.sky), -OX, 0);
   for (const s of NIGHT.stars) { ctx.globalAlpha = .4 + .6 * Math.abs(Math.sin(t / 900 + s.ph)); rect(s.x, s.y, s.big ? 2 : 1, s.big ? 2 : 1, '#dfe6f2'); }
   ctx.globalAlpha = 1;
   const px = (t / 24) % (W + 240) - 120;
   if (px > 0 && px < W) { const py = 30 + px * .04; rect(px, py, 3, 1, '#7f8fb0'); if (Math.floor(t / 450) % 2) rect(px + 3, py, 1, 1, '#ff5a4a'); }
-  sprite(NIGHT.mid, 0, 0);
+  sprite(wide(NIGHT.mid), -OX, 0);
   for (const b of NIGHT.blinkers) if (Math.sin(t / 380 + b.ph) > .3) rect(b.x, b.y, 1, 1, '#ff4a3a');
   // свет в окнах то гаснет, то загорается
   if (t > NIGHT.next) {
@@ -179,7 +179,7 @@ function drawNight(dt) {
     rect(x - 5, y - 17, 3, 7, '#cfd6e4'); rect(x - 4, y - 18, 4, 1, '#cfd6e4'); rect(x - 2, y - 15, 3, 1, '#8792ad');
     if (Math.sin(t / 300) > 0) rect(x, y - 13, 1, 1, '#ff4a3a');
   }
-  sprite(NIGHT.fg, 0, 0);
+  sprite(wide(NIGHT.fg), -OX, 0);
   
   for (const s of NIGHT.snow) { s.y += s.v * dt; s.x += s.dx * dt + Math.sin(t / 500 + s.y / 25) * .1; if (s.y > H) { s.y = -2; s.x = Math.random() * W; } rect(Math.round(s.x), Math.round(s.y), s.big ? 2 : 1, 1, s.c); }
 }

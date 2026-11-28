@@ -350,7 +350,7 @@ scenes.quiz = {
   },
   drawWorld(dt = 16) {
     const cx = Math.round(this.cam), GY = QZ.GY, t = this.t;
-    for (let x = -(cx % 240); x < W; x += 240) ctx.drawImage(QZ.wall, x, 0);
+    for (let x = -(cx % 240) - 240; x < W + OX; x += 240) ctx.drawImage(QZ.wall, x, 0);
     // декор по модулям 240 px: окно / объявления / щиток — по хешу номера модуля
     const m0 = Math.floor(cx / 240) - 1;
     for (let m = m0; m < m0 + 4; m++) { const h = hash(m), x = m * 240 - cx;
@@ -363,7 +363,7 @@ scenes.quiz = {
     // пол: кафель в перспективе, блики от ламп
     for (let y = GY; y < H; y++) { const k = (y - GY) / (H - GY); rect(0, y, W, 1, `rgb(${70 - k * 22 | 0},${82 - k * 26 | 0},${76 - k * 24 | 0})`); }
     for (const yy of [3, 8, 15, 25, 39]) rect(0, GY + yy, W, 1, 'rgba(40,50,46,.6)');
-    const vx = W / 2; for (let wx = Math.floor(cx / 36) * 36 - 36; wx < cx + W + 72; wx += 36) { const sx = wx - cx, bx = vx + (sx - vx) * 1.9;
+    const vx = W / 2; for (let wx = Math.floor(cx / 36) * 36 - 108; wx < cx + W + 72 + OX; wx += 36) { const sx = wx - cx, bx = vx + (sx - vx) * 1.9;
       ctx.strokeStyle = 'rgba(40,50,46,.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(sx + .5, GY); ctx.lineTo(bx + .5, H); ctx.stroke(); }
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     for (let m = m0; m < m0 + 4; m++) { const x = m * 240 + 120 - cx; ctx.globalAlpha = .7; ctx.drawImage(QZ.pool, x - 80, GY + 1); ctx.globalAlpha = 1; ctx.drawImage(QZ.streak, x - 8, GY + 2); }
@@ -412,8 +412,8 @@ scenes.quiz = {
     }
     // передний план с параллаксом и виньетка
     const fx = -((cx * 1.6) % 1100);
-    for (let x = fx; x < W; x += 1100) ctx.drawImage(QZ.fg, x, H - 34);
-    ctx.drawImage(QZ.vig, 0, 0);
+    for (let x = fx - 1100; x < W + OX; x += 1100) ctx.drawImage(QZ.fg, x, H - 34);
+    ctx.drawImage(QZ.vig, -OX, 0, FW, H);
     // HUD
     rect(0, 0, W, 20, 'rgba(14,16,20,.88)');
     if (button('II', 0, 2, 'dark', { left: 2, w: 16 })) { this.paused = true; this.pset = false; }

@@ -256,7 +256,7 @@ function drawHouseItem(id, k, t) {
 
 function drawHouseMap(t, anim) {
   if (!HOUSE_ART.built) buildHouseArt();
-  sprite(HOUSE_ART.bg, 0, 0);
+  sprite(wide(HOUSE_ART.bg), -OX, 0);
   text('14', 177, 158, { size: 6, col: '#f4f3ee', align: 'center' });
   if (Math.random() < 1 / 40) { const w = pick(Math.random, HOUSE_ART.win); w.on = !w.on; }
   for (const w of HOUSE_ART.win) drawHouseWindow(w, t);
@@ -293,7 +293,7 @@ function drawHouseMap(t, anim) {
       for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, d = 4 + k * 18; ctx.globalAlpha = 1 - k; rect(Math.round(cx + Math.cos(a) * d), Math.round(cy + Math.sin(a) * d * .6), 2, 2, i % 2 ? '#e8dcc8' : '#b9aec8'); }
       ctx.globalAlpha = 1; }
   }
-  if (HOUSE_ART.fg) sprite(HOUSE_ART.fg, 0, 0);
+  if (HOUSE_ART.fg) sprite(wide(HOUSE_ART.fg), -OX, 0);
 }
 
 const GEAR_CACHE = new Map();

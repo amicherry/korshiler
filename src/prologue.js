@@ -142,7 +142,7 @@ scenes.prologue = {
     this.moving = !!dir;
     if (dir) { this.dir = dir; this.hx = clamp(this.hx + dir * dt * .07, 8, SWS - 10); this.walkT += dt; this.stepAcc += dt; if (this.stepAcc > 240) { this.stepAcc = 0; sfx.step(); } }
     const sx = this.hx - this.scx; let tx = this.scx; if (sx < 140) tx = this.hx - 140; else if (sx > 260) tx = this.hx - 260;
-    this.scx = lerp(this.scx, clamp(tx, 0, SWS - W), Math.min(1, dt / 200));
+    this.scx = lerp(this.scx, camClamp(tx, SWS), Math.min(1, dt / 200));
     const atDoor = Math.abs(this.hx - STREET_DOOR_X) < 10;
     setTouch({ act: atDoor ? L(PRO.enter) : null, move: true });
     if (atDoor && (hit('act') || (this.plan == null && this.tapDoor))) this.enterHouse();
@@ -164,7 +164,7 @@ scenes.prologue = {
     this.bg = this.preBg || this.makeStairs();
     this.WH = this.bg.height;
     this.h = { x: 14, floor: 1, y: this.base(1), dir: 1, walkT: 0, moving: false, climb: null, anim: null };
-    this.camY = clamp(this.h.y - 165, 0, this.WH - H); this.camX = 0;
+    this.camY = clamp(this.h.y - 165, 0, this.WH - H); this.camX = camClamp(0, SW);
     this.drops = [0, 400, 800].map(o => ({ t: o })); this.rat = null; this.dust = []; this.stink = 0;
     irisFrom(this.h.x - this.camX, this.h.y - this.camY - 14);
   },
@@ -284,7 +284,7 @@ scenes.prologue = {
     this.camY = lerp(this.camY, target, Math.min(1, dt / 160));
     const sx = h.x - this.camX; let tx = this.camX;
     if (sx < 120) tx = h.x - 120; else if (sx > 280) tx = h.x - 280;
-    this.camX = lerp(this.camX, clamp(tx, 0, SW - W), Math.min(1, dt / 200));
+    this.camX = lerp(this.camX, camClamp(tx, SW), Math.min(1, dt / 200));
   },
 
   /* ---------- квартира ---------- */
