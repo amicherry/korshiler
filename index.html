@@ -124,8 +124,11 @@ if (isTouch) document.documentElement.classList.add('touch');
 function fit() {
   const wrap = document.getElementById('wrap');
   // Telegram во весь экран: сверху строка состояния и полоса с кнопками «Закрыть» / «⌄ ⋯» — игра встаёт ниже них
-  // в Telegram тоже на весь экран: кнопки «Закрыть» и «⌄ ⋯» лежат поверх игры (так решили — игра и кнопки крупнее)
-  const top = 0;
+  // в Telegram почти на весь экран: отступ только под строку с часами и батареей,
+  // кнопки «Закрыть» и «⌄ ⋯» лежат поверх игры (так решили — игра и кнопки крупнее); игра всегда по центру
+  let ti = null; try { ti = typeof tgInsets === 'function' ? tgInsets() : null; } catch (e) {}
+  const top = ti ? Math.round(ti.safe) : 0;
+  wrap.style.paddingTop = top ? top + 'px' : ''; wrap.style.alignItems = '';
   const k = Math.min(wrap.clientWidth / FW, (wrap.clientHeight - top) / H);
   cv.style.width = Math.floor(FW * k) + 'px';
   cv.style.height = Math.floor(H * k) + 'px';
