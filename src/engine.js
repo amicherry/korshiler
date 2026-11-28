@@ -9,9 +9,12 @@ const W = 400, H = 225, S = 3;
 // а холст шире — FW (до 520) под пропорцию телефона. Слева и справа по OX логических пикселей —
 // там продолжаются фон, улица и подъезд. Для проверки ширину можно задать в ссылке: ?fw=480
 const FW = (() => { try { const q = +new URLSearchParams(location.search).get('fw'); if (q) return Math.max(W, Math.min(560, Math.round(q / 2) * 2));
-  const a = Math.max(innerWidth, innerHeight), b = Math.max(1, Math.min(innerWidth, innerHeight));
+  // на телефоне берём пропорцию самого экрана: окно Telegram при загрузке ещё может быть не развёрнуто
+  const sw = isTouchDev() && screen.width && screen.height, ww = sw ? screen.width : innerWidth, hh = sw ? screen.height : innerHeight;
+  const a = Math.max(ww, hh), b = Math.max(1, Math.min(ww, hh));
   return Math.max(W, Math.min(520, Math.round(H * a / b / 2) * 2)); } catch (e) { return W; } })();
 const OX = (FW - W) / 2;
+function isTouchDev() { return matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0; }
 const FONT = '"Press Start 2P", monospace';
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
@@ -25,7 +28,8 @@ function fit() {
   // в Telegram почти на весь экран: отступ только под строку с часами и батареей,
   // кнопки «Закрыть» и «⌄ ⋯» лежат поверх игры (так решили — игра и кнопки крупнее); игра всегда по центру
   let ti = null; try { ti = typeof tgInsets === 'function' ? tgInsets() : null; } catch (e) {}
-  const top = ti ? Math.round(ti.safe) : 0;
+  // в Telegram на телефоне сверху строка с часами: Telegram не всегда сообщает её высоту, поэтому не меньше 28 px
+  const top = ti && isTouchDev() ? Math.max(28, Math.round(ti.safe)) : 0;
   wrap.style.paddingTop = top ? top + 'px' : ''; wrap.style.alignItems = '';
   const k = Math.min(wrap.clientWidth / FW, (wrap.clientHeight - top) / H);
   cv.style.width = Math.floor(FW * k) + 'px';

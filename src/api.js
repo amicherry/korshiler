@@ -29,7 +29,6 @@ function tgInsets() {
   const css = n => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)) || 0;
   const safe = (TG.safeAreaInset && TG.safeAreaInset.top) || css('--tg-safe-area-inset-top');
   const content = (TG.contentSafeAreaInset && TG.contentSafeAreaInset.top) || css('--tg-content-safe-area-inset-top');
-  if (!safe && !content) return null;
   return { safe, content, pill: 140 };
 }
 const TG_T = {
